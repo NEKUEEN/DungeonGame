@@ -1,0 +1,88 @@
+{
+  "monsters": [
+    {
+      "id": "rat",
+      "name": "Rat",
+      "family": "Rat",
+      "rank": "Normal",
+      "sprite": "rat.png",
+      "hp": 6, "attack": 3, "defense": 0, "exp": 1,
+      "drops": [
+        { "item": "magic_stone", "chance": 0.55 },
+        { "item": "rat_core",    "chance": 0.12 }
+      ]
+    },
+    {
+      "id": "goblin_warrior",
+      "name": "Goblin Warrior",
+      "family": "Goblin",
+      "rank": "Normal",
+      "sprite": "goblin.png",
+      "hp": 12, "attack": 5, "defense": 1, "exp": 1,
+      "drops": [
+        { "item": "magic_stone", "chance": 0.60 },
+        { "item": "goblin_core", "chance": 0.15 }
+      ]
+    },
+    {
+      "id": "goblin_archer",
+      "name": "Goblin Archer",
+      "family": "Goblin",
+      "rank": "Normal",
+      "sprite": "goblin.png",
+      "hp": 10, "attack": 6, "defense": 0, "exp": 1,
+      "drops": [
+        { "item": "magic_stone", "chance": 0.60 },
+        { "item": "goblin_core", "chance": 0.15 }
+      ]
+    },
+    {
+      "id": "goblin_wizard",
+      "name": "Goblin Wizard",
+      "family": "Goblin",
+      "rank": "Elite",
+      "sprite": "goblin.png",
+      "hp": 20, "attack": 9, "defense": 2, "exp": 2,
+      "drops": [
+        { "item": "magic_stone", "chance": 0.80 },
+        { "item": "goblin_core", "chance": 0.35 }
+      ]
+    },
+    {
+      "id": "goblin_hero",
+      "name": "Goblin Hero",
+      "family": "Goblin",
+      "rank": "Elite",
+      "sprite": "goblin.png",
+      "hp": 25, "attack": 10, "defense": 4, "exp": 2,
+      "drops": [
+        { "item": "magic_stone", "chance": 0.80 },
+        { "item": "goblin_core", "chance": 0.35 }
+      ]
+    },
+    {
+      "id": "goblin_elder",
+      "name": "Goblin Elder",
+      "family": "Goblin",
+      "rank": "Boss",
+      "sprite": "goblin.png",
+      "hp": 60, "attack": 18, "defense": 8, "exp": 3,
+      "drops": [
+        { "item": "magic_stone", "chance": 1.00 },
+        { "item": "goblin_core", "chance": 0.75 }
+      ]
+    },
+    {
+      "id": "orc",
+      "name": "Orc",
+      "family": "Orc",
+      "rank": "Normal",
+      "sprite": "orc.png",
+      "hp": 22, "attack": 8, "defense": 3, "exp": 1,
+      "drops": [
+        { "item": "magic_stone", "chance": 0.60 },
+        { "item": "orc_core",    "chance": 0.12 }
+      ]
+    }
+  ]
+}

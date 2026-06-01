@@ -7,6 +7,7 @@ enum class ItemType
     Food, Potion,
     Helmet, BodyArmor, Gloves, Greaves, Boots,
     Weapon, OffWeapon,
+    Material,   // หินเวทย์, แกนมอน ฯลฯ
 };
 
 struct Item

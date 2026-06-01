@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": "magic_stone",
+      "name": "Magic Stone",
+      "type": "Material",
+      "desc": "A glowing stone imbued with magical energy.",
+      "value": 1,
+      "sprite": "item_magic_stone.png",
+      "stackable": true
+    },
+    {
+      "id": "goblin_core",
+      "name": "Goblin Core",
+      "type": "Core",
+      "desc": "The essence of a fallen goblin. Rare.",
+      "value": 5,
+      "sprite": "item_goblin_core.png",
+      "stackable": true
+    },
+    {
+      "id": "orc_core",
+      "name": "Orc Core",
+      "type": "Core",
+      "desc": "The essence of a fallen orc. Rare.",
+      "value": 8,
+      "sprite": "item_orc_core.png",
+      "stackable": true
+    },
+    {
+      "id": "rat_core",
+      "name": "Rat Core",
+      "type": "Core",
+      "desc": "The essence of a fallen rat.",
+      "value": 2,
+      "sprite": "item_rat_core.png",
+      "stackable": true
+    }
+  ]
+}

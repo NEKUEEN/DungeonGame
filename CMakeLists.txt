@@ -20,7 +20,7 @@ set(SOURCES
 )
 
 add_executable(DungeonGame ${SOURCES})
-target_include_directories(DungeonGame PRIVATE src)
+target_include_directories(DungeonGame PRIVATE src src/lib)
 target_link_libraries(DungeonGame PRIVATE SFML::Graphics SFML::Window SFML::System)
 
 add_custom_command(TARGET DungeonGame POST_BUILD

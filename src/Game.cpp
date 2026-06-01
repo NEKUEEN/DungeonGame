@@ -1,5 +1,7 @@
 #include "Game.hpp"
 #include "TextureManager.hpp"
+#include "MonsterDB.hpp"
+#include "DropTable.hpp"
 #include <iostream>
 #include <cstdlib>
 #include <algorithm>
@@ -18,7 +20,13 @@ Game::Game()
     // โหลด textures ทั้งหมดครั้งเดียว
     TextureManager::instance().loadAll();
 
-    m_gameView.setSize({(float)GAME_VIEW_W*1.1f,(float)GAME_VIEW_H*1.1f});
+    // โหลด monster database (จะ register drops อัตโนมัติ)
+    MonsterDB::instance().load("assets/data/monsters.json");
+
+    // โหลด item database
+    DropTable::instance().loadItems("assets/data/items.json");
+
+    m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
     m_gameView.setViewport(sf::FloatRect({0.f,0.f},
         {(float)GAME_VIEW_W/WINDOW_W,(float)GAME_VIEW_H/WINDOW_H}));
     m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
@@ -94,7 +102,13 @@ void Game::spawnEnemy(int floor)
         if (m_player){int dx=col-m_player->getCol(),dy=row-m_player->getRow();if(dx*dx+dy*dy<36)continue;}
         int r=std::rand()%100;
         EnemyRank rank=r<5?EnemyRank::Boss:r<30?EnemyRank::Elite:EnemyRank::Normal;
-        m_enemies.push_back(new Enemy((EnemyType)(std::rand()%3),rank,col,row,TILE_SIZE,floor));
+        // เลือก monster id จาก MonsterDB ตาม rank
+        std::string rankStr = rank==EnemyRank::Boss?"Boss":
+                              rank==EnemyRank::Elite?"Elite":"Normal";
+        auto ids = MonsterDB::instance().getByRank(rankStr);
+        if (ids.empty()) return;
+        std::string monsterId = ids[std::rand() % ids.size()];
+        m_enemies.push_back(new Enemy(monsterId, col, row, TILE_SIZE, floor));
         return;
     }
 }
@@ -329,7 +343,27 @@ void Game::playerAttack(Enemy* enemy)
     addLog("> You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!",sf::Color(255,200,50));
     if (enemy->isDead())
     {
-        addLog("> "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
+        addLog("> "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",
+               sf::Color(220,80,80));
+
+        // สุ่ม drop
+        auto dropped = DropTable::instance().roll(enemy->getId());
+        for (const auto& itemId : dropped)
+        {
+            const ItemData* idata = DropTable::instance().getItem(itemId);
+            if (!idata) continue;
+
+            Item drop;
+            drop.type  = ItemType::Material;
+            drop.name  = idata->name;
+            drop.desc  = idata->desc;
+            drop.value = idata->value;
+            drop.col   = enemy->getCol();
+            drop.row   = enemy->getRow();
+            m_mapItems.push_back(drop);
+            addLog("> Dropped: " + idata->name, sf::Color(180,220,255));
+        }
+
         if (m_player->addExp(enemy->getExp()))
         {
             m_levelUpFlash=true; m_levelUpTimer=120;

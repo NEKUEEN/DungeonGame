@@ -59,6 +59,7 @@ sf::Color Item::color() const
         case ItemType::Gloves:    return sf::Color(120,90,60);
         case ItemType::Greaves:   return sf::Color(130,100,70);
         case ItemType::Boots:     return sf::Color(110,80,50);
+        case ItemType::Material:  return sf::Color(100,200,255);
         default:                  return sf::Color(200,200,200);
     }
 }
