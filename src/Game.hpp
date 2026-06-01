@@ -10,6 +10,7 @@
 #include "Inventory.hpp"
 #include "Equipment.hpp"
 #include "TextureManager.hpp"
+#include "CoreSlots.hpp"
 
 constexpr int WINDOW_W        = 860;
 constexpr int WINDOW_H        = 660;
@@ -48,7 +49,9 @@ private:
     void handlePlayerMove(int dc, int dr);
     void handleInventoryInput(sf::Keyboard::Key key);
     void tryPickupItem();
-    void useOrEquipSelected();    // ถ้า equipment → equip, ถ้า usable → use
+    void useOrEquipSelected();
+    void equipCore();          // ใส่แกนจาก inventory ไป core slot
+    void unequipCore();        // ถอดแกนจาก core slot กลับ inventory
     void dropSelectedItem();
     void tryDescendStairs();
     void tryAscendStairs();
@@ -80,11 +83,14 @@ private:
     std::vector<Item>    m_mapItems;
     Inventory            m_inventory;
     Equipment            m_equipment;
+    CoreSlots            m_coreSlots;
 
     // UI state
-    int  m_selectedSlot  = 0;
-    bool m_viewEquipment = false;  // toggle inventory / equipment view
+    int  m_selectedSlot      = 0;
+    bool m_viewEquipment     = false;
     int  m_selectedEquipSlot = 0;
+    int  m_selectedCoreSlot  = 0;
+    bool m_viewCores         = false;
 
     int  m_dungeonFloor  = 1;
     int  m_respawnTimer  = 0;

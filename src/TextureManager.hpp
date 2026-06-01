@@ -50,7 +50,11 @@ public:
         load("item_armor",   "assets/textures/item_armor.png");
         load("item_gloves",  "assets/textures/item_gloves.png");
         load("item_greaves", "assets/textures/item_greaves.png");
-        load("item_boots",   "assets/textures/item_boots.png");
+        load("item_boots",       "assets/textures/item_boots.png");
+        load("item_magic_stone", "assets/textures/item_magic_stone.png");
+        load("item_goblin_core", "assets/textures/item_goblin_core.png");
+        load("item_orc_core",    "assets/textures/item_orc_core.png");
+        load("item_rat_core",    "assets/textures/item_rat_core.png");
     }
 
 private:

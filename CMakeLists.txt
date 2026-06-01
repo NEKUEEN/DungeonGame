@@ -17,6 +17,7 @@ set(SOURCES
     src/Item.cpp
     src/Inventory.cpp
     src/Equipment.cpp
+    src/CoreSlots.cpp
 )
 
 add_executable(DungeonGame ${SOURCES})

@@ -13,28 +13,61 @@
       "id": "goblin_core",
       "name": "Goblin Core",
       "type": "Core",
-      "desc": "The essence of a fallen goblin. Rare.",
+      "desc": "Essence of a goblin. Grants cunning.",
       "value": 5,
       "sprite": "item_goblin_core.png",
-      "stackable": true
+      "stackable": true,
+      "core_stats": {
+        "body": 0,
+        "mentality": 3,
+        "ability": 1,
+        "battle_index": 5
+      }
+    },
+    {
+      "id": "goblinWarrior_core",
+      "name": "Goblin Warrior Core",
+      "type": "Core",
+      "desc": "Essence of a goblin warrior. Grants cunning and combat skills.",
+      "value": 5,
+      "sprite": "item_goblin_core.png",
+      "stackable": true,
+      "core_stats": {
+        "body": 10,
+        "mentality": 3,
+        "ability": 1,
+        "battle_index": 5
+      }
     },
     {
       "id": "orc_core",
       "name": "Orc Core",
       "type": "Core",
-      "desc": "The essence of a fallen orc. Rare.",
-      "value": 8,
+      "desc": "Essence of an orc. Grants brute strength.",
+      "value": 18,
       "sprite": "item_orc_core.png",
-      "stackable": true
+      "stackable": true,
+      "core_stats": {
+        "body": 5,
+        "mentality": 0,
+        "ability": 0,
+        "battle_index": 8
+      }
     },
     {
       "id": "rat_core",
       "name": "Rat Core",
       "type": "Core",
-      "desc": "The essence of a fallen rat.",
+      "desc": "Essence of a rat. Grants minor agility.",
       "value": 2,
       "sprite": "item_rat_core.png",
-      "stackable": true
+      "stackable": true,
+      "core_stats": {
+        "body": 1,
+        "mentality": 1,
+        "ability": 0,
+        "battle_index": 2
+      }
     }
   ]
 }

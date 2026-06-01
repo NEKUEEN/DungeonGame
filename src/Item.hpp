@@ -7,7 +7,8 @@ enum class ItemType
     Food, Potion,
     Helmet, BodyArmor, Gloves, Greaves, Boots,
     Weapon, OffWeapon,
-    Material,   // หินเวทย์, แกนมอน ฯลฯ
+    Core,       // แกนมอน — ใส่ Core Slots ได้
+    Material,   // หินเวทย์ ฯลฯ — ไว้ขาย ไม่ equip
 };
 
 struct Item
@@ -15,6 +16,7 @@ struct Item
     ItemType    type;
     std::string name;
     std::string desc;
+    std::string spriteName;  // ชื่อไฟล์ png เช่น "item_goblin_core.png"
     int         value   = 0;
     int         col     = -1;
     int         row     = -1;
@@ -27,6 +29,8 @@ struct Item
 
     sf::Color   color()       const;
     bool        isUsable()    const { return type==ItemType::Food||type==ItemType::Potion; }
-    bool        isEquipment() const { return !isUsable(); }
+    bool        isEquipment() const { return !isUsable()&&type!=ItemType::Material&&type!=ItemType::Core; }
+    bool        isCore()      const { return type==ItemType::Core; }
+    bool        isMaterial()  const { return type==ItemType::Material; }
     std::string spritePath()  const;  // path ของ texture
 };

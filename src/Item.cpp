@@ -60,12 +60,17 @@ sf::Color Item::color() const
         case ItemType::Greaves:   return sf::Color(130,100,70);
         case ItemType::Boots:     return sf::Color(110,80,50);
         case ItemType::Material:  return sf::Color(100,200,255);
+        case ItemType::Core:      return sf::Color(180,100,255);
         default:                  return sf::Color(200,200,200);
     }
 }
 
 std::string Item::spritePath() const
 {
+    // ถ้ามี spriteName กำหนดไว้ใช้เลย (สำหรับ Material/Core ที่ drop จากมอน)
+    if (!spriteName.empty())
+        return "assets/textures/" + spriteName;
+
     switch(type)
     {
         case ItemType::Food:      return "assets/textures/item_food.png";
@@ -77,6 +82,7 @@ std::string Item::spritePath() const
         case ItemType::Gloves:    return "assets/textures/item_gloves.png";
         case ItemType::Greaves:   return "assets/textures/item_greaves.png";
         case ItemType::Boots:     return "assets/textures/item_boots.png";
+        case ItemType::Material:  return "assets/textures/item_magic_stone.png";
         default:                  return "assets/textures/item_food.png";
     }
 }

@@ -72,7 +72,9 @@ void Game::newDungeon(bool keepPlayer)
 
     if (m_player) m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
     updateCamera();
-    m_selectedSlot=0; m_viewEquipment=false;
+    m_selectedSlot=0; m_viewEquipment=false; m_viewCores=false;
+    // core slots = level ของ player
+    if (m_player) m_coreSlots.setSlotCount(m_player->getStats().level);
 
     if (keepPlayer)
         addLog("> Floor "+std::to_string(m_dungeonFloor)+" — Deeper...", sf::Color(180,140,60));
@@ -180,18 +182,36 @@ void Game::processEvents()
                 case sf::Keyboard::Key::D:  dropSelectedItem();         break;
                 case sf::Keyboard::Key::E:
                     m_viewEquipment=!m_viewEquipment;
+                    m_viewCores=false;
                     addLog(m_viewEquipment?"> Equipment view":"> Inventory view",
                            sf::Color(160,160,160));
+                    break;
+                case sf::Keyboard::Key::C:
+                    m_viewCores=!m_viewCores;
+                    m_viewEquipment=false;
+                    addLog(m_viewCores?"> Core Slots view":"> Inventory view",
+                           sf::Color(100,200,255));
+                    break;
+                // Core slot navigation
+                case sf::Keyboard::Key::LBracket:
+                    if (m_viewCores && m_selectedCoreSlot>0) m_selectedCoreSlot--;
+                    break;
+                case sf::Keyboard::Key::RBracket:
+                    if (m_viewCores && m_selectedCoreSlot<m_coreSlots.getSlotCount()-1)
+                        m_selectedCoreSlot++;
+                    break;
+                case sf::Keyboard::Key::X:
+                    if (m_viewCores) unequipCore();
                     break;
                 case sf::Keyboard::Key::Period: tryDescendStairs();     break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();      break;
                 case sf::Keyboard::Key::Space:  waitTurn();             break;
-                case sf::Keyboard::Key::Num1: m_selectedSlot=0; useOrEquipSelected(); break;
-                case sf::Keyboard::Key::Num2: m_selectedSlot=1; useOrEquipSelected(); break;
-                case sf::Keyboard::Key::Num3: m_selectedSlot=2; useOrEquipSelected(); break;
-                case sf::Keyboard::Key::Num4: m_selectedSlot=3; useOrEquipSelected(); break;
-                case sf::Keyboard::Key::Num5: m_selectedSlot=4; useOrEquipSelected(); break;
-                case sf::Keyboard::Key::Num6: m_selectedSlot=5; useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num1: m_selectedSlot=0; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num2: m_selectedSlot=1; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num3: m_selectedSlot=2; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num4: m_selectedSlot=3; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num5: m_selectedSlot=4; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num6: m_selectedSlot=5; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Tab:
                     m_selectedSlot=(m_selectedSlot+1)%MAX_INVENTORY; break;
                 default: break;
@@ -269,26 +289,64 @@ void Game::useOrEquipSelected()
          addLog("> Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(80,180,220));}
         m_inventory.removeItem(m_selectedSlot);
     }
-    else
+    else if (item->isCore())
     {
-        // Equipment → ใส่ใน equip slot ที่เหมาะสม
+        equipCore();  // Core → ใส่ Core Slots อัตโนมัติ
+    }
+    else if (item->isMaterial())
+    {
+        addLog("> "+item->name+" is a trade item. (sell to NPC)",sf::Color(160,160,160));
+    }
+    else if (item->isEquipment())
+    {
         EquipSlot slot=Equipment::itemToSlot(*item);
-
-        // ถ้า slot มีของอยู่แล้ว → เอาออกมาใส่กระเป๋าก่อน
         if (m_equipment.hasItem(slot))
         {
             Item old=m_equipment.unequip(slot);
             if (!m_inventory.isFull()) m_inventory.addItem(old);
-            else { addLog("> Inventory full! Unequip failed.",sf::Color(220,120,50)); return; }
+            else { addLog("> Inventory full!",sf::Color(220,120,50)); return; }
         }
-
         Item toEquip=*item;
         m_inventory.removeItem(m_selectedSlot);
         m_equipment.equip(toEquip,slot);
-
         addLog("> Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
                std::to_string(toEquip.value),sf::Color(180,220,180));
     }
+}
+
+void Game::equipCore()
+{
+    Item* item = m_inventory.getItem(m_selectedSlot);
+    if (!item || !item->isCore())
+    { addLog("> Not a core item!"); return; }
+
+    // หา slot ว่าง
+    int freeSlot = -1;
+    for (int i=0; i<m_coreSlots.getSlotCount(); ++i)
+        if (!m_coreSlots.hasCore(i)) { freeSlot=i; break; }
+
+    if (freeSlot == -1)
+    { addLog("> All core slots full! Level up for more slots.", sf::Color(220,120,50)); return; }
+
+    Item core = *item;
+    m_inventory.removeItem(m_selectedSlot);
+    m_coreSlots.equip(freeSlot, core);
+    addLog("> Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),
+           sf::Color(100,200,255));
+}
+
+void Game::unequipCore()
+{
+    if (!m_coreSlots.hasCore(m_selectedCoreSlot))
+    { addLog("> No core in slot "+std::to_string(m_selectedCoreSlot+1)); return; }
+
+    if (m_inventory.isFull())
+    { addLog("> Inventory full!"); return; }
+
+    Item core = m_coreSlots.unequip(m_selectedCoreSlot);
+    m_inventory.addItem(core);
+    addLog("> Removed "+core.name+" from core slot "+std::to_string(m_selectedCoreSlot+1),
+           sf::Color(160,160,160));
 }
 
 void Game::dropSelectedItem()
@@ -337,7 +395,8 @@ void Game::handlePlayerMove(int dc, int dr)
 void Game::playerAttack(Enemy* enemy)
 {
     Stats& s=m_player->getStats();
-    int atk=s.body/5+m_equipment.getTotalAtkBonus();
+    CoreStats cb = m_coreSlots.getTotalBonus();
+    int atk=(s.body+cb.body)/5+m_equipment.getTotalAtkBonus();
     int dmg=std::max(1,atk+std::rand()%4-enemy->getDefense());
     enemy->takeDamage(dmg);
     addLog("> You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!",sf::Color(255,200,50));
@@ -354,12 +413,14 @@ void Game::playerAttack(Enemy* enemy)
             if (!idata) continue;
 
             Item drop;
-            drop.type  = ItemType::Material;
-            drop.name  = idata->name;
-            drop.desc  = idata->desc;
-            drop.value = idata->value;
-            drop.col   = enemy->getCol();
-            drop.row   = enemy->getRow();
+            // แยก Core กับ Material จาก type ใน items.json
+            drop.type       = (idata->type == "Core") ? ItemType::Core : ItemType::Material;
+            drop.name       = idata->name;
+            drop.desc       = idata->desc;
+            drop.value      = idata->value;
+            drop.spriteName = idata->sprite;
+            drop.col        = enemy->getCol();
+            drop.row        = enemy->getRow();
             m_mapItems.push_back(drop);
             addLog("> Dropped: " + idata->name, sf::Color(180,220,255));
         }
@@ -367,7 +428,9 @@ void Game::playerAttack(Enemy* enemy)
         if (m_player->addExp(enemy->getExp()))
         {
             m_levelUpFlash=true; m_levelUpTimer=120;
-            addLog("> *** LEVEL UP! Level "+std::to_string(m_player->getStats().level)+" ***",
+            int newLevel = m_player->getStats().level;
+            m_coreSlots.setSlotCount(newLevel);
+            addLog("> *** LEVEL UP! Level "+std::to_string(newLevel)+" - Core slot unlocked! ***",
                    sf::Color(255,255,50));
         }
     }
@@ -551,7 +614,7 @@ void Game::renderRightPanel()
 
     if (!m_fontLoaded) return;
 
-    if (!m_viewEquipment)
+    if (!m_viewEquipment && !m_viewCores)
     {
         // ---- Inventory Grid ----
         sf::Text title(m_font,"BAG  [E]=Equip view",9);
@@ -633,9 +696,32 @@ void Game::renderRightPanel()
         infoTxt.setPosition({panelX+8.f,sy0+ROWS*(SZ+GAP)+4.f});
         m_window.draw(infoTxt);
     }
-    else
+    else if (m_viewCores)
     {
-        // ---- Equipment Slots ----
+        // ---- Core Slots View ----
+        m_coreSlots.render(m_window, m_font,
+                           panelX+8.f, panelY+20.f, (float)RIGHT_PANEL_W,
+                           m_selectedCoreSlot, true);
+
+        // hints
+        if (m_fontLoaded)
+        {
+            CoreStats cb = m_coreSlots.getTotalBonus();
+            float hy = panelY + INV_GRID_H - 55.f;
+            auto dh = [&](const std::string& t, sf::Color c=sf::Color(70,70,70))
+            {
+                sf::Text tx(m_font,t,8); tx.setFillColor(c);
+                tx.setPosition({panelX+8.f,hy}); m_window.draw(tx); hy+=12.f;
+            };
+            dh("Bonus: B+"+std::to_string(cb.body)+
+               " M+"+std::to_string(cb.mentality)+
+               " A+"+std::to_string(cb.ability), sf::Color(100,200,255));
+            dh("[C] Close  [U] Equip core");
+            dh("[X] Remove core");
+        }
+    }
+    else if (m_viewEquipment)
+    {
         sf::Text title(m_font,"EQUIPMENT  [E]=Bag",9);
         title.setFillColor(sf::Color(120,160,120));
         title.setPosition({panelX+8.f,panelY+6.f});
