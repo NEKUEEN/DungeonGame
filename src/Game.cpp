@@ -18,7 +18,7 @@ Game::Game()
     // โหลด textures ทั้งหมดครั้งเดียว
     TextureManager::instance().loadAll();
 
-    m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
+    m_gameView.setSize({(float)GAME_VIEW_W*1.1f,(float)GAME_VIEW_H*1.1f});
     m_gameView.setViewport(sf::FloatRect({0.f,0.f},
         {(float)GAME_VIEW_W/WINDOW_W,(float)GAME_VIEW_H/WINDOW_H}));
     m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
