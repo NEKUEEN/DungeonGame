@@ -5,25 +5,34 @@
 
 constexpr int MAX_INVENTORY = 12;
 
+// ============================================================
+//  ItemStack  –  item + จำนวน
+// ============================================================
+struct ItemStack
+{
+    Item item;
+    int  count = 1;
+};
+
 class Inventory
 {
 public:
     Inventory() = default;
 
-    bool addItem(const Item& item);           // return false ถ้าเต็ม
-    void removeItem(int index);
-    Item* getItem(int index);
-    int   size() const { return (int)m_items.size(); }
-    bool  isFull() const { return (int)m_items.size() >= MAX_INVENTORY; }
+    bool addItem(const Item& item);      // stack ถ้าเป็นประเภทเดียวกัน
+    void removeItem(int index);          // ลด count ทีละ 1 ถ้า count > 1 ถึงจะลบ slot
+    void removeStack(int index);         // ลบทั้ง stack
+    Item* getItem(int index);            // return item ใน slot
+    int   getCount(int index) const;     // จำนวนใน slot
+    int   size() const { return (int)m_stacks.size(); }
+    bool  isFull() const;                // เต็มเมื่อ slot ครบ MAX และ stack ไม่ตรง
 
-    // Render inventory popup
-    void render(sf::RenderWindow& window, const sf::Font& font,
-                int selectedIndex);
-
-    // weapon/armor ที่ equip อยู่
-    int equippedWeaponBonus  = 0;
-    int equippedArmorBonus   = 0;
+    // weapon/armor bonus
+    int equippedWeaponBonus = 0;
+    int equippedArmorBonus  = 0;
 
 private:
-    std::vector<Item> m_items;
+    bool canStack(const Item& a, const Item& b) const;  // stack ได้เฉพาะ usable
+
+    std::vector<ItemStack> m_stacks;
 };

@@ -574,11 +574,26 @@ void Game::renderRightPanel()
                     num.setPosition({sx+2.f,sy+1.f});
                     m_window.draw(num);
                 }
+                // แสดง stack count ถ้ามากกว่า 1
+                int cnt = m_inventory.getCount(idx);
+                if (cnt > 1)
+                {
+                    sf::Text countTxt(m_font,"x"+std::to_string(cnt),7);
+                    countTxt.setFillColor(sf::Color(255,220,100));
+                    countTxt.setPosition({sx+SZ-14.f, sy+SZ-10.f});
+                    m_window.draw(countTxt);
+                }
             }
         }
 
         Item* sel=m_inventory.getItem(m_selectedSlot);
-        std::string info=sel?sel->name+" ("+std::to_string(sel->value)+")":"(empty)";
+        std::string info="(empty)";
+        if (sel)
+        {
+            int cnt=m_inventory.getCount(m_selectedSlot);
+            info=sel->name+" ("+std::to_string(sel->value)+")";
+            if (cnt>1) info+=" x"+std::to_string(cnt);
+        }
         sf::Text infoTxt(m_font,info,9);
         infoTxt.setFillColor(sf::Color(180,160,100));
         infoTxt.setPosition({panelX+8.f,sy0+ROWS*(SZ+GAP)+4.f});
