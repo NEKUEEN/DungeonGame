@@ -1,0 +1,59 @@
+#pragma once
+#include <SFML/Graphics.hpp>
+#include <map>
+#include <string>
+#include <iostream>
+
+// ============================================================
+//  TextureManager  –  Singleton โหลด texture ครั้งเดียว
+//  ใช้งาน: TextureManager::instance().load("name","path.png")
+//           TextureManager::instance().get("name")
+// ============================================================
+class TextureManager
+{
+public:
+    static TextureManager& instance()
+    { static TextureManager tm; return tm; }
+
+    void load(const std::string& name, const std::string& path)
+    {
+        if (m_textures.count(name)) return;  // โหลดแล้ว
+        sf::Texture tex;
+        if (!tex.loadFromFile(path))
+            std::cerr<<"[TextureManager] Failed: "<<path<<"\n";
+        else
+            m_textures[name] = std::move(tex);
+    }
+
+    const sf::Texture* get(const std::string& name) const
+    {
+        auto it = m_textures.find(name);
+        if (it == m_textures.end()) return nullptr;
+        return &it->second;
+    }
+
+    void loadAll()
+    {
+        load("player",       "assets/textures/player.png");
+        load("rat",          "assets/textures/rat.png");
+        load("goblin",       "assets/textures/goblin.png");
+        load("orc",          "assets/textures/orc.png");
+        load("tile_floor",   "assets/textures/tile_floor.png");
+        load("tile_wall",    "assets/textures/tile_wall.png");
+        load("stairs_down",  "assets/textures/stairs_down.png");
+        load("stairs_up",    "assets/textures/stairs_up.png");
+        load("item_food",    "assets/textures/item_food.png");
+        load("item_potion",  "assets/textures/item_potion.png");
+        load("item_weapon",  "assets/textures/item_weapon.png");
+        load("item_offweapon","assets/textures/item_offweapon.png");
+        load("item_helmet",  "assets/textures/item_helmet.png");
+        load("item_armor",   "assets/textures/item_armor.png");
+        load("item_gloves",  "assets/textures/item_gloves.png");
+        load("item_greaves", "assets/textures/item_greaves.png");
+        load("item_boots",   "assets/textures/item_boots.png");
+    }
+
+private:
+    TextureManager() = default;
+    std::map<std::string, sf::Texture> m_textures;
+};
