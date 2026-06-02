@@ -505,6 +505,8 @@ void Game::renderItems()
             case ItemType::Potion:    texName="item_potion";  break;
             case ItemType::Weapon:
             case ItemType::OffWeapon: texName="item_weapon";  break;
+            case ItemType::Core:      texName="item_core";    break;
+            case ItemType::Material:  texName="gooner";break;
             default:                  texName="item_armor";   break;
         }
 
