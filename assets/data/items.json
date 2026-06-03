@@ -42,6 +42,10 @@
       "type": "Weapon",
       "desc": "A small sharp blade.",
       "value": 3,
+      "hp": 0,
+      "atk": 10,
+      "def": 0,
+      "dodge": 2,
       "sprite": "item_weapon.png",
       "stackable": false
     },
@@ -51,6 +55,10 @@
       "type": "OffWeapon",
       "desc": "Protects from attacks.",
       "value": 2,
+      "hp": 0,
+      "atk": 0,
+      "def": 3,
+      "dodge": 1,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -60,6 +68,10 @@
       "type": "Helmet",
       "desc": "Protects the head.",
       "value": 2,
+      "hp": 5,
+      "atk": 0,
+      "def": 2,
+      "dodge": 0,
       "sprite": "item_helmet.png",
       "stackable": false
     },
@@ -69,6 +81,10 @@
       "type": "BodyArmor",
       "desc": "Protects the body.",
       "value": 4,
+      "hp": 30,
+      "atk": 0,
+      "def": 20,
+      "dodge": 0,
       "sprite": "item_armor.png",
       "stackable": false
     },
@@ -78,6 +94,10 @@
       "type": "Gloves",
       "desc": "Protects the hands.",
       "value": 1,
+      "hp": 2,
+      "atk": 0,
+      "def": 1,
+      "dodge": 2,
       "sprite": "item_gloves.png",
       "stackable": false
     },
@@ -87,6 +107,10 @@
       "type": "Greaves",
       "desc": "Protects the legs.",
       "value": 1,
+      "hp": 4,
+      "atk": 0,
+      "def": 1,
+      "dodge": 0,
       "sprite": "item_greaves.png",
       "stackable": false
     },
@@ -96,6 +120,10 @@
       "type": "Boots",
       "desc": "Protects the feet.",
       "value": 1,
+      "hp": 2,
+      "atk": 0,
+      "def": 0,
+      "dodge": 2,
       "sprite": "item_boots.png",
       "stackable": false
     },
@@ -108,10 +136,10 @@
       "sprite": "item_goblin_core.png",
       "stackable": false,
       "core_stats": {
-        "body": 0,
-        "mentality": 3,
-        "ability": 1,
-        "battle_index": 5
+        "hp": 30,
+      "atk": 10,
+      "def": 10,
+      "dodge": 4
       }
     },
     {
@@ -123,10 +151,10 @@
       "sprite": "item_goblin_core.png",
       "stackable": false,
       "core_stats": {
-        "body": 10,
-        "mentality": 3,
-        "ability": 1,
-        "battle_index": 5
+        "hp": 50,
+        "atk": 15,
+        "def": 20,
+        "dodge": 4
       }
     },
     {
@@ -138,10 +166,10 @@
       "sprite": "item_orc_core.png",
       "stackable": false,
       "core_stats": {
-        "body": 5,
-        "mentality": 0,
-        "ability": 0,
-        "battle_index": 8
+        "hp": 100,
+        "atk": 20,
+        "def": 15,
+        "dodge": 2
       }
     },
     {
@@ -153,10 +181,10 @@
       "sprite": "item_rat_core.png",
       "stackable": false,
       "core_stats": {
-        "body": 1,
-        "mentality": 1,
-        "ability": 0,
-        "battle_index": 2
+        "hp": 2,
+        "atk": 0,
+        "def": 0,
+        "dodge": 2
       }
     }
   ]

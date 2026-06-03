@@ -28,6 +28,10 @@ struct ItemData
     std::string desc;
     std::string sprite;
     int  value     = 1;
+    int  hpBonus   = 0;
+    int  atkBonus  = 0;
+    int  defBonus  = 0;
+    int  dodgeBonus= 0;
     bool stackable = true;
 };
 
@@ -57,8 +61,12 @@ public:
             d.type      = it["type"].get<std::string>();
             d.desc      = it["desc"].get<std::string>();
             d.sprite    = it["sprite"].get<std::string>();
-            d.value     = it["value"].get<int>();
-            d.stackable = it["stackable"].get<bool>();
+            d.value      = it["value"].get<int>();
+            d.stackable  = it["stackable"].get<bool>();
+            d.hpBonus    = it.contains("hp") ? it["hp"].get<int>() : 0;
+            d.atkBonus   = it.contains("atk") ? it["atk"].get<int>() : 0;
+            d.defBonus   = it.contains("def") ? it["def"].get<int>() : 0;
+            d.dodgeBonus = it.contains("dodge") ? it["dodge"].get<int>() : 0;
             m_items[d.id] = d;
             m_itemsByType[d.type].push_back(d.id);
         }

@@ -7,6 +7,9 @@
 #include <algorithm>
 #include <optional>
 
+// ============================================================
+//  Constructor / Destructor
+// ============================================================
 Game::Game()
     : m_window(sf::VideoMode({WINDOW_W, WINDOW_H}), "Dungeon and Stone",
                sf::Style::Titlebar | sf::Style::Close)
@@ -18,13 +21,8 @@ Game::Game()
     m_fontLoaded = m_font.openFromFile("assets/fonts/font.ttf");
     if (!m_fontLoaded) std::cerr << "[Game] Warning: font not loaded\n";
 
-    // โหลด textures ทั้งหมดครั้งเดียว
     TextureManager::instance().loadAll();
-
-    // โหลด monster database (จะ register drops อัตโนมัติ)
     MonsterDB::instance().load("assets/data/monsters.json");
-
-    // โหลด item database
     DropTable::instance().loadItems("assets/data/items.json");
 
     m_gameView.setSize({(float)GAME_VIEW_W*1.25f,(float)GAME_VIEW_H*1.25f});
@@ -38,10 +36,87 @@ Game::Game()
 
 Game::~Game() { delete m_player; clearEnemies(); }
 
+// ============================================================
+//  Stats Helpers (NEW)
+// ============================================================
+int Game::computeBody() const
+{
+    if (!m_player) return 0;
+    const Stats& s = m_player->getStats();
+    CoreStats cb   = m_coreSlots.getTotalBonus();
+
+    // base + bonus จาก core/equipment
+    int hp    = s.maxHp    + cb.body + m_equipment.getTotalHpBonus(); // core body + equipment hp
+    int atk   = s.maxAtk   + m_equipment.getTotalAtkBonus();
+    int def   = s.maxDef   + m_equipment.getTotalDefBonus();
+    int dodge = s.maxDodge + m_equipment.getTotalDodgeBonus();
+
+    return (int)(hp*0.4f + atk*0.3f + def*0.2f + dodge*0.1f);
+}
+
+int Game::getItemLevelTotal() const
+{
+    // รวม value ของ equipment ทุกชิ้นที่ใส่อยู่ (ใช้ item.value เป็น grade ไปก่อน)
+    int total = 0;
+    const EquipSlot slots[] = {
+        EquipSlot::Head, EquipSlot::Body, EquipSlot::Arms,
+        EquipSlot::Legs, EquipSlot::Feet,
+        EquipSlot::MainHand, EquipSlot::OffHand
+    };
+    for (auto slot : slots)
+    {
+        const Item* item = m_equipment.getItem(slot);
+        if (item) total += item->value;
+    }
+    return total;
+}
+
+int Game::computeBattleIndex() const
+{
+    if (!m_player) return 0;
+    const Stats& s = m_player->getStats();
+    CoreStats cb   = m_coreSlots.getTotalBonus();
+
+    int body      = computeBody();
+    int mentality = s.maxMentality + cb.mentality;
+    int itemLv    = getItemLevelTotal();
+
+    // bonus% = 30% + (level-1)*5%  →  lv1=30%, lv2=35%, lv3=40% ...
+    float bonusPct = 0.30f + (s.level - 1) * 0.05f;
+
+    return (int)(body + mentality + itemLv * bonusPct);
+}
+
+void Game::drainMentality()
+{
+    if (!m_player) return;
+    Stats& s = m_player->getStats();
+    if (!s.hpDepleted) return;
+    if (m_playerDead) return;
+
+    s.mentality -= 3;
+    if (s.mentality < 0) s.mentality = 0;
+
+    addLog("> Mentality -3/turn (" +
+           std::to_string(s.mentality) + "/" + std::to_string(s.maxMentality) + ")",
+           sf::Color(180, 80, 220));
+
+    if (s.mentality <= 0)
+    {
+        m_playerDead = true;
+        addLog(" *** Mind shattered   DEAD *** [R] restart",
+               sf::Color(255, 50, 50));
+    }
+}
+
+// ============================================================
+//  Dungeon Setup
+// ============================================================
 void Game::newDungeon(bool keepPlayer)
 {
     m_tileMap.generate();
     m_fog.reset();
+    m_playerDead = false;
 
     if (!keepPlayer)
     {
@@ -51,6 +126,7 @@ void Game::newDungeon(bool keepPlayer)
         m_equipment=Equipment();
     }
 
+    // วาง player ที่ StairsUp
     bool placed=false;
     for (int row=1;row<MAP_ROWS-1&&!placed;++row)
         for (int col=1;col<MAP_COLS-1&&!placed;++col)
@@ -71,11 +147,20 @@ void Game::newDungeon(bool keepPlayer)
     m_mapItems.clear(); spawnItems();
     m_respawnTimer=0;
 
-    if (m_player) m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+    if (m_player)
+    {
+        // sync stats ทันทีหลัง spawn
+        Stats& s      = m_player->getStats();
+        s.body        = computeBody();
+        s.itemLevel   = getItemLevelTotal();
+        s.battleIndex = computeBattleIndex();
+
+        m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+        m_coreSlots.setSlotCount(m_player->getStats().level);
+    }
+
     updateCamera();
     m_selectedSlot=0; m_viewEquipment=false; m_viewCores=false;
-    // core slots = level ของ player
-    if (m_player) m_coreSlots.setSlotCount(m_player->getStats().level);
 
     if (keepPlayer)
         addLog("> Floor "+std::to_string(m_dungeonFloor)+" — Deeper...", sf::Color(180,140,60));
@@ -94,6 +179,9 @@ void Game::updateCamera()
     m_gameView.setCenter({px,py});
 }
 
+// ============================================================
+//  Enemy Spawn
+// ============================================================
 void Game::spawnEnemies(int count) { for(int i=0;i<count;++i) spawnEnemy(m_dungeonFloor); }
 
 void Game::spawnEnemy(int floor)
@@ -104,10 +192,7 @@ void Game::spawnEnemy(int floor)
         if (!m_tileMap.isWalkable(col,row)) continue;
         if (m_player){int dx=col-m_player->getCol(),dy=row-m_player->getRow();if(dx*dx+dy*dy<36)continue;}
         int r=std::rand()%100;
-        EnemyRank rank=r<5?EnemyRank::Boss:r<30?EnemyRank::Elite:EnemyRank::Normal;
-        // เลือก monster id จาก MonsterDB ตาม rank
-        std::string rankStr = rank==EnemyRank::Boss?"Boss":
-                              rank==EnemyRank::Elite?"Elite":"Normal";
+        std::string rankStr = r<5?"Boss":r<30?"Elite":"Normal";
         auto ids = MonsterDB::instance().getByRank(rankStr);
         if (ids.empty()) return;
         std::string monsterId = ids[std::rand() % ids.size()];
@@ -139,19 +224,13 @@ void Game::spawnItems()
         Item item;
         std::optional<std::string> itemId;
         int r=std::rand()%10;
-        if (r<3)
-            itemId = DropTable::instance().getRandomItemIdByType("Food");
-        else if (r<5)
-            itemId = DropTable::instance().getRandomItemIdByType("Potion");
-        else if (r<7)
-            itemId = DropTable::instance().getRandomItemIdByType("Weapon");
-        else if (r<8)
-            itemId = DropTable::instance().getRandomItemIdByType("OffWeapon");
-        else
-        {
+        if (r<3)       itemId = DropTable::instance().getRandomItemIdByType("Food");
+        else if (r<5)  itemId = DropTable::instance().getRandomItemIdByType("Potion");
+        else if (r<7)  itemId = DropTable::instance().getRandomItemIdByType("Weapon");
+        else if (r<8)  itemId = DropTable::instance().getRandomItemIdByType("OffWeapon");
+        else {
             const char* armorTypes[] = {"Helmet","BodyArmor","Gloves","Greaves","Boots"};
-            itemId = DropTable::instance().getRandomItemIdByType(
-                armorTypes[std::rand() % 5]);
+            itemId = DropTable::instance().getRandomItemIdByType(armorTypes[std::rand()%5]);
         }
 
         if (itemId)
@@ -159,18 +238,24 @@ void Game::spawnItems()
             const ItemData* idata = DropTable::instance().getItem(*itemId);
             if (idata)
             {
-                item.type       = idata->type == "Core" ? ItemType::Core :
-                                  idata->type == "Material" ? ItemType::Material :
-                                  idata->type == "Helmet" ? ItemType::Helmet :
-                                  idata->type == "BodyArmor" ? ItemType::BodyArmor :
-                                  idata->type == "Gloves" ? ItemType::Gloves :
-                                  idata->type == "Greaves" ? ItemType::Greaves :
-                                  idata->type == "Boots" ? ItemType::Boots :
-                                  idata->type == "Weapon" ? ItemType::Weapon :
-                                  idata->type == "OffWeapon" ? ItemType::OffWeapon : ItemType::Material;
+                item.type = idata->type=="Core"      ? ItemType::Core      :
+                            idata->type=="Material"  ? ItemType::Material  :
+                            idata->type=="Food"      ? ItemType::Food      :
+                            idata->type=="Potion"    ? ItemType::Potion    :
+                            idata->type=="Helmet"    ? ItemType::Helmet    :
+                            idata->type=="BodyArmor" ? ItemType::BodyArmor :
+                            idata->type=="Gloves"    ? ItemType::Gloves    :
+                            idata->type=="Greaves"   ? ItemType::Greaves   :
+                            idata->type=="Boots"     ? ItemType::Boots     :
+                            idata->type=="Weapon"    ? ItemType::Weapon    :
+                            idata->type=="OffWeapon" ? ItemType::OffWeapon : ItemType::Material;
                 item.name       = idata->name;
                 item.desc       = idata->desc;
                 item.value      = idata->value;
+                item.hpBonus    = idata->hpBonus;
+                item.atkBonus   = idata->atkBonus;
+                item.defBonus   = idata->defBonus;
+                item.dodgeBonus = idata->dodgeBonus;
                 item.spriteName = idata->sprite;
                 item.stackable  = idata->stackable;
             }
@@ -192,6 +277,9 @@ void Game::spawnItems()
 
 void Game::clearEnemies(){for(auto*e:m_enemies)delete e;m_enemies.clear();}
 
+// ============================================================
+//  Main Loop
+// ============================================================
 void Game::run(){while(m_window.isOpen()){processEvents();update();render();}}
 
 void Game::update()
@@ -199,6 +287,9 @@ void Game::update()
     if (m_levelUpFlash){m_levelUpTimer--;if(m_levelUpTimer<=0)m_levelUpFlash=false;}
 }
 
+// ============================================================
+//  Input
+// ============================================================
 void Game::processEvents()
 {
     while (const std::optional event = m_window.pollEvent())
@@ -206,24 +297,32 @@ void Game::processEvents()
         if (event->is<sf::Event::Closed>()) m_window.close();
         if (const auto* key = event->getIf<sf::Event::KeyPressed>())
         {
+            // ถ้าตายแล้ว รับแค่ R กับ Escape
+            if (m_playerDead)
+            {
+                if (key->code == sf::Keyboard::Key::R)  newDungeon(false);
+                if (key->code == sf::Keyboard::Key::Escape) m_window.close();
+                return;
+            }
+
             switch(key->code)
             {
-                case sf::Keyboard::Key::Escape: m_window.close();       break;
+                case sf::Keyboard::Key::Escape: m_window.close();        break;
                 case sf::Keyboard::Key::Up:
-                case sf::Keyboard::Key::K:  handlePlayerMove(0,-1);     break;
+                case sf::Keyboard::Key::K:  handlePlayerMove(0,-1);      break;
                 case sf::Keyboard::Key::Down:
-                case sf::Keyboard::Key::J:  handlePlayerMove(0, 1);     break;
+                case sf::Keyboard::Key::J:  handlePlayerMove(0, 1);      break;
                 case sf::Keyboard::Key::Left:
-                case sf::Keyboard::Key::H:  handlePlayerMove(-1,0);     break;
+                case sf::Keyboard::Key::H:  handlePlayerMove(-1,0);      break;
                 case sf::Keyboard::Key::Right:
-                case sf::Keyboard::Key::L:  handlePlayerMove(1, 0);     break;
-                case sf::Keyboard::Key::Y:  handlePlayerMove(-1,-1);    break;
-                case sf::Keyboard::Key::U:  handlePlayerMove(1,-1);     break;
-                case sf::Keyboard::Key::B:  handlePlayerMove(-1, 1);    break;
-                case sf::Keyboard::Key::N:  handlePlayerMove(1,  1);    break;
-                case sf::Keyboard::Key::R:  newDungeon(false);          break;
-                case sf::Keyboard::Key::G:  tryPickupItem();            break;
-                case sf::Keyboard::Key::D:  dropSelectedItem();         break;
+                case sf::Keyboard::Key::L:  handlePlayerMove(1, 0);      break;
+                case sf::Keyboard::Key::Y:  handlePlayerMove(-1,-1);     break;
+                case sf::Keyboard::Key::U:  handlePlayerMove(1,-1);      break;
+                case sf::Keyboard::Key::B:  handlePlayerMove(-1, 1);     break;
+                case sf::Keyboard::Key::N:  handlePlayerMove(1,  1);     break;
+                case sf::Keyboard::Key::R:  newDungeon(false);           break;
+                case sf::Keyboard::Key::G:  tryPickupItem();             break;
+                case sf::Keyboard::Key::D:  dropSelectedItem();          break;
                 case sf::Keyboard::Key::E:
                     m_viewEquipment=!m_viewEquipment;
                     m_viewCores=false;
@@ -236,7 +335,6 @@ void Game::processEvents()
                     addLog(m_viewCores?"> Core Slots view":"> Inventory view",
                            sf::Color(100,200,255));
                     break;
-                // Core slot navigation
                 case sf::Keyboard::Key::LBracket:
                     if (m_viewCores && m_selectedCoreSlot>0) m_selectedCoreSlot--;
                     break;
@@ -247,9 +345,9 @@ void Game::processEvents()
                 case sf::Keyboard::Key::X:
                     if (m_viewCores) unequipCore();
                     break;
-                case sf::Keyboard::Key::Period: tryDescendStairs();     break;
-                case sf::Keyboard::Key::Comma:  tryAscendStairs();      break;
-                case sf::Keyboard::Key::Space:  waitTurn();             break;
+                case sf::Keyboard::Key::Period: tryDescendStairs();      break;
+                case sf::Keyboard::Key::Comma:  tryAscendStairs();       break;
+                case sf::Keyboard::Key::Space:  waitTurn();              break;
                 case sf::Keyboard::Key::Num1: m_selectedSlot=0; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Num2: m_selectedSlot=1; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Num3: m_selectedSlot=2; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
@@ -259,7 +357,7 @@ void Game::processEvents()
                 case sf::Keyboard::Key::Num7: m_selectedSlot=6; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Num8: m_selectedSlot=7; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Num9: m_selectedSlot=8; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
-                case sf::Keyboard::Key::Num0: m_selectedSlot=9; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break; 
+                case sf::Keyboard::Key::Num0: m_selectedSlot=9; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Tab:
                     m_selectedSlot=(m_selectedSlot+1)%MAX_INVENTORY; break;
                 default: break;
@@ -270,6 +368,9 @@ void Game::processEvents()
 
 void Game::handleInventoryInput(sf::Keyboard::Key){}
 
+// ============================================================
+//  Stairs
+// ============================================================
 void Game::tryDescendStairs()
 {
     if (!m_player) return;
@@ -304,6 +405,9 @@ void Game::waitTurn()
     addLog("> You wait.", sf::Color(140,140,140));
 }
 
+// ============================================================
+//  Inventory / Item actions
+// ============================================================
 void Game::tryPickupItem()
 {
     if (!m_player) return;
@@ -333,17 +437,23 @@ void Game::useOrEquipSelected()
         {s.hunger=std::min(100,s.hunger+item->value);
          addLog("> Ate "+item->name+". Hunger +"+std::to_string(item->value),sf::Color(200,180,80));}
         else
-        {s.hp=std::min(s.body,s.hp+item->value);
+        {// Potion: ฟื้น hp และถ้า hp กลับมา > 0 ให้ clear hpDepleted
+         s.hp=std::min(s.maxHp,s.hp+item->value);
+         if (s.hp > 0 && s.hpDepleted)
+         {
+             s.hpDepleted = false;
+             addLog("> HP ฟื้นแล้ว — ค่าจิตหยุดลด",sf::Color(100,220,180));
+         }
          addLog("> Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(80,180,220));}
         m_inventory.removeItem(m_selectedSlot);
     }
     else if (item->isCore())
     {
-        equipCore();  // Core → ใส่ Core Slots อัตโนมัติ
+        equipCore();
     }
     else if (item->isMaterial())
     {
-        addLog("> "+item->name+" is a trade item. (sell to NPC)",sf::Color(160,160,160));
+        addLog("> "+item->name+" is a trade item.",sf::Color(160,160,160));
     }
     else if (item->isEquipment())
     {
@@ -359,6 +469,9 @@ void Game::useOrEquipSelected()
         m_equipment.equip(toEquip,slot);
         addLog("> Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
                std::to_string(toEquip.value),sf::Color(180,220,180));
+
+        // sync item level ทันที
+        m_player->getStats().itemLevel = getItemLevelTotal();
     }
 }
 
@@ -368,13 +481,12 @@ void Game::equipCore()
     if (!item || !item->isCore())
     { addLog("> Not a core item!"); return; }
 
-    // หา slot ว่าง
     int freeSlot = -1;
     for (int i=0; i<m_coreSlots.getSlotCount(); ++i)
         if (!m_coreSlots.hasCore(i)) { freeSlot=i; break; }
 
     if (freeSlot == -1)
-    { addLog("> All core slots full! Level up for more slots.", sf::Color(220,120,50)); return; }
+    { addLog("> All core slots full!", sf::Color(220,120,50)); return; }
 
     Item core = *item;
     m_inventory.removeItem(m_selectedSlot);
@@ -387,7 +499,6 @@ void Game::unequipCore()
 {
     if (!m_coreSlots.hasCore(m_selectedCoreSlot))
     { addLog("> No core in slot "+std::to_string(m_selectedCoreSlot+1)); return; }
-
     if (m_inventory.isFull())
     { addLog("> Inventory full!"); return; }
 
@@ -407,6 +518,9 @@ void Game::dropSelectedItem()
     m_inventory.removeItem(m_selectedSlot);
 }
 
+// ============================================================
+//  Movement & Combat
+// ============================================================
 void Game::handlePlayerMove(int dc, int dr)
 {
     if (!m_player) return;
@@ -414,14 +528,19 @@ void Game::handlePlayerMove(int dc, int dr)
 
     for (auto*e:m_enemies)
         if (!e->isDead()&&e->getCol()==tc&&e->getRow()==tr)
-        {playerAttack(e);processTurn();
-         m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
-         updateCamera();return;}
+        {
+            playerAttack(e);
+            processTurn();
+            m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+            updateCamera();
+            return;
+        }
 
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
     if (!moved){addLog("> Blocked!");return;}
 
-    m_turnCount++; m_player->onTurnPassed();
+    m_turnCount++;
+    m_player->onTurnPassed();
     m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
     processTurn(); tryRespawnEnemies(); updateCamera();
 
@@ -442,36 +561,41 @@ void Game::handlePlayerMove(int dc, int dr)
 
 void Game::playerAttack(Enemy* enemy)
 {
-    Stats& s=m_player->getStats();
-    CoreStats cb = m_coreSlots.getTotalBonus();
-    int atk=(s.body+cb.body)/5+m_equipment.getTotalAtkBonus();
-    int dmg=std::max(1,atk+std::rand()%4-enemy->getDefense());
+    if (!m_player) return;
+    const Stats& s = m_player->getStats();
+    CoreStats cb   = m_coreSlots.getTotalBonus();
+
+    int atk = s.maxAtk + cb.body/3 + m_equipment.getTotalAtkBonus();
+    int dmg = std::max(1, atk + std::rand()%4 - enemy->getDefense());
     enemy->takeDamage(dmg);
     addLog("> You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!",sf::Color(255,200,50));
+
     if (enemy->isDead())
     {
         addLog("> "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",
                sf::Color(220,80,80));
 
-        // สุ่ม drop
+        // drop items
         auto dropped = DropTable::instance().roll(enemy->getId());
         for (const auto& itemId : dropped)
         {
             const ItemData* idata = DropTable::instance().getItem(itemId);
             if (!idata) continue;
-
             Item drop;
-            // แยก Core กับ Material จาก type ใน items.json
-            drop.type       = (idata->type == "Core") ? ItemType::Core : ItemType::Material;
+            drop.type       = (idata->type=="Core") ? ItemType::Core : ItemType::Material;
             drop.name       = idata->name;
             drop.desc       = idata->desc;
             drop.value      = idata->value;
+            drop.hpBonus    = idata->hpBonus;
+            drop.atkBonus   = idata->atkBonus;
+            drop.defBonus   = idata->defBonus;
+            drop.dodgeBonus = idata->dodgeBonus;
             drop.spriteName = idata->sprite;
             drop.stackable  = idata->stackable;
             drop.col        = enemy->getCol();
             drop.row        = enemy->getRow();
             m_mapItems.push_back(drop);
-            addLog("> Dropped: " + idata->name, sf::Color(180,220,255));
+            addLog("> Dropped: "+idata->name, sf::Color(180,220,255));
         }
 
         if (m_player->addExp(enemy->getExp()))
@@ -479,7 +603,7 @@ void Game::playerAttack(Enemy* enemy)
             m_levelUpFlash=true; m_levelUpTimer=120;
             int newLevel = m_player->getStats().level;
             m_coreSlots.setSlotCount(newLevel);
-            addLog("> *** LEVEL UP! Level "+std::to_string(newLevel)+" - Core slot unlocked! ***",
+            addLog("> *** LEVEL UP! Level "+std::to_string(newLevel)+" — Core slot unlocked! ***",
                    sf::Color(255,255,50));
         }
     }
@@ -488,18 +612,59 @@ void Game::playerAttack(Enemy* enemy)
 void Game::enemyAttack(Enemy* enemy)
 {
     if (!m_player) return;
-    Stats& s=m_player->getStats();
-    int def=s.body/10+m_equipment.getTotalDefBonus();
-    int dmg=std::max(1,enemy->getAttack()-def+std::rand()%3);
-    s.hp-=dmg;
-    addLog("> "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(220,80,80));
-    if (s.hp<=0){s.hp=0;addLog("> You died on floor "+std::to_string(m_dungeonFloor)+"! [R] restart.",sf::Color(255,50,50));}
+    Stats& s = m_player->getStats();
+
+    int def   = s.maxDef + m_equipment.getTotalDefBonus();
+    int dodge = s.maxDodge + m_equipment.getTotalDodgeBonus();
+    float dodgeChance = std::min(0.45f, 0.06f + dodge * 0.05f);
+
+    if ((std::rand() % 100) < (int)(dodgeChance * 100))
+    {
+        addLog("> You dodged "+enemy->getName()+"!", sf::Color(150,220,150));
+        return;
+    }
+
+    int dmg = std::max(1, enemy->getAttack() - def + std::rand()%3);
+    s.hp -= dmg;
+
+    addLog("> "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",
+           sf::Color(220,80,80));
+
+    if (s.hp <= 0)
+    {
+        s.hp = 0;
+        if (!s.hpDepleted)
+        {
+            s.hpDepleted = true;
+            addLog("> WARNING: HP depleted — Mentality drain starts!",
+                   sf::Color(255, 120, 50));
+            addLog("> Mentality -3/turn until recovered",
+                   sf::Color(220, 100, 200));
+        }
+    }
 }
 
+// ============================================================
+//  Process Turn
+// ============================================================
 void Game::processTurn()
 {
     if (!m_player) return;
-    for (auto*e:m_enemies)
+
+    // ── sync computed stats ──
+    Stats& s      = m_player->getStats();
+    s.body        = computeBody();
+    s.itemLevel   = getItemLevelTotal();
+    s.battleIndex = computeBattleIndex();
+    s.ability     = m_coreSlots.getTotalBonus().ability;
+
+    // ── mentality drain ──
+    drainMentality();
+
+    if (m_playerDead) return;  // หยุดประมวลผล enemy ถ้าตายแล้ว
+
+    // ── enemy AI ──
+    for (auto* e : m_enemies)
     {
         if (e->isDead()) continue;
         if (!m_fog.isVisible(e->getCol(),e->getRow())) continue;
@@ -512,12 +677,15 @@ void Game::processTurn()
         [](Enemy*e){bool d=e->isDead();if(d)delete e;return d;}),m_enemies.end());
 }
 
-void Game::addLog(const std::string& msg,sf::Color color)
+void Game::addLog(const std::string& msg, sf::Color color)
 {
     m_log.push_back({msg,color});
     if((int)m_log.size()>LOG_MAX_LINES) m_log.erase(m_log.begin());
 }
 
+// ============================================================
+//  Render
+// ============================================================
 void Game::render()
 {
     m_window.clear(sf::Color(0,0,0));
@@ -540,13 +708,11 @@ void Game::render()
 void Game::renderItems()
 {
     auto& tm = TextureManager::instance();
-
     for (const auto& item:m_mapItems)
     {
         if (!m_fog.isVisible(item.col,item.row)) continue;
         float px=(float)(item.col*TILE_SIZE),py=(float)(item.row*TILE_SIZE),ts=(float)TILE_SIZE;
 
-        // เลือก texture ตาม spritePath ของไอเท็ม เพื่อให้ core/material ใช้ sprite จาก items.json
         std::string path = item.spritePath();
         std::string texName = path.substr(path.rfind('/')+1);
         if (texName.find('.') != std::string::npos)
@@ -557,7 +723,7 @@ void Game::renderItems()
         {
             sf::Sprite spr(*tex);
             sf::Vector2u sz=tex->getSize();
-            float scale = ts * 0.6f / std::max((float)sz.x,(float)sz.y);
+            float scale = ts*0.6f / std::max((float)sz.x,(float)sz.y);
             spr.setScale({scale,scale});
             spr.setPosition({px+ts*0.2f, py+ts*0.2f});
             m_window.draw(spr);
@@ -591,6 +757,9 @@ void Game::renderLevelUpEffect()
     }
 }
 
+// ============================================================
+//  Status Panel  –  ขวาบน
+// ============================================================
 void Game::renderStatusPanel()
 {
     float px=(float)(WINDOW_W-RIGHT_PANEL_W);
@@ -602,33 +771,78 @@ void Game::renderStatusPanel()
     m_window.draw(panel);
 
     if (!m_fontLoaded||!m_player) return;
-    const Stats& s=m_player->getStats();
-    float x=px+10.f,y=(float)STATUS_PANEL_TOP_PADDING;
+    const Stats& s  = m_player->getStats();
+    float x=px+10.f, y=(float)STATUS_PANEL_TOP_PADDING;
 
-    auto drawLine=[&](const std::string& label, const std::string& value, sf::Color color=sf::Color::White, int size=STATUS_LINE_SIZE)
+    auto drawLine=[&](const std::string& label, const std::string& value,
+                      sf::Color color=sf::Color::White, int size=STATUS_LINE_SIZE)
     {
-        sf::Text t(m_font,label+" "+value,(unsigned int)size);
-        t.setFillColor(color); t.setPosition({x,y});
-        m_window.draw(t); y+=size+STATUS_LINE_SPACING;
+        sf::Text t(m_font, label+" "+value, (unsigned int)size);
+        t.setFillColor(color);
+        t.setPosition({x,y});
+        m_window.draw(t);
+        y += size + STATUS_LINE_SPACING;
     };
 
-    // Display only requested fields
+    // ── Header ──
     {
-        sf::Text header(m_font,"player 1",STATUS_HEADER_SIZE);
+        sf::Text header(m_font, "player 1", STATUS_HEADER_SIZE);
         header.setFillColor(sf::Color::Yellow);
-        header.setPosition({x,y}); m_window.draw(header); y+=STATUS_HEADER_SIZE+STATUS_HEADER_SPACING;
+        header.setPosition({x,y});
+        m_window.draw(header);
+        y += STATUS_HEADER_SIZE + STATUS_HEADER_SPACING;
     }
+
     drawLine("level:", std::to_string(s.level));
+
+    // body — แสดงพร้อม breakdown เล็กน้อย
     drawLine("body:", std::to_string(s.body));
-    drawLine("mentality:", std::to_string(s.mentality));
+
+    // (atk/def/dodge คงทำงานเบื้องหลัง ไม่แสดงใน status panel)
+
+    // mentality — สีม่วงถ้ากำลัง drain
+    {
+        sf::Color mc = s.hpDepleted ? sf::Color(220,100,200) : sf::Color::White;
+        std::string mVal = std::to_string(s.maxMentality);
+        if (s.hpDepleted) mVal += " (!drain)";
+        drawLine("mentality:", mVal, mc);
+    }
+
     drawLine("ability:", std::to_string(s.ability));
     drawLine("item level:", std::to_string(s.itemLevel));
-    drawLine("Comprehensive Battle", "");
-    drawLine("Index:", std::to_string(s.battleIndex));
+
+    // battle index
+    drawLine("battle", "");
+    drawLine("index:", std::to_string(s.battleIndex), sf::Color(255,220,100));
+
+    // separator
+    y += 4;
+    sf::RectangleShape sep({(float)RIGHT_PANEL_W-20.f, 1.f});
+    sep.setFillColor(sf::Color(60,50,30));
+    sep.setPosition({x, y});
+    m_window.draw(sep);
+    y += 6;
+
+    // hp bar numeric
+    {
+        std::string hpStr = std::to_string(s.hp) + "/" + std::to_string(s.maxHp);
+        sf::Color hpColor = s.hp > s.maxHp/2 ? sf::Color(80,200,80) :
+                            s.hp > s.maxHp/4 ? sf::Color(220,180,0) :
+                                               sf::Color(220,60,60);
+        drawLine("hp:", hpStr, hpColor);
+    }
+
+    // hunger
+    {
+        sf::Color hColor = s.hunger > 50 ? sf::Color(180,160,80) :
+                           s.hunger > 20 ? sf::Color(220,130,50) :
+                                           sf::Color(220,60,60);
+        drawLine("hunger:", std::to_string(s.hunger)+"%", hColor);
+    }
 }
 
 // ============================================================
-//  Right Panel Lower  –  Inventory หรือ Equipment
+//  Right Panel Lower  –  Inventory / Equipment / Cores
 // ============================================================
 void Game::renderRightPanel()
 {
@@ -646,8 +860,8 @@ void Game::renderRightPanel()
 
     if (!m_viewEquipment && !m_viewCores)
     {
-        // ---- Inventory Grid ----
-        sf::Text title(m_font,"BAG  [E]=Equip view",9);
+        // ── Inventory Grid ──
+        sf::Text title(m_font,"BAG  [E]=Equip",9);
         title.setFillColor(sf::Color(120,100,60));
         title.setPosition({panelX+8.f,panelY+6.f});
         m_window.draw(title);
@@ -673,7 +887,6 @@ void Game::renderRightPanel()
             if (item)
             {
                 auto& tm = TextureManager::instance();
-                // หา texture name จาก spritePath
                 std::string path = item->spritePath();
                 std::string name = path.substr(path.rfind('/')+1);
                 name = name.substr(0, name.rfind('.'));
@@ -701,7 +914,6 @@ void Game::renderRightPanel()
                     num.setPosition({sx+2.f,sy+1.f});
                     m_window.draw(num);
                 }
-                // แสดง stack count ถ้ามากกว่า 1
                 int cnt = m_inventory.getCount(idx);
                 if (cnt > 1)
                 {
@@ -728,27 +940,22 @@ void Game::renderRightPanel()
     }
     else if (m_viewCores)
     {
-        // ---- Core Slots View ----
         m_coreSlots.render(m_window, m_font,
                            panelX+8.f, panelY+20.f, (float)RIGHT_PANEL_W,
                            m_selectedCoreSlot, true);
 
-        // hints
-        if (m_fontLoaded)
+        CoreStats cb = m_coreSlots.getTotalBonus();
+        float hy = panelY + INV_GRID_H - 55.f;
+        auto dh = [&](const std::string& t, sf::Color c=sf::Color(70,70,70))
         {
-            CoreStats cb = m_coreSlots.getTotalBonus();
-            float hy = panelY + INV_GRID_H - 55.f;
-            auto dh = [&](const std::string& t, sf::Color c=sf::Color(70,70,70))
-            {
-                sf::Text tx(m_font,t,8); tx.setFillColor(c);
-                tx.setPosition({panelX+8.f,hy}); m_window.draw(tx); hy+=12.f;
-            };
-            dh("Bonus: B+"+std::to_string(cb.body)+
-               " M+"+std::to_string(cb.mentality)+
-               " A+"+std::to_string(cb.ability), sf::Color(100,200,255));
-            dh("[C] Close  [U] Equip core");
-            dh("[X] Remove core");
-        }
+            sf::Text tx(m_font,t,8); tx.setFillColor(c);
+            tx.setPosition({panelX+8.f,hy}); m_window.draw(tx); hy+=12.f;
+        };
+        dh("Bonus: B+"+std::to_string(cb.body)+
+           " M+"+std::to_string(cb.mentality)+
+           " A+"+std::to_string(cb.ability), sf::Color(100,200,255));
+        dh("[C] Close  [1-9] Equip core");
+        dh("[X] Remove core");
     }
     else if (m_viewEquipment)
     {
@@ -762,7 +969,7 @@ void Game::renderRightPanel()
             EquipSlot::Legs, EquipSlot::Feet,
             EquipSlot::MainHand, EquipSlot::OffHand
         };
-        const float SZW=80.f,SZH=18.f,GAP=3.f;
+        const float SZH=18.f,GAP=3.f;
         float sx=panelX+8.f, sy=panelY+20.f;
 
         for (int i=0;i<7;++i)
@@ -770,26 +977,22 @@ void Game::renderRightPanel()
             EquipSlot slot=slots[i];
             const Item* item=m_equipment.getItem(slot);
 
-            // slot label
             sf::Text label(m_font,Equipment::slotName(slot)+":",9);
             label.setFillColor(sf::Color(140,120,80));
             label.setPosition({sx,sy}); m_window.draw(label);
 
-            // item name
             std::string itemName=item?item->name:"--";
             sf::Color itemColor=item?item->color():sf::Color(60,60,60);
             sf::Text itemTxt(m_font,itemName,9);
             itemTxt.setFillColor(itemColor);
             itemTxt.setPosition({sx+44.f,sy}); m_window.draw(itemTxt);
 
-            // value
             if (item)
             {
                 sf::Text val(m_font,"+"+std::to_string(item->value),9);
                 val.setFillColor(sf::Color(180,200,100));
                 val.setPosition({sx+160.f,sy}); m_window.draw(val);
             }
-
             sy+=SZH+GAP;
         }
     }

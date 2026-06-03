@@ -5,20 +5,43 @@
 struct Stats
 {
     int level       = 1;
-    int body        = 25;
-    int mentality   = 36;
-    int ability     = 1;
+
+    // ── Base stats (ก่อน equipment/core) ──
+    int maxHp       = 25;
+    int maxAtk      = 5;
+    int maxDef      = 2;
+    int maxDodge    = 2;
+
+    // ── Computed by Game::computeBody() ──
+    int body        = 0;   // maxHp*0.4 + maxAtk*0.3 + maxDef*0.2 + maxDodge*0.1
+
+    // ── HP bar (เลือดจริง ใต้ตัวละคร) ──
+    int hp          = 25;  // เริ่ม = maxHp
+
+    // ── Mentality (เลือดสำรอง — แสดงค่า max, ไม่ลดตาม dmg) ──
+    int maxMentality = 20;
+    int mentality    = 20;
+    bool hpDepleted  = false;  // flag: hp ลงถึง 0 → drain mentality ทุก turn
+
+    // ── Ability (จาก core bonus) ──
+    int ability     = 0;
+
+    // ── Item Level (sum grade จาก equipment — set จาก Game) ──
     int itemLevel   = 0;
-    int battleIndex = 68;
-    int hp          = 25;
+
+    // ── Battle Index (computed ใน Game) ──
+    int battleIndex = 0;
+
+    // ── Hunger ──
     int hunger      = 100;
 
+    // ── EXP ──
     int exp         = 0;
     int expToNext   = 100;
 
-    // timers (ไม่แสดงใน UI)
-    int hungerTimer = 0;   // นับถึง 100 แล้วลด hunger
-    int regenTimer  = 0;   // นับถึง 7 แล้วรีเจน HP 1
+    // ── Timers (ไม่แสดงใน UI) ──
+    int hungerTimer = 0;
+    int regenTimer  = 0;
 };
 
 class Player

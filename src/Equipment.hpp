@@ -32,8 +32,10 @@ public:
     const Item* getItem(EquipSlot slot) const;
 
     // คำนวณ bonus รวมจากทุก slot
+    int getTotalHpBonus() const;
     int getTotalAtkBonus() const;
     int getTotalDefBonus() const;
+    int getTotalDodgeBonus() const;
 
     void render(sf::RenderWindow& window, const sf::Font& font,
                 int selectedSlot, bool focused);

@@ -18,6 +18,10 @@ struct Item
     std::string desc;
     std::string spriteName;  // ชื่อไฟล์ png เช่น "item_goblin_core.png"
     int         value   = 0;
+    int         hpBonus = 0;
+    int         atkBonus = 0;
+    int         defBonus = 0;
+    int         dodgeBonus = 0;
     int         col     = -1;
     int         row     = -1;
     bool        stackable = false;

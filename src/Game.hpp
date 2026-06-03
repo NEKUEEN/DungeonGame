@@ -18,16 +18,17 @@ constexpr int RIGHT_PANEL_W   = 250;
 constexpr int LOG_PANEL_H     = 170;
 constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;
 constexpr int GAME_VIEW_H     = WINDOW_H - LOG_PANEL_H;
-constexpr int INV_GRID_H      = 200;   // เพิ่มความสูงสำหรับ equip slots
-// Status panel font sizes and spacing (can be tuned)
-constexpr int STATUS_PANEL_TOP_PADDING = 16;
-constexpr int STATUS_HEADER_SIZE      = 13;
-constexpr int STATUS_LINE_SIZE        = 10;
-constexpr int STATUS_LINE_SPACING     = 10;
-constexpr int STATUS_HEADER_SPACING   = 16;
-constexpr int STATUS_PANEL_H          = GAME_VIEW_H - INV_GRID_H;
-constexpr int LOG_MAX_LINES      = 7;
+constexpr int INV_GRID_H      = 200;
 
+// Status panel tuning
+constexpr int STATUS_PANEL_TOP_PADDING = 16;
+constexpr int STATUS_HEADER_SIZE       = 13;
+constexpr int STATUS_LINE_SIZE         = 10;
+constexpr int STATUS_LINE_SPACING      = 10;
+constexpr int STATUS_HEADER_SPACING    = 16;
+constexpr int STATUS_PANEL_H           = GAME_VIEW_H - INV_GRID_H;
+
+constexpr int LOG_MAX_LINES   = 7;
 constexpr int TILE_SIZE       = 64;
 constexpr int MAP_COLS        = 50;
 constexpr int MAP_ROWS        = 50;
@@ -43,26 +44,29 @@ public:
     void run();
 
 private:
+    // ── Event / Update / Render ──
     void processEvents();
     void update();
     void render();
     void renderStatusPanel();
-    void renderRightPanel();      // inventory + equipment รวม
+    void renderRightPanel();
     void renderLogPanel();
     void renderItems();
     void renderLevelUpEffect();
 
+    // ── Player actions ──
     void handlePlayerMove(int dc, int dr);
     void handleInventoryInput(sf::Keyboard::Key key);
     void tryPickupItem();
     void useOrEquipSelected();
-    void equipCore();          // ใส่แกนจาก inventory ไป core slot
-    void unequipCore();        // ถอดแกนจาก core slot กลับ inventory
+    void equipCore();
+    void unequipCore();
     void dropSelectedItem();
     void tryDescendStairs();
     void tryAscendStairs();
     void waitTurn();
 
+    // ── Turn / Combat ──
     void processTurn();
     void tryRespawnEnemies();
     void spawnEnemy(int floor);
@@ -71,17 +75,26 @@ private:
     void clearEnemies();
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
+
+    // ── Stats helpers (NEW) ──
+    int  computeBody()       const;  // HP*0.4 + ATK*0.3 + DEF*0.2 + Dodge*0.1
+    int  computeBattleIndex() const; // body + mentality + itemLv*bonus%
+    int  getItemLevelTotal() const;  // sum ของ equipment item value (grade)
+    void drainMentality();           // ลด maxMentality 3/turn เมื่อ hpDepleted
+
+    // ── Misc ──
     void addLog(const std::string& msg, sf::Color color = sf::Color(200,200,200));
     void newDungeon(bool keepPlayer = false);
     void updateCamera();
 
+    // ── SFML ──
     sf::RenderWindow m_window;
     sf::Font         m_font;
     bool             m_fontLoaded = false;
-
     sf::View         m_gameView;
     sf::View         m_uiView;
 
+    // ── Game objects ──
     TileMap              m_tileMap;
     FogOfWar             m_fog;
     Player*              m_player   = nullptr;
@@ -91,17 +104,19 @@ private:
     Equipment            m_equipment;
     CoreSlots            m_coreSlots;
 
-    // UI state
+    // ── UI state ──
     int  m_selectedSlot      = 0;
     bool m_viewEquipment     = false;
     int  m_selectedEquipSlot = 0;
     int  m_selectedCoreSlot  = 0;
     bool m_viewCores         = false;
 
+    // ── Dungeon state ──
     int  m_dungeonFloor  = 1;
     int  m_respawnTimer  = 0;
     bool m_levelUpFlash  = false;
     int  m_levelUpTimer  = 0;
+    bool m_playerDead    = false;  // ล็อค input เมื่อ mentality = 0
 
     struct LogEntry { std::string text; sf::Color color; };
     std::vector<LogEntry> m_log;

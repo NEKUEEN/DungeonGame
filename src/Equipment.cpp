@@ -29,12 +29,19 @@ const Item* Equipment::getItem(EquipSlot slot) const
     return &it->second;
 }
 
+int Equipment::getTotalHpBonus() const
+{
+    int bonus = 0;
+    for (auto& [slot, item] : m_equipped)
+        bonus += item.hpBonus;
+    return bonus;
+}
+
 int Equipment::getTotalAtkBonus() const
 {
     int bonus = 0;
     for (auto& [slot, item] : m_equipped)
-        if (item.type==ItemType::Weapon||item.type==ItemType::OffWeapon)
-            bonus += item.value;
+        bonus += item.atkBonus;
     return bonus;
 }
 
@@ -42,9 +49,15 @@ int Equipment::getTotalDefBonus() const
 {
     int bonus = 0;
     for (auto& [slot, item] : m_equipped)
-        if (item.type!=ItemType::Weapon&&item.type!=ItemType::OffWeapon
-            &&item.type!=ItemType::Food&&item.type!=ItemType::Potion)
-            bonus += item.value;
+        bonus += item.defBonus;
+    return bonus;
+}
+
+int Equipment::getTotalDodgeBonus() const
+{
+    int bonus = 0;
+    for (auto& [slot, item] : m_equipped)
+        bonus += item.dodgeBonus;
     return bonus;
 }
 
