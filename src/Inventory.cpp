@@ -2,12 +2,12 @@
 #include <algorithm>
 
 // ============================================================
-//  canStack  –  stack ได้เฉพาะ Food และ Potion ประเภทเดียวกัน
+//  canStack  –  stack ได้เฉพาะ item ที่ stackable และเหมือนกัน
 // ============================================================
 bool Inventory::canStack(const Item& a, const Item& b) const
 {
-    if (!a.isUsable() || !b.isUsable()) return false;
-    return a.type == b.type && a.name == b.name;
+    if (!a.stackable || !b.stackable) return false;
+    return a.type == b.type && a.name == b.name && a.spriteName == b.spriteName;
 }
 
 // ============================================================
@@ -16,7 +16,7 @@ bool Inventory::canStack(const Item& a, const Item& b) const
 bool Inventory::addItem(const Item& item)
 {
     // ลองหา stack ที่มีอยู่แล้ว
-    if (item.isUsable())
+    if (item.stackable)
     {
         for (auto& stack : m_stacks)
             if (canStack(stack.item, item))

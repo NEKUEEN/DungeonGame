@@ -10,13 +10,103 @@
       "stackable": true
     },
     {
+      "id": "bread",
+      "name": "Bread",
+      "type": "Food",
+      "desc": "Tasty bread to restore hunger.",
+      "value": 20,
+      "sprite": "item_food.png",
+      "stackable": true
+    },
+    {
+      "id": "apple",
+      "name": "Apple",
+      "type": "Food",
+      "desc": "A juicy apple.",
+      "value": 15,
+      "sprite": "item_food.png",
+      "stackable": true
+    },
+    {
+      "id": "health_potion",
+      "name": "Health Potion",
+      "type": "Potion",
+      "desc": "Restores HP.",
+      "value": 8,
+      "sprite": "item_potion.png",
+      "stackable": true
+    },
+    {
+      "id": "dagger",
+      "name": "Dagger",
+      "type": "Weapon",
+      "desc": "A small sharp blade.",
+      "value": 3,
+      "sprite": "item_weapon.png",
+      "stackable": false
+    },
+    {
+      "id": "shield",
+      "name": "Shield",
+      "type": "OffWeapon",
+      "desc": "Protects from attacks.",
+      "value": 2,
+      "sprite": "item_offweapon.png",
+      "stackable": false
+    },
+    {
+      "id": "helmet",
+      "name": "Helmet",
+      "type": "Helmet",
+      "desc": "Protects the head.",
+      "value": 2,
+      "sprite": "item_helmet.png",
+      "stackable": false
+    },
+    {
+      "id": "armor",
+      "name": "Armor",
+      "type": "BodyArmor",
+      "desc": "Protects the body.",
+      "value": 4,
+      "sprite": "item_armor.png",
+      "stackable": false
+    },
+    {
+      "id": "gloves",
+      "name": "Gloves",
+      "type": "Gloves",
+      "desc": "Protects the hands.",
+      "value": 1,
+      "sprite": "item_gloves.png",
+      "stackable": false
+    },
+    {
+      "id": "greaves",
+      "name": "Greaves",
+      "type": "Greaves",
+      "desc": "Protects the legs.",
+      "value": 1,
+      "sprite": "item_greaves.png",
+      "stackable": false
+    },
+    {
+      "id": "boots",
+      "name": "Boots",
+      "type": "Boots",
+      "desc": "Protects the feet.",
+      "value": 1,
+      "sprite": "item_boots.png",
+      "stackable": false
+    },
+    {
       "id": "goblin_core",
       "name": "Goblin Core",
       "type": "Core",
       "desc": "Essence of a goblin. Grants cunning.",
       "value": 5,
       "sprite": "item_goblin_core.png",
-      "stackable": true,
+      "stackable": false,
       "core_stats": {
         "body": 0,
         "mentality": 3,
@@ -31,7 +121,7 @@
       "desc": "Essence of a goblin warrior. Grants cunning and combat skills.",
       "value": 5,
       "sprite": "item_goblin_core.png",
-      "stackable": true,
+      "stackable": false,
       "core_stats": {
         "body": 10,
         "mentality": 3,
@@ -46,7 +136,7 @@
       "desc": "Essence of an orc. Grants brute strength.",
       "value": 18,
       "sprite": "item_orc_core.png",
-      "stackable": true,
+      "stackable": false,
       "core_stats": {
         "body": 5,
         "mentality": 0,
@@ -61,7 +151,7 @@
       "desc": "Essence of a rat. Grants minor agility.",
       "value": 2,
       "sprite": "item_rat_core.png",
-      "stackable": true,
+      "stackable": false,
       "core_stats": {
         "body": 1,
         "mentality": 1,

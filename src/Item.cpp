@@ -6,14 +6,14 @@ Item Item::makeFood()
     static const char* names[]={"Bread","Meat","Apple","Mushroom","Cheese"};
     Item i; i.type=ItemType::Food;
     i.name=names[std::rand()%5]; i.desc="Fills your stomach.";
-    i.value=30+std::rand()%30; return i;
+    i.value=30+std::rand()%30; i.stackable=true; return i;
 }
 
 Item Item::makePotion()
 {
     Item i; i.type=ItemType::Potion;
     i.name="Health Potion"; i.desc="Restores HP.";
-    i.value=8+std::rand()%8; return i;
+    i.value=8+std::rand()%8; i.stackable=true; return i;
 }
 
 Item Item::makeWeapon()

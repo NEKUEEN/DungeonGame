@@ -1,0 +1,1 @@
+Applying changes to Item.hpp, DropTable.hpp, Equipment, CoreSlots, and Game to support StatSheet bonuses and auto-apply on equip/unequip.

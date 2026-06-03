@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <algorithm>
+#include <optional>
 
 Game::Game()
     : m_window(sf::VideoMode({WINDOW_W, WINDOW_H}), "Dungeon and Stone",
@@ -26,7 +27,7 @@ Game::Game()
     // โหลด item database
     DropTable::instance().loadItems("assets/data/items.json");
 
-    m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
+    m_gameView.setSize({(float)GAME_VIEW_W*1.25f,(float)GAME_VIEW_H*1.25f});
     m_gameView.setViewport(sf::FloatRect({0.f,0.f},
         {(float)GAME_VIEW_W/WINDOW_W,(float)GAME_VIEW_H/WINDOW_H}));
     m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
@@ -134,13 +135,56 @@ void Game::spawnItems()
         att++;
         int col=1+std::rand()%(MAP_COLS-2),row=1+std::rand()%(MAP_ROWS-2);
         if (!m_tileMap.isWalkable(col,row)) continue;
+
         Item item;
+        std::optional<std::string> itemId;
         int r=std::rand()%10;
-        if(r<3)      item=Item::makeFood();
-        else if(r<5) item=Item::makePotion();
-        else if(r<7) item=Item::makeWeapon();
-        else if(r<8) item=Item::makeOffWeapon();
-        else         item=Item::makeArmor();
+        if (r<3)
+            itemId = DropTable::instance().getRandomItemIdByType("Food");
+        else if (r<5)
+            itemId = DropTable::instance().getRandomItemIdByType("Potion");
+        else if (r<7)
+            itemId = DropTable::instance().getRandomItemIdByType("Weapon");
+        else if (r<8)
+            itemId = DropTable::instance().getRandomItemIdByType("OffWeapon");
+        else
+        {
+            const char* armorTypes[] = {"Helmet","BodyArmor","Gloves","Greaves","Boots"};
+            itemId = DropTable::instance().getRandomItemIdByType(
+                armorTypes[std::rand() % 5]);
+        }
+
+        if (itemId)
+        {
+            const ItemData* idata = DropTable::instance().getItem(*itemId);
+            if (idata)
+            {
+                item.type       = idata->type == "Core" ? ItemType::Core :
+                                  idata->type == "Material" ? ItemType::Material :
+                                  idata->type == "Helmet" ? ItemType::Helmet :
+                                  idata->type == "BodyArmor" ? ItemType::BodyArmor :
+                                  idata->type == "Gloves" ? ItemType::Gloves :
+                                  idata->type == "Greaves" ? ItemType::Greaves :
+                                  idata->type == "Boots" ? ItemType::Boots :
+                                  idata->type == "Weapon" ? ItemType::Weapon :
+                                  idata->type == "OffWeapon" ? ItemType::OffWeapon : ItemType::Material;
+                item.name       = idata->name;
+                item.desc       = idata->desc;
+                item.value      = idata->value;
+                item.spriteName = idata->sprite;
+                item.stackable  = idata->stackable;
+            }
+        }
+
+        if (item.name.empty())
+        {
+            if(r<3)      item=Item::makeFood();
+            else if(r<5) item=Item::makePotion();
+            else if(r<7) item=Item::makeWeapon();
+            else if(r<8) item=Item::makeOffWeapon();
+            else         item=Item::makeArmor();
+        }
+
         item.col=col; item.row=row;
         m_mapItems.push_back(item);
     }
@@ -212,6 +256,10 @@ void Game::processEvents()
                 case sf::Keyboard::Key::Num4: m_selectedSlot=3; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Num5: m_selectedSlot=4; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Num6: m_selectedSlot=5; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num7: m_selectedSlot=6; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num8: m_selectedSlot=7; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num9: m_selectedSlot=8; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Num0: m_selectedSlot=9; if(m_viewCores) equipCore(); else if(!m_viewEquipment) useOrEquipSelected(); break; 
                 case sf::Keyboard::Key::Tab:
                     m_selectedSlot=(m_selectedSlot+1)%MAX_INVENTORY; break;
                 default: break;
@@ -419,6 +467,7 @@ void Game::playerAttack(Enemy* enemy)
             drop.desc       = idata->desc;
             drop.value      = idata->value;
             drop.spriteName = idata->sprite;
+            drop.stackable  = idata->stackable;
             drop.col        = enemy->getCol();
             drop.row        = enemy->getRow();
             m_mapItems.push_back(drop);
@@ -497,18 +546,11 @@ void Game::renderItems()
         if (!m_fog.isVisible(item.col,item.row)) continue;
         float px=(float)(item.col*TILE_SIZE),py=(float)(item.row*TILE_SIZE),ts=(float)TILE_SIZE;
 
-        // เลือก texture ตาม type
-        std::string texName;
-        switch(item.type)
-        {
-            case ItemType::Food:      texName="item_food";    break;
-            case ItemType::Potion:    texName="item_potion";  break;
-            case ItemType::Weapon:
-            case ItemType::OffWeapon: texName="item_weapon";  break;
-            case ItemType::Core:      texName="item_core";    break;
-            case ItemType::Material:  texName="gooner";break;
-            default:                  texName="item_armor";   break;
-        }
+        // เลือก texture ตาม spritePath ของไอเท็ม เพื่อให้ core/material ใช้ sprite จาก items.json
+        std::string path = item.spritePath();
+        std::string texName = path.substr(path.rfind('/')+1);
+        if (texName.find('.') != std::string::npos)
+            texName = texName.substr(0, texName.rfind('.'));
 
         const sf::Texture* tex = tm.get(texName);
         if (tex)
@@ -561,42 +603,28 @@ void Game::renderStatusPanel()
 
     if (!m_fontLoaded||!m_player) return;
     const Stats& s=m_player->getStats();
-    float x=px+10.f,y=10.f;
+    float x=px+10.f,y=(float)STATUS_PANEL_TOP_PADDING;
 
-    auto dl=[&](const std::string& text,sf::Color color=sf::Color::White,int size=11)
+    auto drawLine=[&](const std::string& label, const std::string& value, sf::Color color=sf::Color::White, int size=STATUS_LINE_SIZE)
     {
-        sf::Text t(m_font,text,(unsigned int)size);
+        sf::Text t(m_font,label+" "+value,(unsigned int)size);
         t.setFillColor(color); t.setPosition({x,y});
-        m_window.draw(t); y+=size+5.f;
+        m_window.draw(t); y+=size+STATUS_LINE_SPACING;
     };
 
-    dl("player 1",sf::Color::Yellow,13); y+=2.f;
-    dl("Floor: "+std::to_string(m_dungeonFloor),sf::Color(180,140,60),11); y+=2.f;
-    dl("level: "+std::to_string(s.level));
-    dl("EXP: "+std::to_string(s.exp)+"/"+std::to_string(s.expToNext),sf::Color(100,200,255),10);
-
-    float bw=(float)RIGHT_PANEL_W-20.f;
-    sf::RectangleShape ebg({bw,5.f}); ebg.setFillColor(sf::Color(30,30,60)); ebg.setPosition({x,y}); m_window.draw(ebg);
-    float er=std::clamp((float)s.exp/s.expToNext,0.f,1.f);
-    sf::RectangleShape ebar({bw*er,5.f}); ebar.setFillColor(sf::Color(80,160,255)); ebar.setPosition({x,y}); m_window.draw(ebar);
-    y+=10.f;
-
-    dl("body: "+std::to_string(s.body));
-    dl("HP: "+std::to_string(s.hp)+"/"+std::to_string(s.body),
-       s.hp>s.body/2?sf::Color(50,200,50):sf::Color(220,80,80));
-    dl("mentality: "+std::to_string(s.mentality));
-    dl("ability: "+std::to_string(s.ability)); y+=2.f;
-    sf::Color hc=s.hunger>50?sf::Color(100,200,100):s.hunger>20?sf::Color(220,180,50):sf::Color(220,60,60);
-    dl("hunger: "+std::to_string(s.hunger)+"/100",hc); y+=2.f;
-    dl("ATK: +"+std::to_string(m_equipment.getTotalAtkBonus()),sf::Color(200,200,100),10);
-    dl("DEF: +"+std::to_string(m_equipment.getTotalDefBonus()),sf::Color(140,180,140),10);
-    dl("Turn: "+std::to_string(m_turnCount),sf::Color(120,120,120),10);
-    dl("Enemies: "+std::to_string(m_enemies.size()),sf::Color(200,100,100),10);
-    y+=6.f;
-    dl("[HJKL] Move [G]Pick",sf::Color(70,70,70),9);
-    dl("[D]Drop [1-6]Use/Eq",sf::Color(70,70,70),9);
-    dl("[E]Equip [Tab]Sel",sf::Color(70,70,70),9);
-    dl("[.]Down [,]Up [Spc]Wait",sf::Color(70,70,70),9);
+    // Display only requested fields
+    {
+        sf::Text header(m_font,"player 1",STATUS_HEADER_SIZE);
+        header.setFillColor(sf::Color::Yellow);
+        header.setPosition({x,y}); m_window.draw(header); y+=STATUS_HEADER_SIZE+STATUS_HEADER_SPACING;
+    }
+    drawLine("level:", std::to_string(s.level));
+    drawLine("body:", std::to_string(s.body));
+    drawLine("mentality:", std::to_string(s.mentality));
+    drawLine("ability:", std::to_string(s.ability));
+    drawLine("item level:", std::to_string(s.itemLevel));
+    drawLine("Comprehensive Battle", "");
+    drawLine("Index:", std::to_string(s.battleIndex));
 }
 
 // ============================================================

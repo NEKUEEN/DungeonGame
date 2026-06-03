@@ -20,6 +20,7 @@ struct Item
     int         value   = 0;
     int         col     = -1;
     int         row     = -1;
+    bool        stackable = false;
 
     static Item makeFood();
     static Item makePotion();

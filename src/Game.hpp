@@ -12,15 +12,21 @@
 #include "TextureManager.hpp"
 #include "CoreSlots.hpp"
 
-constexpr int WINDOW_W        = 860;
-constexpr int WINDOW_H        = 660;
-constexpr int RIGHT_PANEL_W   = 220;
-constexpr int LOG_PANEL_H     = 140;
+constexpr int WINDOW_W        = 800;
+constexpr int WINDOW_H        = 600;
+constexpr int RIGHT_PANEL_W   = 250;
+constexpr int LOG_PANEL_H     = 170;
 constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;
 constexpr int GAME_VIEW_H     = WINDOW_H - LOG_PANEL_H;
 constexpr int INV_GRID_H      = 200;   // เพิ่มความสูงสำหรับ equip slots
-constexpr int STATUS_PANEL_H  = GAME_VIEW_H - INV_GRID_H;
-constexpr int LOG_MAX_LINES   = 7;
+// Status panel font sizes and spacing (can be tuned)
+constexpr int STATUS_PANEL_TOP_PADDING = 16;
+constexpr int STATUS_HEADER_SIZE      = 13;
+constexpr int STATUS_LINE_SIZE        = 10;
+constexpr int STATUS_LINE_SPACING     = 10;
+constexpr int STATUS_HEADER_SPACING   = 16;
+constexpr int STATUS_PANEL_H          = GAME_VIEW_H - INV_GRID_H;
+constexpr int LOG_MAX_LINES      = 7;
 
 constexpr int TILE_SIZE       = 64;
 constexpr int MAP_COLS        = 50;
