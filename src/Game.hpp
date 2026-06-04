@@ -19,10 +19,9 @@ constexpr int RIGHT_PANEL_W   = 250;
 constexpr int LOG_PANEL_H     = 170;
 constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;
 constexpr int GAME_VIEW_H     = WINDOW_H - LOG_PANEL_H;
-constexpr int INV_GRID_H      = 200;
+constexpr int INV_GRID_H      = 185;
 
-// Status panel tuning
-constexpr int STATUS_PANEL_TOP_PADDING = 16;
+constexpr int STATUS_PANEL_TOP_PADDING = 20;
 constexpr int STATUS_HEADER_SIZE       = 13;
 constexpr int STATUS_LINE_SIZE         = 10;
 constexpr int STATUS_LINE_SPACING      = 10;
@@ -55,6 +54,7 @@ private:
     void renderItems();
     void renderLevelUpEffect();
     void renderSkillPanel();
+    void renderTargeting();        // NEW — วาด cursor + เส้น
 
     // ── Player actions ──
     void handlePlayerMove(int dc, int dr);
@@ -67,6 +67,12 @@ private:
     void tryDescendStairs();
     void tryAscendStairs();
     void waitTurn();
+
+    // ── Targeting ──
+    void enterTargetingMode();                  // NEW
+    void moveTargetCursor(int dc, int dr);      // NEW
+    void confirmTarget();                        // NEW
+    void cancelTargeting();                      // NEW
 
     // ── Turn / Combat ──
     void processTurn();
@@ -86,9 +92,13 @@ private:
 
     // ── Skill helpers ──
     void useSkillBuff(const std::string& skillId);
-    void useSkillRanged(int dc, int dr);
+    void fireRangedAt(int targetCol, int targetRow);   // NEW — ยิงไปที่ target
     int  getBuffedAtk() const;
     int  getBuffedDef() const;
+
+    // ── Line helper ──
+    // return list of tiles จาก (x0,y0) ถึง (x1,y1) — Bresenham
+    std::vector<sf::Vector2i> getLine(int x0, int y0, int x1, int y1) const;
 
     // ── Misc ──
     void addLog(const std::string& msg, sf::Color color = sf::Color(200,200,200));
@@ -120,7 +130,13 @@ private:
     bool m_viewCores         = false;
 
     // ── Skill state ──
-    bool m_awaitingRangedDir = false;  // รอผู้เล่นกดทิศหลังกด F
+    // (ลบ m_awaitingRangedDir ออก ใช้ targeting mode แทน)
+
+    // ── Targeting state (NEW) ──
+    bool m_targetingMode  = false;   // อยู่ใน targeting mode หรือเปล่า
+    int  m_targetCol      = 0;       // ตำแหน่ง cursor ปัจจุบัน
+    int  m_targetRow      = 0;
+    std::string m_targetSkillId;     // skill ที่กำลัง target อยู่
 
     // ── Dungeon state ──
     int  m_dungeonFloor  = 1;

@@ -39,7 +39,7 @@
       "atk_pct": 0,
       "def_pct": 0,
       "dodge_pct": 0,
-      "damage": 100,
+      "damage": 1000,
       "range": 6
     }
   ]

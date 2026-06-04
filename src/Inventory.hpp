@@ -3,7 +3,7 @@
 #include <vector>
 #include "Item.hpp"
 
-constexpr int MAX_INVENTORY = 12;
+constexpr int MAX_INVENTORY = 20;
 
 // ============================================================
 //  ItemStack  –  item + จำนวน
