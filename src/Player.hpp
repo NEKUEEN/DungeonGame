@@ -1,45 +1,48 @@
 #pragma once
 #include <SFML/Graphics.hpp>
+#include <vector>
+#include <string>
 #include "TileMap.hpp"
+#include "Skill.hpp"
 
 struct Stats
 {
-    int level       = 1;
+    int level = 1;
 
     // ── Base stats (ก่อน equipment/core) ──
-    int maxHp       = 25;
-    int maxAtk      = 5;
-    int maxDef      = 2;
-    int maxDodge    = 2;
+    int maxHp    = 25;
+    int maxAtk   = 5;
+    int maxDef   = 2;
+    int maxDodge = 2;
 
     // ── Computed by Game::computeBody() ──
-    int body        = 0;   // maxHp*0.4 + maxAtk*0.3 + maxDef*0.2 + maxDodge*0.1
+    int body = 0;
 
-    // ── HP bar (เลือดจริง ใต้ตัวละคร) ──
-    int hp          = 25;  // เริ่ม = maxHp
+    // ── HP bar ──
+    int hp = 25;
 
-    // ── Mentality (เลือดสำรอง — แสดงค่า max, ไม่ลดตาม dmg) ──
-    int maxMentality = 20;
-    int mentality    = 20;
-    bool hpDepleted  = false;  // flag: hp ลงถึง 0 → drain mentality ทุก turn
+    // ── Mentality ──
+    int  maxMentality = 20;
+    int  mentality    = 20;
+    bool hpDepleted   = false;
 
     // ── Ability (จาก core bonus) ──
-    int ability     = 0;
+    int ability = 0;
 
-    // ── Item Level (sum grade จาก equipment — set จาก Game) ──
-    int itemLevel   = 0;
+    // ── Item Level ──
+    int itemLevel = 0;
 
-    // ── Battle Index (computed ใน Game) ──
+    // ── Battle Index ──
     int battleIndex = 0;
 
     // ── Hunger ──
-    int hunger      = 100;
+    int hunger = 100;
 
     // ── EXP ──
-    int exp         = 0;
-    int expToNext   = 100;
+    int exp       = 0;
+    int expToNext = 100;
 
-    // ── Timers (ไม่แสดงใน UI) ──
+    // ── Timers ──
     int hungerTimer = 0;
     int regenTimer  = 0;
 };
@@ -53,22 +56,41 @@ public:
     bool tryMove(int dc, int dr, const TileMap& map);
     void render(sf::RenderWindow& window);
     void onTurnPassed();
-
     bool addExp(int amount);
     void levelUp();
 
     int getCol() const { return m_col; }
     int getRow() const { return m_row; }
-    Stats& getStats()             { return m_stats; }
+
+    Stats&       getStats()       { return m_stats; }
     const Stats& getStats() const { return m_stats; }
+
+    // ── Skills ──
+    std::vector<SkillInstance>&       getSkills()       { return m_skills; }
+    const std::vector<SkillInstance>& getSkills() const { return m_skills; }
+
+    SkillInstance* findSkill(const std::string& id)
+    {
+        for (auto& sk : m_skills)
+            if (sk.data.id == id) return &sk;
+        return nullptr;
+    }
+
+    const SkillInstance* findSkill(const std::string& id) const
+    {
+        for (const auto& sk : m_skills)
+            if (sk.data.id == id) return &sk;
+        return nullptr;
+    }
 
 private:
     void drawHPBar(sf::RenderWindow& window);
 
-    int   m_col, m_row, m_tileSize;
-    Stats m_stats;
-
+    int         m_col, m_row, m_tileSize;
+    Stats       m_stats;
     sf::Texture m_texture;
     sf::Sprite* m_sprite    = nullptr;
     bool        m_hasSprite = false;
+
+    std::vector<SkillInstance> m_skills;
 };

@@ -1,0 +1,46 @@
+{
+  "skills": [
+    {
+      "id": "power_strike",
+      "name": "Power Strike",
+      "desc": "Buff ATK +50% for 5 turns.",
+      "type": "active_buff",
+      "key": "Q",
+      "cooldown": 20,
+      "duration": 5,
+      "atk_pct": 50,
+      "def_pct": 0,
+      "dodge_pct": 0,
+      "damage": 0,
+      "range": 0
+    },
+    {
+      "id": "iron_skin",
+      "name": "Iron Skin",
+      "desc": "Passive: DEF +20% always.",
+      "type": "passive",
+      "key": "",
+      "cooldown": 0,
+      "duration": 0,
+      "atk_pct": 0,
+      "def_pct": 20,
+      "dodge_pct": 0,
+      "damage": 0,
+      "range": 0
+    },
+    {
+      "id": "stone_throw",
+      "name": "Stone Throw",
+      "desc": "Throw a stone. [F] then arrow key. Range 6, dmg ATK/2.",
+      "type": "active_ranged",
+      "key": "F",
+      "cooldown": 1,
+      "duration": 0,
+      "atk_pct": 0,
+      "def_pct": 0,
+      "dodge_pct": 0,
+      "damage": 100,
+      "range": 6
+    }
+  ]
+}

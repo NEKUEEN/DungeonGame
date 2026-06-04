@@ -11,6 +11,7 @@
 #include "Equipment.hpp"
 #include "TextureManager.hpp"
 #include "CoreSlots.hpp"
+#include "SkillDB.hpp"
 
 constexpr int WINDOW_W        = 800;
 constexpr int WINDOW_H        = 600;
@@ -53,6 +54,7 @@ private:
     void renderLogPanel();
     void renderItems();
     void renderLevelUpEffect();
+    void renderSkillPanel();
 
     // ── Player actions ──
     void handlePlayerMove(int dc, int dr);
@@ -76,11 +78,17 @@ private:
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
 
-    // ── Stats helpers (NEW) ──
-    int  computeBody()       const;  // HP*0.4 + ATK*0.3 + DEF*0.2 + Dodge*0.1
-    int  computeBattleIndex() const; // body + mentality + itemLv*bonus%
-    int  getItemLevelTotal() const;  // sum ของ equipment item value (grade)
-    void drainMentality();           // ลด maxMentality 3/turn เมื่อ hpDepleted
+    // ── Stats helpers ──
+    int  computeBody()        const;
+    int  computeBattleIndex() const;
+    int  getItemLevelTotal()  const;
+    void drainMentality();
+
+    // ── Skill helpers ──
+    void useSkillBuff(const std::string& skillId);
+    void useSkillRanged(int dc, int dr);
+    int  getBuffedAtk() const;
+    int  getBuffedDef() const;
 
     // ── Misc ──
     void addLog(const std::string& msg, sf::Color color = sf::Color(200,200,200));
@@ -111,12 +119,15 @@ private:
     int  m_selectedCoreSlot  = 0;
     bool m_viewCores         = false;
 
+    // ── Skill state ──
+    bool m_awaitingRangedDir = false;  // รอผู้เล่นกดทิศหลังกด F
+
     // ── Dungeon state ──
     int  m_dungeonFloor  = 1;
     int  m_respawnTimer  = 0;
     bool m_levelUpFlash  = false;
     int  m_levelUpTimer  = 0;
-    bool m_playerDead    = false;  // ล็อค input เมื่อ mentality = 0
+    bool m_playerDead    = false;
 
     struct LogEntry { std::string text; sf::Color color; };
     std::vector<LogEntry> m_log;
