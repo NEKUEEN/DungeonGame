@@ -21,7 +21,7 @@
       "hp": 12, "attack": 5, "defense": 1, "exp": 1,
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblin_core", "chance": 0.15 }
+        { "item": "goblinWarrior_core", "chance": 0.15 }
       ]
     },
     {
@@ -33,7 +33,7 @@
       "hp": 10, "attack": 6, "defense": 0, "exp": 1,
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblin_core", "chance": 0.15 }
+        { "item": "goblinArcher_core", "chance": 0.99 }
       ]
     },
     {

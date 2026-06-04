@@ -91,8 +91,18 @@ public:
         for (const auto& entry : it->second)
         {
             float r = m_dist(m_rng);
-            if (r <= entry.chance)
-                result.push_back(entry.itemId);
+            if (r < entry.chance)
+            {
+                if (m_items.find(entry.itemId) == m_items.end())
+                {
+                    std::cerr << "[DropTable] Unknown drop item id '" << entry.itemId
+                              << "' for monster '" << monsterId << "'\n";
+                }
+                else
+                {
+                    result.push_back(entry.itemId);
+                }
+            }
         }
         return result;
     }

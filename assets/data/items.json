@@ -158,6 +158,21 @@
       }
     },
     {
+      "id": "goblinArcher_core",
+      "name": "Goblin Archer Core",
+      "type": "Core",
+      "desc": "Essence of a goblin archer. Grants cunning and ranged combat skills.",
+      "value": 5,
+      "sprite": "item_goblin_core.png",
+      "stackable": false,
+      "core_stats": {
+        "hp": 5,
+        "atk": 15,
+        "def": 20,
+        "dodge": 10
+      }
+    },
+    {
       "id": "orc_core",
       "name": "Orc Core",
       "type": "Core",
