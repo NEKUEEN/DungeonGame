@@ -80,6 +80,9 @@ public:
                 d.coreAtk   = cs.contains("atk")   ? cs["atk"].get<int>()   : 0;
                 d.coreDef   = cs.contains("def")   ? cs["def"].get<int>()   : 0;
                 d.coreDodge = cs.contains("dodge") ? cs["dodge"].get<int>() : 0;
+                d.coreMana  = cs.contains("mana")  ? cs["mana"].get<int>()  : 0;
+                d.coreMagicDmg  = cs.contains("magic_dmg")  ? cs["magic_dmg"].get<int>()  : 0;
+                d.coreMagicRes  = cs.contains("magic_res")  ? cs["magic_res"].get<int>()  : 0;
             }
 
             // skills ที่ core ให้

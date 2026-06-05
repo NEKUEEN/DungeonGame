@@ -46,6 +46,9 @@ CoreStats CoreSlots::readStats(const Item& core) const
     cs.atk   = data->coreAtk;
     cs.def   = data->coreDef;
     cs.dodge = data->coreDodge;
+    cs.mana = data->coreMana;
+    cs.magicDmg = data->coreMagicDmg;
+    cs.magicRes = data->coreMagicRes;
     return cs;
 }
 
@@ -60,6 +63,9 @@ CoreStats CoreSlots::getTotalBonus() const
         total.atk   += cs.atk;
         total.def   += cs.def;
         total.dodge += cs.dodge;
+        total.mana += cs.mana;
+        total.magicDmg += cs.magicDmg;
+        total.magicRes += cs.magicRes;
     }
     return total;
 }
@@ -135,6 +141,9 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         if (cs.atk)   info += " ATK+"+std::to_string(cs.atk);
         if (cs.def)   info += " DEF+"+std::to_string(cs.def);
         if (cs.dodge) info += " DOD+"+std::to_string(cs.dodge);
+        if (cs.mana)  info += " MANA+"+std::to_string(cs.mana);
+        if (cs.magicDmg) info += " MAGIC DMG+"+std::to_string(cs.magicDmg);
+        if (cs.magicRes) info += " MAGIC RES+"+std::to_string(cs.magicRes);
 
         sf::Text infoTxt(font, info, 8);
         infoTxt.setFillColor(sf::Color(100,200,255));
