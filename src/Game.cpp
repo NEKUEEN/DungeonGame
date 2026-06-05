@@ -58,9 +58,9 @@ int Game::computeMentality() const
     if (!m_player) return 0;
     const Stats& s = m_player->getStats();
     CoreStats cb   = m_coreSlots.getTotalBonus();
-    int mana = s.maxMana + cb.mana;             + m_equipment.getTotalManaBonus();
-    int magicDmg = s.maxMagicDmg + cb.magicDmg; + m_equipment.getTotalMagicDmgBonus();
-    int magicRes = s.maxMagicRes + cb.magicRes; + m_equipment.getTotalMagicResBonus();
+    int mana = s.maxMana + cb.mana             + m_equipment.getTotalManaBonus();
+    int magicDmg = s.maxMagicDmg + cb.magicDmg + m_equipment.getTotalMagicDmgBonus();
+    int magicRes = s.maxMagicRes + cb.magicRes + m_equipment.getTotalMagicResBonus();
     return (int)(mana * 0.4f + magicDmg * 0.3f + magicRes * 0.3f);
 }
 
@@ -444,6 +444,9 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         drop.atkBonus   = idata->atkBonus;
                         drop.defBonus   = idata->defBonus;
                         drop.dodgeBonus = idata->dodgeBonus;
+                        drop.manaBonus  = idata->manaBonus;
+                        drop.magicDmgBonus = idata->magicDmgBonus;
+                        drop.magicResBonus = idata->magicResBonus;
                         drop.spriteName = idata->sprite;
                         drop.stackable  = idata->stackable;
                         drop.col        = e->getCol();

@@ -71,6 +71,9 @@ public:
             d.atkBonus   = it.contains("atk")   ? it["atk"].get<int>()   : 0;
             d.defBonus   = it.contains("def")   ? it["def"].get<int>()   : 0;
             d.dodgeBonus = it.contains("dodge") ? it["dodge"].get<int>() : 0;
+            d.manaBonus  = it.contains("mana")  ? it["mana"].get<int>()  : 0;
+            d.magicDmgBonus  = it.contains("magic_dmg")  ? it["magic_dmg"].get<int>()  : 0;
+            d.magicResBonus  = it.contains("magic_res")  ? it["magic_res"].get<int>()  : 0;
 
             // core_stats
             if (it.contains("core_stats"))
