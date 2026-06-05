@@ -26,6 +26,9 @@ struct ItemData
     int  atkBonus   = 0;
     int  defBonus   = 0;
     int  dodgeBonus = 0;
+    int  manaBonus  = 0;
+    int  magicDmgBonus = 0;
+    int  magicResBonus = 0;
     bool stackable  = true;
 
     // core_stats (เฉพาะ Core items)
@@ -33,6 +36,9 @@ struct ItemData
     int coreAtk   = 0;
     int coreDef   = 0;
     int coreDodge = 0;
+    int coreMana  = 0;
+    int coreMagicDmg = 0;
+    int coreMagicRes = 0;
 
     // skills ที่ core นี้ให้เมื่อ equip
     std::vector<std::string> coreSkills;

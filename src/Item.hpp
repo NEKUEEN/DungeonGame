@@ -23,9 +23,12 @@ struct Item
     int         atkBonus   = 0;
     int         defBonus   = 0;
     int         dodgeBonus = 0;
+    int         manaBonus  = 0;  // เพิ่ม: สำหรับ Core ที่มี bonus mana
+    int         magicDmgBonus = 0; // เพิ่ม: สำหรับ Core ที่มี bonus magic damage
+    int         magicResBonus = 0; // เพิ่ม: สำหรับ Core ที่มี bonus magic resistance
+    bool        stackable  = false;
     int         col        = -1;
     int         row        = -1;
-    bool        stackable  = false;
 
     static Item makeFood();
     static Item makePotion();

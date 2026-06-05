@@ -61,6 +61,31 @@ int Equipment::getTotalDodgeBonus() const
     return bonus;
 }
 
+int Equipment::getTotalManaBonus() const
+{
+    int bonus = 0;
+    for (auto& [slot, item] : m_equipped)
+        bonus += item.manaBonus;
+    return bonus;
+}
+
+int Equipment::getTotalMagicDmgBonus() const
+{
+    int bonus = 0;
+    for (auto& [slot, item] : m_equipped)
+        bonus += item.magicDmgBonus;
+    return bonus;
+}
+
+int Equipment::getTotalMagicResBonus() const
+{
+    int bonus = 0;
+    for (auto& [slot, item] : m_equipped)
+        bonus += item.magicResBonus;
+    return bonus;
+}
+
+
 // ============================================================
 //  Render  –  แสดง equipment slots
 // ============================================================

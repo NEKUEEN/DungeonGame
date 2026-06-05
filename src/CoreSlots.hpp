@@ -15,6 +15,9 @@ struct CoreStats
     int atk   = 0;
     int def   = 0;
     int dodge = 0;
+    int mana = 0;
+    int magicDmg = 0;
+    int magicRes = 0;
     // อนาคต: int speed = 0; int atkSpd = 0;
     // อนาคต mentality: int magicDmg = 0; int mana = 0; int magicRes = 0;
 };

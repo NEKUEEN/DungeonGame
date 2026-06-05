@@ -36,6 +36,9 @@ public:
     int getTotalAtkBonus() const;
     int getTotalDefBonus() const;
     int getTotalDodgeBonus() const;
+    int getTotalManaBonus() const;
+    int getTotalMagicDmgBonus() const;
+    int getTotalMagicResBonus() const;
 
     void render(sf::RenderWindow& window, const sf::Font& font,
                 int selectedSlot, bool focused);
