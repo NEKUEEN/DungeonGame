@@ -614,6 +614,8 @@ void Game::spawnItems()
                 item.name=idata->name; item.desc=idata->desc; item.value=idata->value;
                 item.hpBonus=idata->hpBonus; item.atkBonus=idata->atkBonus;
                 item.defBonus=idata->defBonus; item.dodgeBonus=idata->dodgeBonus;
+                item.manaBonus=idata->manaBonus; item.magicDmgBonus=idata->magicDmgBonus;
+                item.magicResBonus=idata->magicResBonus;
                 item.spriteName=idata->sprite; item.stackable=idata->stackable;
             }
         }
@@ -997,6 +999,8 @@ void Game::playerAttack(Enemy* enemy)
             drop.name=idata->name; drop.desc=idata->desc; drop.value=idata->value;
             drop.hpBonus=idata->hpBonus; drop.atkBonus=idata->atkBonus;
             drop.defBonus=idata->defBonus; drop.dodgeBonus=idata->dodgeBonus;
+            drop.manaBonus=idata->manaBonus; drop.magicDmgBonus=idata->magicDmgBonus;
+            drop.magicResBonus=idata->magicResBonus;
             drop.spriteName=idata->sprite; drop.stackable=idata->stackable;
             drop.col=enemy->getCol(); drop.row=enemy->getRow();
             m_mapItems.push_back(drop);
