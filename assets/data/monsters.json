@@ -33,7 +33,7 @@
       "hp": 10, "attack": 6, "defense": 0, "exp": 1,
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblinArcher_core", "chance": 0.99 }
+        { "item": "goblinArcher_core", "chance": 0.15 }
       ]
     },
     {
@@ -45,7 +45,7 @@
       "hp": 20, "attack": 9, "defense": 2, "exp": 2,
       "drops": [
         { "item": "magic_stone", "chance": 0.80 },
-        { "item": "goblin_core", "chance": 0.35 }
+        { "item": "goblinWizard_core", "chance": 0.35 }
       ]
     },
     {
@@ -57,7 +57,7 @@
       "hp": 25, "attack": 10, "defense": 4, "exp": 2,
       "drops": [
         { "item": "magic_stone", "chance": 0.80 },
-        { "item": "goblin_core", "chance": 0.35 }
+        { "item": "goblinHero_core", "chance": 0.35 }
       ]
     },
     {
@@ -69,7 +69,7 @@
       "hp": 60, "attack": 18, "defense": 8, "exp": 3,
       "drops": [
         { "item": "magic_stone", "chance": 1.00 },
-        { "item": "goblin_core", "chance": 0.75 }
+        { "item": "goblinElder_core", "chance": 0.75 }
       ]
     },
     {

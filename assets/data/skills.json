@@ -5,42 +5,62 @@
       "name": "Power Strike",
       "desc": "Buff ATK +50% for 5 turns.",
       "type": "active_buff",
-      "key": "Q",
+      "hotbar_slot": -1,
       "cooldown": 20,
       "duration": 5,
-      "atk_pct": 50,
-      "def_pct": 0,
-      "dodge_pct": 0,
-      "damage": 0,
-      "range": 0
+      "effect": {
+        "atk_pct": 50
+      }
     },
     {
       "id": "iron_skin",
       "name": "Iron Skin",
       "desc": "Passive: DEF +20% always.",
       "type": "passive",
-      "key": "",
+      "hotbar_slot": -1,
       "cooldown": 0,
       "duration": 0,
-      "atk_pct": 0,
-      "def_pct": 20,
-      "dodge_pct": 0,
-      "damage": 0,
-      "range": 0
+      "effect": {
+        "def_pct": 20
+      }
     },
     {
       "id": "stone_throw",
       "name": "Stone Throw",
-      "desc": "Throw a stone. [F] then arrow key. Range 6, dmg ATK/2.",
+      "desc": "Throw a stone. Range 6, dmg ATK/2.",
       "type": "active_ranged",
-      "key": "F",
+      "hotbar_slot": -1,
       "cooldown": 1,
       "duration": 0,
-      "atk_pct": 0,
-      "def_pct": 0,
-      "dodge_pct": 0,
-      "damage": 1000,
-      "range": 6
+      "effect": {
+        "damage_pct": 50,
+        "range": 6
+      }
+    },
+    {
+      "id": "quick_heal",
+      "name": "Quick Heal",
+      "desc": "Instantly heal 20 HP.",
+      "type": "active_heal",
+      "hotbar_slot": -1,
+      "cooldown": 10,
+      "duration": 0,
+      "effect": {
+        "heal_flat": 20,
+        "heal_pct": 0
+      }
+    },
+    {
+      "id": "blink",
+      "name": "Blink",
+      "desc": "Teleport to a tile within range 5.",
+      "type": "active_warp",
+      "hotbar_slot": -1,
+      "cooldown": 15,
+      "duration": 0,
+      "effect": {
+        "range": 5
+      }
     }
   ]
 }

@@ -31,16 +31,41 @@ public:
             d.desc     = s["desc"].get<std::string>();
             d.cooldown = s["cooldown"].get<int>();
             d.duration = s["duration"].get<int>();
-            d.atkPct   = s["atk_pct"].get<int>();
-            d.defPct   = s["def_pct"].get<int>();
-            d.dodgePct = s["dodge_pct"].get<int>();
-            d.damage   = s["damage"].get<int>();
-            d.range    = s["range"].get<int>();
+            d.hotbarSlot = s.contains("hotbar_slot") ? s["hotbar_slot"].get<int>() : -1;
 
+            // type
             std::string t = s["type"].get<std::string>();
             if      (t == "active_buff")   d.type = SkillType::ActiveBuff;
             else if (t == "active_ranged") d.type = SkillType::ActiveRanged;
+            else if (t == "active_heal")   d.type = SkillType::ActiveHeal;
+            else if (t == "active_warp")   d.type = SkillType::ActiveWarp;
+            else if (t == "active_aoe")    d.type = SkillType::ActiveAoe;
             else                           d.type = SkillType::Passive;
+
+            // effect — รองรับทั้ง format ใหม่ (effect object) และเก่า (flat fields)
+            if (s.contains("effect"))
+            {
+                const auto& e = s["effect"];
+                if (e.contains("atk_pct"))      d.effect.atkPct      = e["atk_pct"].get<int>();
+                if (e.contains("def_pct"))       d.effect.defPct      = e["def_pct"].get<int>();
+                if (e.contains("dodge_pct"))     d.effect.dodgePct    = e["dodge_pct"].get<int>();
+                if (e.contains("heal_flat"))     d.effect.healFlat    = e["heal_flat"].get<int>();
+                if (e.contains("heal_pct"))      d.effect.healPct     = e["heal_pct"].get<int>();
+                if (e.contains("damage_pct"))    d.effect.damagePct   = e["damage_pct"].get<int>();
+                if (e.contains("range"))         d.effect.range       = e["range"].get<int>();
+                if (e.contains("speed_bonus"))   d.effect.speedBonus  = e["speed_bonus"].get<int>();
+                if (e.contains("atk_speed_pct")) d.effect.atkSpeedPct = e["atk_speed_pct"].get<int>();
+                if (e.contains("aoe_radius"))    d.effect.aoeRadius   = e["aoe_radius"].get<int>();
+            }
+            else
+            {
+                // backward-compat: flat fields (skills.json เก่า)
+                if (s.contains("atk_pct"))   d.effect.atkPct    = s["atk_pct"].get<int>();
+                if (s.contains("def_pct"))   d.effect.defPct    = s["def_pct"].get<int>();
+                if (s.contains("dodge_pct")) d.effect.dodgePct  = s["dodge_pct"].get<int>();
+                if (s.contains("damage"))    d.effect.damagePct = s["damage"].get<int>();
+                if (s.contains("range"))     d.effect.range     = s["range"].get<int>();
+            }
 
             m_skills[d.id] = d;
         }
@@ -54,7 +79,6 @@ public:
         return it == m_skills.end() ? nullptr : &it->second;
     }
 
-    // return SkillData ทั้งหมด (สำหรับ init player skills)
     std::vector<SkillData> getAll() const
     {
         std::vector<SkillData> out;

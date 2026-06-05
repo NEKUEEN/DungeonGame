@@ -16,12 +16,16 @@ Player::Player(int startCol, int startRow, int tileSize)
         m_hasSprite = true;
     }
 
-    // โหลด skills จาก SkillDB (ต้อง load ก่อนสร้าง Player)
+    // โหลด skills จาก SkillDB และ assign hotbar ตาม hotbarSlot
     for (const auto& sd : SkillDB::instance().getAll())
     {
         SkillInstance inst;
         inst.data = sd;
         m_skills.push_back(inst);
+
+        // assign hotbar จาก JSON
+        if (sd.hotbarSlot >= 0 && sd.hotbarSlot < 9)
+            m_hotbar[sd.hotbarSlot] = sd.id;
     }
 }
 
@@ -143,4 +147,6 @@ void Player::onTurnPassed()
         m_stats.hp = 0;
         m_stats.hpDepleted = true;
     }
+
+    // AP reset ทำใน Game::recalcAP() แล้ว
 }

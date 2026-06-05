@@ -54,7 +54,8 @@ private:
     void renderItems();
     void renderLevelUpEffect();
     void renderSkillPanel();
-    void renderTargeting();        // NEW — วาด cursor + เส้น
+    void renderHotbar();
+    void renderTargeting();
 
     // ── Player actions ──
     void handlePlayerMove(int dc, int dr);
@@ -68,13 +69,18 @@ private:
     void tryAscendStairs();
     void waitTurn();
 
-    // ── Targeting ──
-    void enterTargetingMode();                  // NEW
-    void moveTargetCursor(int dc, int dr);      // NEW
-    void confirmTarget();                        // NEW
-    void cancelTargeting();                      // NEW
+    // ── Skill (hotbar) ──
+    void executeSkill(int hotbarIdx);        // กด Num1-9 → ใช้ skill ใน slot
+    void executeAoe(SkillInstance* sk);      // AOE รอบตัว
+    void executeWarp(int col, int row);      // teleport ไปที่ target
 
-    // ── Turn / Combat ──
+    // ── Targeting ──
+    void enterTargetingMode();
+    void moveTargetCursor(int dc, int dr);
+    void confirmTarget();
+    void cancelTargeting();
+
+    // ── Turn / Combat / AP ──
     void processTurn();
     void tryRespawnEnemies();
     void spawnEnemy(int floor);
@@ -83,6 +89,7 @@ private:
     void clearEnemies();
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
+    void recalcAP();                         // คำนวณ/reset AP จาก buff/passive
 
     // ── Stats helpers ──
     int  computeBody()        const;
@@ -90,14 +97,13 @@ private:
     int  getItemLevelTotal()  const;
     void drainMentality();
 
-    // ── Skill helpers ──
+    // ── Skill helpers (legacy) ──
     void useSkillBuff(const std::string& skillId);
-    void fireRangedAt(int targetCol, int targetRow);   // NEW — ยิงไปที่ target
+    void fireRangedAt(int targetCol, int targetRow);
     int  getBuffedAtk() const;
     int  getBuffedDef() const;
 
     // ── Line helper ──
-    // return list of tiles จาก (x0,y0) ถึง (x1,y1) — Bresenham
     std::vector<sf::Vector2i> getLine(int x0, int y0, int x1, int y1) const;
 
     // ── Misc ──
@@ -129,14 +135,11 @@ private:
     int  m_selectedCoreSlot  = 0;
     bool m_viewCores         = false;
 
-    // ── Skill state ──
-    // (ลบ m_awaitingRangedDir ออก ใช้ targeting mode แทน)
-
-    // ── Targeting state (NEW) ──
-    bool m_targetingMode  = false;   // อยู่ใน targeting mode หรือเปล่า
-    int  m_targetCol      = 0;       // ตำแหน่ง cursor ปัจจุบัน
-    int  m_targetRow      = 0;
-    std::string m_targetSkillId;     // skill ที่กำลัง target อยู่
+    // ── Targeting state ──
+    bool        m_targetingMode  = false;
+    int         m_targetCol      = 0;
+    int         m_targetRow      = 0;
+    std::string m_targetSkillId;
 
     // ── Dungeon state ──
     int  m_dungeonFloor  = 1;

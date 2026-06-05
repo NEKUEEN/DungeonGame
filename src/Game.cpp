@@ -46,10 +46,10 @@ int Game::computeBody() const
     if (!m_player) return 0;
     const Stats& s = m_player->getStats();
     CoreStats cb   = m_coreSlots.getTotalBonus();
-    int hp    = s.maxHp    + cb.body + m_equipment.getTotalHpBonus();
-    int atk   = s.maxAtk   + m_equipment.getTotalAtkBonus();
-    int def   = s.maxDef   + m_equipment.getTotalDefBonus();
-    int dodge = s.maxDodge + m_equipment.getTotalDodgeBonus();
+    int hp    = s.maxHp    + cb.hp    + m_equipment.getTotalHpBonus();
+    int atk   = s.maxAtk   + cb.atk   + m_equipment.getTotalAtkBonus();
+    int def   = s.maxDef   + cb.def   + m_equipment.getTotalDefBonus();
+    int dodge = s.maxDodge + cb.dodge + m_equipment.getTotalDodgeBonus();
     return (int)(hp*0.4f + atk*0.3f + def*0.2f + dodge*0.1f);
 }
 
@@ -75,7 +75,7 @@ int Game::computeBattleIndex() const
     const Stats& s = m_player->getStats();
     CoreStats cb   = m_coreSlots.getTotalBonus();
     int body      = computeBody();
-    int mentality = s.maxMentality + cb.mentality;
+    int mentality = s.maxMentality;
     int itemLv    = getItemLevelTotal();
     float bonusPct = 0.30f + (s.level - 1) * 0.05f;
     return (int)(body + mentality + itemLv * bonusPct);
@@ -98,6 +98,35 @@ void Game::drainMentality()
 }
 
 // ============================================================
+//  AP Helpers
+// ============================================================
+void Game::recalcAP()
+{
+    if (!m_player) return;
+    Stats& s = m_player->getStats();
+    int ap = 1; // base
+
+    for (const auto& sk : m_player->getSkills())
+    {
+        if (!sk.buffActive && !sk.isPassive()) continue;
+        ap += sk.data.effect.speedBonus;
+    }
+    s.maxAP     = ap;
+    s.currentAP = ap;
+
+    // attack speed — คำนวณ AP cost ต่อการโจมตี
+    int atkCost = 100;
+    for (const auto& sk : m_player->getSkills())
+    {
+        if (!sk.buffActive && !sk.isPassive()) continue;
+        if (sk.data.effect.atkSpeedPct < atkCost)
+            atkCost = sk.data.effect.atkSpeedPct;
+    }
+    s.atkSpeedCost = atkCost;
+    s.atkAPAccum   = 0;
+}
+
+// ============================================================
 //  Skill Helpers
 // ============================================================
 int Game::getBuffedAtk() const
@@ -105,10 +134,10 @@ int Game::getBuffedAtk() const
     if (!m_player) return 0;
     const Stats& s = m_player->getStats();
     CoreStats cb   = m_coreSlots.getTotalBonus();
-    int base = s.maxAtk + cb.body/3 + m_equipment.getTotalAtkBonus();
-    const SkillInstance* sk = m_player->findSkill("power_strike");
-    if (sk && sk->buffActive)
-        base = base + base * sk->data.atkPct / 100;
+    int base = s.maxAtk + cb.atk + m_equipment.getTotalAtkBonus();
+    for (const auto& sk : m_player->getSkills())
+        if (sk.buffActive && sk.data.type == SkillType::ActiveBuff)
+            base = base + base * sk.data.effect.atkPct / 100;
     return base;
 }
 
@@ -118,8 +147,8 @@ int Game::getBuffedDef() const
     const Stats& s = m_player->getStats();
     int base = s.maxDef + m_equipment.getTotalDefBonus();
     for (const auto& inst : m_player->getSkills())
-        if (inst.data.type == SkillType::Passive && inst.data.defPct > 0)
-            base = base + base * inst.data.defPct / 100;
+        if (inst.data.type == SkillType::Passive && inst.data.effect.defPct > 0)
+            base = base + base * inst.data.effect.defPct / 100;
     return base;
 }
 
@@ -137,8 +166,127 @@ void Game::useSkillBuff(const std::string& skillId)
     sk->buffActive   = true;
     sk->durationLeft = sk->data.duration;
     sk->cooldownLeft = sk->data.cooldown;
-    addLog("> "+sk->data.name+" activated! ATK +"+std::to_string(sk->data.atkPct)+
+    addLog("> "+sk->data.name+" activated! ATK +"+std::to_string(sk->data.effect.atkPct)+
            "% for "+std::to_string(sk->data.duration)+" turns", sf::Color(255,200,50));
+    recalcAP();
+}
+
+// ============================================================
+//  executeSkill  –  ตัวกลางที่อ่าน type แล้วทำ
+// ============================================================
+void Game::executeSkill(int hotbarIdx)
+{
+    if (!m_player) return;
+    const std::string& id = m_player->getHotbar(hotbarIdx);
+    if (id.empty()) { addLog("> Slot "+std::to_string(hotbarIdx+1)+" empty."); return; }
+
+    SkillInstance* sk = m_player->findSkill(id);
+    if (!sk) return;
+
+    if (!sk->isReady())
+    {
+        addLog("> "+sk->data.name+" cooldown: "
+               +std::to_string(sk->cooldownLeft)+" turns",
+               sf::Color(160,160,160));
+        return;
+    }
+
+    switch (sk->data.type)
+    {
+    case SkillType::ActiveBuff:
+        sk->buffActive   = true;
+        sk->durationLeft = sk->data.duration;
+        sk->cooldownLeft = sk->data.cooldown;
+        addLog("> "+sk->data.name+" activated!", sf::Color(255,200,50));
+        recalcAP(); // speed buff อาจเปลี่ยน AP
+        break;
+
+    case SkillType::ActiveHeal:
+    {
+        Stats& s = m_player->getStats();
+        int heal = sk->data.effect.healFlat
+                 + s.maxHp * sk->data.effect.healPct / 100;
+        s.hp = std::min(s.maxHp, s.hp + heal);
+        if (s.hp > 0 && s.hpDepleted)
+        {
+            s.hpDepleted = false;
+            addLog("> HP recovered", sf::Color(100,220,180));
+        }
+        sk->cooldownLeft = sk->data.cooldown;
+        addLog("> "+sk->data.name+" +"+std::to_string(heal)+" HP",
+               sf::Color(80,220,120));
+        break;
+    }
+
+    case SkillType::ActiveRanged:
+        m_targetingMode = true;
+        m_targetSkillId = id;
+        m_targetCol = m_player->getCol();
+        m_targetRow = m_player->getRow();
+        addLog(" [Targeting] arrow/HJKL | Enter=fire | Esc=cancel",
+               sf::Color(255,220,50));
+        break;
+
+    case SkillType::ActiveWarp:
+        m_targetingMode = true;
+        m_targetSkillId = id;
+        m_targetCol = m_player->getCol();
+        m_targetRow = m_player->getRow();
+        addLog(" [Warp] choose destination | Enter=warp | Esc=cancel",
+               sf::Color(100,200,255));
+        break;
+
+    case SkillType::ActiveAoe:
+        executeAoe(sk);
+        sk->cooldownLeft = sk->data.cooldown;
+        break;
+
+    case SkillType::Passive:
+        addLog("> "+sk->data.name+" is passive.", sf::Color(120,200,120));
+        break;
+    }
+}
+
+void Game::executeAoe(SkillInstance* sk)
+{
+    if (!m_player || !sk) return;
+    int pc = m_player->getCol();
+    int pr = m_player->getRow();
+    int radius = sk->data.effect.aoeRadius;
+    int baseAtk = getBuffedAtk();
+    int dmg = std::max(1, baseAtk * sk->data.effect.damagePct / 100);
+    int hits = 0;
+
+    for (auto* e : m_enemies)
+    {
+        if (e->isDead()) continue;
+        int dx = e->getCol() - pc, dy = e->getRow() - pr;
+        if (dx*dx + dy*dy <= radius*radius)
+        {
+            e->takeDamage(dmg);
+            addLog("> "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
+                   sf::Color(255,180,50));
+            hits++;
+        }
+    }
+    if (hits == 0)
+        addLog("> "+sk->data.name+" — no targets in range.", sf::Color(140,140,140));
+
+    processTurn(); tryRespawnEnemies();
+    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+}
+
+void Game::executeWarp(int col, int row)
+{
+    if (!m_tileMap.isWalkable(col, row))
+    { addLog("> Cannot warp there!"); return; }
+    m_player->setPos(col, row);
+    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
+    if (sk) sk->cooldownLeft = sk->data.cooldown;
+    addLog("> Warped!", sf::Color(100,200,255));
+    m_fog.compute(col, row, VIEW_RADIUS, m_tileMap);
+    updateCamera();
+    processTurn(); tryRespawnEnemies();
 }
 
 // ============================================================
@@ -180,13 +328,11 @@ void Game::enterTargetingMode()
 
     m_targetingMode  = true;
     m_targetSkillId  = "stone_throw";
-    // เริ่ม cursor ที่ตัวผู้เล่น
     m_targetCol = m_player->getCol();
     m_targetRow = m_player->getRow();
 
     addLog(" [Targeting] Move cursor: arrow/HJKLYUBN", sf::Color(255,220,50));
-    addLog(" Fire: Enter/Space  |  Cancel: Esc",
-           sf::Color(255,220,50));
+    addLog(" Fire: Enter/Space  |  Cancel: Esc", sf::Color(255,220,50));
 }
 
 void Game::moveTargetCursor(int dc, int dr)
@@ -198,18 +344,16 @@ void Game::moveTargetCursor(int dc, int dr)
     int nc = m_targetCol + dc;
     int nr = m_targetRow + dr;
 
-    // จำกัด range
     int ddx = nc - m_player->getCol();
     int ddy = nr - m_player->getRow();
     float dist = std::sqrt((float)(ddx*ddx + ddy*ddy));
-    if (dist > sk->data.range)
+    if (dist > sk->data.effect.range)
     {
-        addLog("> Out of range (max "+std::to_string(sk->data.range)+" tiles)",
+        addLog("> Out of range (max "+std::to_string(sk->data.effect.range)+" tiles)",
                sf::Color(220,100,50));
         return;
     }
 
-    // จำกัด map boundary
     nc = std::clamp(nc, 0, MAP_COLS-1);
     nr = std::clamp(nr, 0, MAP_ROWS-1);
 
@@ -221,7 +365,13 @@ void Game::confirmTarget()
 {
     if (!m_player) return;
     m_targetingMode = false;
-    fireRangedAt(m_targetCol, m_targetRow);
+    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
+    if (!sk) return;
+
+    if (sk->data.type == SkillType::ActiveRanged)
+        fireRangedAt(m_targetCol, m_targetRow);
+    else if (sk->data.type == SkillType::ActiveWarp)
+        executeWarp(m_targetCol, m_targetRow);
 }
 
 void Game::cancelTargeting()
@@ -233,7 +383,7 @@ void Game::cancelTargeting()
 void Game::fireRangedAt(int targetCol, int targetRow)
 {
     if (!m_player) return;
-    SkillInstance* sk = m_player->findSkill("stone_throw");
+    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
     if (!sk) return;
 
     sk->cooldownLeft = sk->data.cooldown;
@@ -241,25 +391,21 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     int pc = m_player->getCol();
     int pr = m_player->getRow();
     int baseAtk = getBuffedAtk();
-    int projDmg = std::max(1, baseAtk * sk->data.damage / 100);
+    int projDmg = std::max(1, baseAtk * sk->data.effect.damagePct / 100);
 
-    // เดิน projectile ตาม line
     auto line = getLine(pc, pr, targetCol, targetRow);
     bool hit = false;
 
-    for (int i = 1; i < (int)line.size(); ++i)   // เริ่ม i=1 ข้ามตำแหน่งตัวเอง
+    for (int i = 1; i < (int)line.size(); ++i)
     {
         int tx = line[i].x;
         int ty = line[i].y;
 
-        // ชนกำแพง
         if (m_tileMap.getTile(tx, ty) == TileType::Wall) break;
 
-        // เกิน range
         int ddx = tx - pc, ddy = ty - pr;
-        if (std::sqrt((float)(ddx*ddx+ddy*ddy)) > sk->data.range) break;
+        if (std::sqrt((float)(ddx*ddx+ddy*ddy)) > sk->data.effect.range) break;
 
-        // ชน enemy
         for (auto* e : m_enemies)
         {
             if (!e->isDead() && e->getCol()==tx && e->getRow()==ty)
@@ -279,6 +425,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         const ItemData* idata = DropTable::instance().getItem(itemId);
                         if (!idata) continue;
                         Item drop;
+                        drop.id         = idata->id;
                         drop.type       = (idata->type=="Core") ? ItemType::Core : ItemType::Material;
                         drop.name       = idata->name;
                         drop.desc       = idata->desc;
@@ -363,6 +510,7 @@ void Game::newDungeon(bool keepPlayer)
         s.battleIndex = computeBattleIndex();
         m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
         m_coreSlots.setSlotCount(m_player->getStats().level);
+        recalcAP();
     }
 
     updateCamera();
@@ -371,7 +519,7 @@ void Game::newDungeon(bool keepPlayer)
     if (keepPlayer)
         addLog("> Floor "+std::to_string(m_dungeonFloor)+" - Deeper...", sf::Color(180,140,60));
     else
-        addLog("> Floor 1 | [Q]=Buff [F]=Throw [E]=Equip [Tab]=Inv", sf::Color(100,220,100));
+        addLog("> Floor 1 | 1-9=Skills [E]=Equip [Tab]=Inv", sf::Color(100,220,100));
 }
 
 void Game::updateCamera()
@@ -441,6 +589,7 @@ void Game::spawnItems()
             const ItemData* idata=DropTable::instance().getItem(*itemId);
             if (idata)
             {
+                item.id = idata->id;
                 item.type = idata->type=="Core"?ItemType::Core:idata->type=="Material"?ItemType::Material:
                             idata->type=="Food"?ItemType::Food:idata->type=="Potion"?ItemType::Potion:
                             idata->type=="Helmet"?ItemType::Helmet:idata->type=="BodyArmor"?ItemType::BodyArmor:
@@ -494,13 +643,12 @@ void Game::processEvents()
             }
 
             // ============================================================
-            //  TARGETING MODE — รับ input แยกจาก normal mode
+            //  TARGETING MODE
             // ============================================================
             if (m_targetingMode)
             {
                 switch(key->code)
                 {
-                    // ขยับ cursor
                     case sf::Keyboard::Key::Up:    case sf::Keyboard::Key::K: moveTargetCursor(0,-1);  break;
                     case sf::Keyboard::Key::Down:  case sf::Keyboard::Key::J: moveTargetCursor(0, 1);  break;
                     case sf::Keyboard::Key::Left:  case sf::Keyboard::Key::H: moveTargetCursor(-1, 0); break;
@@ -510,13 +658,11 @@ void Game::processEvents()
                     case sf::Keyboard::Key::B: moveTargetCursor(-1, 1); break;
                     case sf::Keyboard::Key::N: moveTargetCursor(1,  1); break;
 
-                    // ยืนยัน
                     case sf::Keyboard::Key::Enter:
                     case sf::Keyboard::Key::Space:
                         confirmTarget();
                         break;
 
-                    // ยกเลิก
                     case sf::Keyboard::Key::Escape:
                     case sf::Keyboard::Key::F:
                         cancelTargeting();
@@ -524,7 +670,7 @@ void Game::processEvents()
 
                     default: break;
                 }
-                return;  // ไม่ผ่านไป normal input
+                return;
             }
 
             // ============================================================
@@ -546,8 +692,16 @@ void Game::processEvents()
                 case sf::Keyboard::Key::B:  handlePlayerMove(-1, 1); break;
                 case sf::Keyboard::Key::N:  handlePlayerMove(1,  1); break;
 
-                case sf::Keyboard::Key::Q:  useSkillBuff("power_strike"); break;
-                case sf::Keyboard::Key::F:  enterTargetingMode();          break;
+                // Num1-9 = hotbar skill slots
+                case sf::Keyboard::Key::Num1: executeSkill(0); break;
+                case sf::Keyboard::Key::Num2: executeSkill(1); break;
+                case sf::Keyboard::Key::Num3: executeSkill(2); break;
+                case sf::Keyboard::Key::Num4: executeSkill(3); break;
+                case sf::Keyboard::Key::Num5: executeSkill(4); break;
+                case sf::Keyboard::Key::Num6: executeSkill(5); break;
+                case sf::Keyboard::Key::Num7: executeSkill(6); break;
+                case sf::Keyboard::Key::Num8: executeSkill(7); break;
+                case sf::Keyboard::Key::Num9: executeSkill(8); break;
 
                 case sf::Keyboard::Key::R:  newDungeon(false);        break;
                 case sf::Keyboard::Key::G:  tryPickupItem();          break;
@@ -591,8 +745,15 @@ void Game::tryDescendStairs()
     m_dungeonFloor++;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
+    auto savedHotbar = std::vector<std::string>();
+    for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
     newDungeon(true);
-    if (m_player){m_player->getStats()=saved;m_player->getSkills()=savedSkills;}
+    if (m_player)
+    {
+        m_player->getStats()=saved;
+        m_player->getSkills()=savedSkills;
+        for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
+    }
     addLog("> Descended to floor "+std::to_string(m_dungeonFloor)+"!",sf::Color(255,220,50));
 }
 
@@ -605,8 +766,15 @@ void Game::tryAscendStairs()
     m_dungeonFloor--;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
+    auto savedHotbar = std::vector<std::string>();
+    for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
     newDungeon(true);
-    if (m_player){m_player->getStats()=saved;m_player->getSkills()=savedSkills;}
+    if (m_player)
+    {
+        m_player->getStats()=saved;
+        m_player->getSkills()=savedSkills;
+        for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
+    }
     addLog("> Ascended to floor "+std::to_string(m_dungeonFloor)+"!",sf::Color(100,220,255));
 }
 
@@ -687,6 +855,18 @@ void Game::equipCore()
     m_inventory.removeItem(m_selectedSlot);
     m_coreSlots.equip(freeSlot,core);
     addLog("> Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),sf::Color(100,200,255));
+
+    // ให้สกิลจาก core
+    const ItemData* idata = DropTable::instance().getItem(core.id);
+    if (idata)
+        for (const auto& skillId : idata->coreSkills)
+        {
+            if (m_player->addCoreSkill(skillId))
+                addLog("> Skill unlocked: "+skillId, sf::Color(100,220,255));
+            else
+                addLog("> Hotbar full — "+skillId+" not assigned", sf::Color(180,120,50));
+        }
+    m_player->getStats().ability = (int)m_player->getSkills().size();
 }
 
 void Game::unequipCore()
@@ -697,6 +877,16 @@ void Game::unequipCore()
     Item core=m_coreSlots.unequip(m_selectedCoreSlot);
     m_inventory.addItem(core);
     addLog("> Removed "+core.name+" from core slot "+std::to_string(m_selectedCoreSlot+1),sf::Color(160,160,160));
+
+    // ลบสกิลที่ได้จาก core นี้
+    const ItemData* idata = DropTable::instance().getItem(core.id);
+    if (idata)
+        for (const auto& skillId : idata->coreSkills)
+        {
+            m_player->removeCoreSkill(skillId);
+            addLog("> Skill lost: "+skillId, sf::Color(160,100,100));
+        }
+    m_player->getStats().ability = (int)m_player->getSkills().size();
 }
 
 void Game::dropSelectedItem()
@@ -715,12 +905,21 @@ void Game::dropSelectedItem()
 void Game::handlePlayerMove(int dc, int dr)
 {
     if (!m_player) return;
+
+    // เช็ค AP
+    if (m_player->getStats().currentAP <= 0) return;
+
     int tc=m_player->getCol()+dc, tr=m_player->getRow()+dr;
 
     for (auto*e:m_enemies)
         if (!e->isDead()&&e->getCol()==tc&&e->getRow()==tr)
         {
-            playerAttack(e); processTurn();
+            playerAttack(e);
+            // ตรวจ AP หลังโจมตี
+            if (m_player->getStats().currentAP <= 0)
+            {
+                processTurn(); tryRespawnEnemies(); recalcAP();
+            }
             m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
             updateCamera(); return;
         }
@@ -728,9 +927,18 @@ void Game::handlePlayerMove(int dc, int dr)
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
     if (!moved){addLog("> Blocked!");return;}
 
+    // หัก AP จากการเดิน
+    m_player->getStats().currentAP--;
+
     m_turnCount++; m_player->onTurnPassed();
     m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
-    processTurn(); tryRespawnEnemies(); updateCamera();
+
+    // ถ้า AP หมด → enemy turn แล้ว reset AP
+    if (m_player->getStats().currentAP <= 0)
+    {
+        processTurn(); tryRespawnEnemies(); recalcAP();
+    }
+    updateCamera();
 
     int pc=m_player->getCol(),pr=m_player->getRow();
     for (auto& it:m_mapItems)
@@ -753,10 +961,24 @@ void Game::playerAttack(Enemy* enemy)
     int atk=getBuffedAtk();
     int dmg=std::max(1,atk+std::rand()%4-enemy->getDefense());
     enemy->takeDamage(dmg);
-    const SkillInstance* ps=m_player->findSkill("power_strike");
+
+    bool powered = false;
+    for (const auto& sk : m_player->getSkills())
+        if (sk.buffActive && sk.data.type == SkillType::ActiveBuff && sk.data.effect.atkPct > 0)
+            powered = true;
+
     std::string msg="> You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!";
-    if (ps&&ps->buffActive) msg+=" [POWERED]";
+    if (powered) msg+=" [POWERED]";
     addLog(msg,sf::Color(255,200,50));
+
+    // หัก AP ตาม atkSpeedCost
+    Stats& s = m_player->getStats();
+    s.atkAPAccum += s.atkSpeedCost;
+    while (s.atkAPAccum >= 100)
+    {
+        s.atkAPAccum -= 100;
+        s.currentAP--;
+    }
 
     if (enemy->isDead())
     {
@@ -767,6 +989,7 @@ void Game::playerAttack(Enemy* enemy)
             const ItemData* idata=DropTable::instance().getItem(itemId);
             if (!idata) continue;
             Item drop;
+            drop.id=(idata->id);
             drop.type=(idata->type=="Core")?ItemType::Core:ItemType::Material;
             drop.name=idata->name; drop.desc=idata->desc; drop.value=idata->value;
             drop.hpBonus=idata->hpBonus; drop.atkBonus=idata->atkBonus;
@@ -818,7 +1041,7 @@ void Game::processTurn()
     if (!m_player) return;
     Stats& s=m_player->getStats();
     s.body=computeBody(); s.itemLevel=getItemLevelTotal();
-    s.battleIndex=computeBattleIndex(); s.ability=m_coreSlots.getTotalBonus().ability;
+    s.battleIndex=computeBattleIndex(); s.ability= (int)m_player->getSkills().size();
     drainMentality();
     if (m_playerDead) return;
     for (auto*e:m_enemies)
@@ -854,19 +1077,90 @@ void Game::render()
     if (m_player) m_player->render(m_window);
     m_fog.render(m_window,TILE_SIZE);
 
-    // วาด targeting overlay ทับบน fog (ใน game view)
     if (m_targetingMode) renderTargeting();
 
     m_window.setView(m_uiView);
     renderStatusPanel();
     renderRightPanel();
     renderLogPanel();
+    renderHotbar();
     if (m_levelUpFlash) renderLevelUpEffect();
     m_window.display();
 }
 
 // ============================================================
-//  Targeting Render  –  เส้นสีเหลือง + cursor
+//  Hotbar Render  –  แถบ skill ด้านล่าง game view
+// ============================================================
+void Game::renderHotbar()
+{
+    if (!m_player || !m_fontLoaded) return;
+
+    const float SZ  = 32.f;
+    const float GAP = 4.f;
+    const int   N   = 9;
+    float totalW = N * (SZ + GAP) - GAP;
+    float startX = ((float)GAME_VIEW_W - totalW) / 2.f;
+    float startY = (float)GAME_VIEW_H - SZ - 8.f;
+
+    for (int i = 0; i < N; ++i)
+    {
+        float sx = startX + i * (SZ + GAP);
+        const std::string& id = m_player->getHotbar(i);
+        const SkillInstance* sk = id.empty() ? nullptr : m_player->findSkill(id);
+
+        // bg slot
+        sf::RectangleShape slot({SZ, SZ});
+        slot.setFillColor(sf::Color(10, 10, 10, 200));
+        slot.setOutlineColor(sf::Color(80, 70, 50));
+        slot.setOutlineThickness(1.5f);
+        slot.setPosition({sx, startY});
+        m_window.draw(slot);
+
+        // hotkey label
+        sf::Text numTxt(m_font, std::to_string(i+1), 8);
+        numTxt.setFillColor(sf::Color(120, 120, 120));
+        numTxt.setPosition({sx + 2.f, startY + 1.f});
+        m_window.draw(numTxt);
+
+        if (sk)
+        {
+            // cooldown overlay
+            if (!sk->isReady())
+            {
+                float ratio = sk->data.cooldown > 0
+                    ? (float)sk->cooldownLeft / sk->data.cooldown : 1.f;
+                sf::RectangleShape cd({SZ, SZ * ratio});
+                cd.setFillColor(sf::Color(0, 0, 0, 160));
+                cd.setPosition({sx, startY + SZ * (1.f - ratio)});
+                m_window.draw(cd);
+
+                sf::Text cdTxt(m_font, std::to_string(sk->cooldownLeft), 9);
+                cdTxt.setFillColor(sf::Color(220, 100, 100));
+                cdTxt.setPosition({sx + SZ/2.f - 5.f, startY + SZ/2.f - 6.f});
+                m_window.draw(cdTxt);
+            }
+            else if (sk->buffActive)
+            {
+                sf::RectangleShape activeGlow({SZ, SZ});
+                activeGlow.setFillColor(sf::Color(255, 200, 50, 40));
+                activeGlow.setOutlineColor(sf::Color(255, 200, 50));
+                activeGlow.setOutlineThickness(2.f);
+                activeGlow.setPosition({sx, startY});
+                m_window.draw(activeGlow);
+            }
+
+            // skill name (first 4 chars)
+            std::string label = sk->data.name.substr(0, 4);
+            sf::Text nameTxt(m_font, label, 7);
+            nameTxt.setFillColor(sk->isReady() ? sf::Color(200, 200, 200) : sf::Color(100, 100, 100));
+            nameTxt.setPosition({sx + 2.f, startY + SZ - 10.f});
+            m_window.draw(nameTxt);
+        }
+    }
+}
+
+// ============================================================
+//  Targeting Render
 // ============================================================
 void Game::renderTargeting()
 {
@@ -877,9 +1171,8 @@ void Game::renderTargeting()
     float ts = (float)TILE_SIZE;
 
     SkillInstance* sk = m_player->findSkill(m_targetSkillId);
-    int maxRange = sk ? sk->data.range : 6;
+    int maxRange = sk ? sk->data.effect.range : 6;
 
-    // วาดเส้นจาก player ถึง cursor
     auto line = getLine(pc, pr, m_targetCol, m_targetRow);
 
     bool blocked = false;
@@ -890,26 +1183,23 @@ void Game::renderTargeting()
         float px = tx * ts;
         float py = ty * ts;
 
-        // เช็คว่าชนกำแพงหรือเกิน range
         int ddx = tx-pc, ddy = ty-pr;
         float dist = std::sqrt((float)(ddx*ddx+ddy*ddy));
         bool outOfRange = dist > maxRange;
         bool isWall = (m_tileMap.getTile(tx,ty)==TileType::Wall);
         if (isWall) blocked = true;
 
-        // สีของ tile บน line
         sf::Color tileColor;
         if (blocked || outOfRange)
-            tileColor = sf::Color(180,50,50,120);   // แดง = บล็อก/เกิน range
+            tileColor = sf::Color(180,50,50,120);
         else
-            tileColor = sf::Color(255,220,50,100);  // เหลือง = ทางผ่าน
+            tileColor = sf::Color(255,220,50,100);
 
         sf::RectangleShape highlight({ts, ts});
         highlight.setFillColor(tileColor);
         highlight.setPosition({px, py});
         m_window.draw(highlight);
 
-        // ถ้ามี enemy บน tile นี้ ไฮไลท์แดงเข้ม
         if (!blocked && !outOfRange)
         {
             for (auto* e : m_enemies)
@@ -928,12 +1218,10 @@ void Game::renderTargeting()
         }
     }
 
-    // วาด cursor ที่ตำแหน่ง target
     {
         float cpx = m_targetCol * ts;
         float cpy = m_targetRow * ts;
 
-        // เช็คว่า cursor อยู่ใน range และไม่บล็อก
         int ddx = m_targetCol-pc, ddy = m_targetRow-pr;
         float dist = std::sqrt((float)(ddx*ddx+ddy*ddy));
         bool cursorBlocked = blocked || dist > maxRange;
@@ -942,7 +1230,6 @@ void Game::renderTargeting()
             ? sf::Color(220,50,50,220)
             : sf::Color(255,220,50,220);
 
-        // cursor — กรอบหนา
         sf::RectangleShape cursor({ts, ts});
         cursor.setFillColor(sf::Color(0,0,0,0));
         cursor.setOutlineColor(cursorColor);
@@ -950,7 +1237,6 @@ void Game::renderTargeting()
         cursor.setPosition({cpx, cpy});
         m_window.draw(cursor);
 
-        // มุม 4 มุมของ cursor
         float cornerSz = 8.f;
         const float offsets[4][2] = {{0,0},{ts-cornerSz,0},{0,ts-cornerSz},{ts-cornerSz,ts-cornerSz}};
         for (auto& off : offsets)
@@ -961,7 +1247,6 @@ void Game::renderTargeting()
             m_window.draw(corner);
         }
 
-        // ถ้าเป็น tile ที่มี enemy แสดงชื่อเหนือ cursor
         if (m_fontLoaded)
         {
             for (auto* e : m_enemies)
@@ -1038,17 +1323,6 @@ void Game::renderSkillPanel()
     if (!m_player||!m_fontLoaded) return;
     float px=(float)(WINDOW_W-RIGHT_PANEL_W);
     float y= 185.f;
-    //float y=(float)STATUS_PANEL_H-50.f;
-
-    sf::RectangleShape sep({(float)RIGHT_PANEL_W-20.f,1.f});
-    sep.setFillColor(sf::Color(60,50,30));
-    sep.setPosition({px+10.f,y}); //m_window.draw(sep);
-    y+=4.f;
-
-    sf::Text header(m_font,"SKILLS",9);
-    header.setFillColor(sf::Color(180,220,255));
-    header.setPosition({px+10.f,y}); //m_window.draw(header);
-    y+=13.f;
 
     for (const auto& sk:m_player->getSkills())
     {
@@ -1061,17 +1335,11 @@ void Game::renderSkillPanel()
         else if (!sk.isReady())
         { line+=" [cd:"+std::to_string(sk.cooldownLeft)+"]"; c=sf::Color(180,80,80); }
         else
-        {
-            if (sk.data.type==SkillType::ActiveBuff)   line+=" [Q] ready";
-            if (sk.data.type==SkillType::ActiveRanged) line+=" [F] ready";
-            c=sf::Color(100,220,100);
-        }
-        if (m_targetingMode&&sk.data.type==SkillType::ActiveRanged)
-        { line+=" <TARGETING>"; c=sf::Color(255,160,50); }
+        { line+=" ready"; c=sf::Color(100,220,100); }
 
         sf::Text t(m_font,line,8);
         t.setFillColor(c);
-        t.setPosition({px+10.f,y}); //m_window.draw(t);
+        t.setPosition({px+10.f,y});
         y+=11.f;
     }
 }
@@ -1092,7 +1360,6 @@ void Game::renderStatusPanel()
     if (!m_fontLoaded||!m_player) return;
     const Stats& s=m_player->getStats();
     float x=px+15.f, y=(float)STATUS_PANEL_TOP_PADDING;
-    //float x=px+10.f, y=(float)STATUS_PANEL_TOP_PADDING;
 
     auto drawLine=[&](const std::string& label,const std::string& value,
                       sf::Color color=sf::Color::White,int size=STATUS_LINE_SIZE)
@@ -1103,7 +1370,6 @@ void Game::renderStatusPanel()
     };
 
     {sf::Text h(m_font,"player 1",STATUS_HEADER_SIZE);
-     //h.setFillColor(sf::Color::Yellow);
      h.setPosition({x,y});m_window.draw(h);
      y+=STATUS_HEADER_SIZE+STATUS_HEADER_SPACING;}
 
@@ -1114,20 +1380,12 @@ void Game::renderStatusPanel()
      drawLine("mentality:",mv,mc);}
     drawLine("ability:",   std::to_string(s.ability));
     drawLine("item level:",std::to_string(s.itemLevel));
-    drawLine("Comprehensive Battle","");
-    drawLine("Index:",std::to_string(s.battleIndex));
+    drawLine("Battle Index:",std::to_string(s.battleIndex));
 
-    y+=4;
-    sf::RectangleShape sep({(float)RIGHT_PANEL_W-20.f,1.f});
-    sep.setFillColor(sf::Color(60,50,30));sep.setPosition({x,y});//m_window.draw(sep);y+=6;
-
-    {std::string hpStr=std::to_string(s.hp)+"/"+std::to_string(s.maxHp);
-     sf::Color hpC=s.hp>s.maxHp/2?sf::Color(80,200,80):s.hp>s.maxHp/4?sf::Color(220,180,0):sf::Color(220,60,60);
-     //drawLine("hp:",hpStr,hpC);
-    }
-    {sf::Color hC=s.hunger>50?sf::Color(180,160,80):s.hunger>20?sf::Color(220,130,50):sf::Color(220,60,60);
-     //drawLine("hunger:",std::to_string(s.hunger)+"%",hC);
-    }
+    // AP indicator
+    std::string apStr = "AP: "+std::to_string(s.currentAP)+"/"+std::to_string(s.maxAP);
+    sf::Color apColor = s.currentAP > 0 ? sf::Color(100,200,255) : sf::Color(100,100,100);
+    drawLine("", apStr, apColor);
 
     renderSkillPanel();
 }
@@ -1146,21 +1404,16 @@ void Game::renderRightPanel()
     panel.setOutlineColor(sf::Color(80,60,40));
     panel.setOutlineThickness(0.f);
     m_window.draw(panel);
-    sf::Vertex leftLine[2];//เส้นตรง
+    sf::Vertex leftLine[2];
     leftLine[0].position = sf::Vector2f(panelX, panelY);
     leftLine[0].color = sf::Color(80,60,40);
     leftLine[1].position = sf::Vector2f(panelX, panelY + 250.f);
     leftLine[1].color = sf::Color(80,60,40);
-
     m_window.draw(leftLine, 2, sf::PrimitiveType::Lines);
     if (!m_fontLoaded) return;
 
     if (!m_viewEquipment&&!m_viewCores)
     {
-        sf::Text title(m_font,"BAG  [E]=Equip",9);
-        title.setFillColor(sf::Color(120,100,60));
-        title.setPosition({panelX+8.f,panelY+6.f}); //m_window.draw(title);
-
         const int COLS=5,ROWS=4;
         const float SZ=35.f,GAP=4.f;
         float sx0=panelX+(RIGHT_PANEL_W-(COLS*(SZ+GAP)-GAP))/2.f;
@@ -1175,7 +1428,6 @@ void Game::renderRightPanel()
             sf::RectangleShape slot({SZ,SZ});
             slot.setFillColor(sel?sf::Color(60,50,30):sf::Color(8,8,8));
             slot.setOutlineColor(sel?sf::Color(200,160,60):sf::Color(120,120,120));
-            //slot.setOutlineColor(sel?sf::Color(200,160,60):sf::Color(70,55,40));
             slot.setOutlineThickness(1.5f);
             slot.setPosition({sx,sy}); m_window.draw(slot);
             Item* item=m_inventory.getItem(idx);
@@ -1196,7 +1448,6 @@ void Game::renderRightPanel()
                 }
                 else
                 {sf::CircleShape dot(SZ*0.28f);dot.setFillColor(item->color());dot.setPosition({sx+SZ*0.22f,sy+SZ*0.22f});m_window.draw(dot);}
-                //if (idx<9){sf::Text num(m_font,std::to_string(idx+1),7);num.setFillColor(sf::Color(150,150,150));num.setPosition({sx+2.f,sy+1.f});m_window.draw(num);}
                 int cnt=m_inventory.getCount(idx);
                 if (cnt>1){sf::Text ct(m_font,"x"+std::to_string(cnt),7);ct.setFillColor(sf::Color(255,220,100));ct.setPosition({sx+SZ-14.f,sy+SZ-10.f});m_window.draw(ct);}
             }
@@ -1215,7 +1466,7 @@ void Game::renderRightPanel()
         float hy=panelY+INV_GRID_H-55.f;
         auto dh=[&](const std::string& t,sf::Color c=sf::Color(70,70,70))
         {sf::Text tx(m_font,t,8);tx.setFillColor(c);tx.setPosition({panelX+8.f,hy});m_window.draw(tx);hy+=12.f;};
-        dh("Bonus: B+"+std::to_string(cb.body)+" M+"+std::to_string(cb.mentality)+" A+"+std::to_string(cb.ability),sf::Color(100,200,255));
+        dh("Bonus: HP+"+std::to_string(cb.hp)+" ATK+"+std::to_string(cb.atk)+" DEF+"+std::to_string(cb.def)+" DOD+"+std::to_string(cb.dodge),sf::Color(100,200,255));
         dh("[C] Close  [1-9] Equip core");
         dh("[X] Remove core");
     }

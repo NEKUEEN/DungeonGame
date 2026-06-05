@@ -8,18 +8,12 @@
 #include <optional>
 #include "lib/json.hpp"
 
-// ============================================================
-//  DropEntry  –  item id + โอกาส drop (0.0 - 1.0)
-// ============================================================
 struct DropEntry
 {
     std::string itemId;
     float       chance = 0.f;
 };
 
-// ============================================================
-//  ItemData  –  ข้อมูล item จาก items.json
-// ============================================================
 struct ItemData
 {
     std::string id;
@@ -27,25 +21,29 @@ struct ItemData
     std::string type;
     std::string desc;
     std::string sprite;
-    int  value     = 1;
-    int  hpBonus   = 0;
-    int  atkBonus  = 0;
-    int  defBonus  = 0;
-    int  dodgeBonus= 0;
-    bool stackable = true;
+    int  value      = 1;
+    int  hpBonus    = 0;
+    int  atkBonus   = 0;
+    int  defBonus   = 0;
+    int  dodgeBonus = 0;
+    bool stackable  = true;
+
+    // core_stats (เฉพาะ Core items)
+    int coreHp    = 0;
+    int coreAtk   = 0;
+    int coreDef   = 0;
+    int coreDodge = 0;
+
+    // skills ที่ core นี้ให้เมื่อ equip
+    std::vector<std::string> coreSkills;
 };
 
-// ============================================================
-//  DropTable  –  Singleton
-//  โหลด items.json + drop data จาก monsters.json
-// ============================================================
 class DropTable
 {
 public:
     static DropTable& instance()
     { static DropTable dt; return dt; }
 
-    // โหลด items.json
     bool loadItems(const std::string& path)
     {
         std::ifstream f(path);
@@ -63,10 +61,26 @@ public:
             d.sprite    = it["sprite"].get<std::string>();
             d.value      = it["value"].get<int>();
             d.stackable  = it["stackable"].get<bool>();
-            d.hpBonus    = it.contains("hp") ? it["hp"].get<int>() : 0;
-            d.atkBonus   = it.contains("atk") ? it["atk"].get<int>() : 0;
-            d.defBonus   = it.contains("def") ? it["def"].get<int>() : 0;
+            d.hpBonus    = it.contains("hp")    ? it["hp"].get<int>()    : 0;
+            d.atkBonus   = it.contains("atk")   ? it["atk"].get<int>()   : 0;
+            d.defBonus   = it.contains("def")   ? it["def"].get<int>()   : 0;
             d.dodgeBonus = it.contains("dodge") ? it["dodge"].get<int>() : 0;
+
+            // core_stats
+            if (it.contains("core_stats"))
+            {
+                const auto& cs = it["core_stats"];
+                d.coreHp    = cs.contains("hp")    ? cs["hp"].get<int>()    : 0;
+                d.coreAtk   = cs.contains("atk")   ? cs["atk"].get<int>()   : 0;
+                d.coreDef   = cs.contains("def")   ? cs["def"].get<int>()   : 0;
+                d.coreDodge = cs.contains("dodge") ? cs["dodge"].get<int>() : 0;
+            }
+
+            // skills ที่ core ให้
+            if (it.contains("skills"))
+                for (const auto& sk : it["skills"])
+                    d.coreSkills.push_back(sk.get<std::string>());
+
             m_items[d.id] = d;
             m_itemsByType[d.type].push_back(d.id);
         }
@@ -74,14 +88,12 @@ public:
         return true;
     }
 
-    // register drop table ของมอนตัวหนึ่ง
     void registerDrops(const std::string& monsterId,
                        const std::vector<DropEntry>& drops)
     {
         m_drops[monsterId] = drops;
     }
 
-    // สุ่ม drop — return list ของ item ids ที่ drop
     std::vector<std::string> roll(const std::string& monsterId)
     {
         std::vector<std::string> result;
@@ -94,20 +106,15 @@ public:
             if (r < entry.chance)
             {
                 if (m_items.find(entry.itemId) == m_items.end())
-                {
                     std::cerr << "[DropTable] Unknown drop item id '" << entry.itemId
                               << "' for monster '" << monsterId << "'\n";
-                }
                 else
-                {
                     result.push_back(entry.itemId);
-                }
             }
         }
         return result;
     }
 
-    // ดึงข้อมูล item
     const ItemData* getItem(const std::string& id) const
     {
         auto it = m_items.find(id);
@@ -129,8 +136,8 @@ private:
         , m_dist(0.f, 1.f)
     {}
 
-    mutable std::mt19937                      m_rng;
-    std::uniform_real_distribution<float>     m_dist;
+    mutable std::mt19937                          m_rng;
+    std::uniform_real_distribution<float>         m_dist;
     std::map<std::string, std::vector<DropEntry>> m_drops;
     std::map<std::string, ItemData>               m_items;
     std::map<std::string, std::vector<std::string>> m_itemsByType;

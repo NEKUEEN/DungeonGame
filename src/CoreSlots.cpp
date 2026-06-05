@@ -4,7 +4,7 @@
 bool CoreSlots::equip(int slotIdx, const Item& core)
 {
     if (slotIdx < 0 || slotIdx >= (int)m_slots.size()) return false;
-    if (core.type != ItemType::Core) return false;  // ใส่ได้เฉพาะ Core
+    if (core.type != ItemType::Core) return false;
     m_slots[slotIdx] = core;
     return true;
 }
@@ -32,20 +32,20 @@ const Item* CoreSlots::getCore(int slotIdx) const
 }
 
 // ============================================================
-//  readStats  –  อ่าน core_stats จาก DropTable
+//  readStats  –  อ่าน core_stats จาก DropTable ผ่าน item.id
 // ============================================================
 CoreStats CoreSlots::readStats(const Item& core) const
 {
     CoreStats cs;
-    // หา item id จากชื่อ (ใช้ name map ผ่าน DropTable)
-    // วิธีง่ายกว่า: เก็บ id ไว้ใน Item แทนแต่ตอนนี้ไม่มี
-    // ใช้ hardcode ตาม name ก่อน แล้วค่อยแก้ตอนมี id
-    if (core.name == "Goblin Core")
-    { cs.mentality=3; cs.ability=1; cs.battleIndex=5; }
-    else if (core.name == "Orc Core")
-    { cs.body=5; cs.battleIndex=8; }
-    else if (core.name == "Rat Core")
-    { cs.body=1; cs.mentality=1; cs.battleIndex=2; }
+    if (core.id.empty()) return cs;
+
+    const ItemData* data = DropTable::instance().getItem(core.id);
+    if (!data) return cs;
+
+    cs.hp    = data->coreHp;
+    cs.atk   = data->coreAtk;
+    cs.def   = data->coreDef;
+    cs.dodge = data->coreDodge;
     return cs;
 }
 
@@ -56,22 +56,21 @@ CoreStats CoreSlots::getTotalBonus() const
     {
         if (!slot.has_value()) continue;
         CoreStats cs = readStats(slot.value());
-        total.body        += cs.body;
-        total.mentality   += cs.mentality;
-        total.ability     += cs.ability;
-        total.battleIndex += cs.battleIndex;
+        total.hp    += cs.hp;
+        total.atk   += cs.atk;
+        total.def   += cs.def;
+        total.dodge += cs.dodge;
     }
     return total;
 }
 
 // ============================================================
-//  Render  –  แสดง core slots
+//  Render
 // ============================================================
 void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
                        float startX, float startY, float panelW,
                        int selectedSlot, bool focused)
 {
-    // Title
     sf::Text title(font, "CORE SLOTS", 9);
     title.setFillColor(sf::Color(100,200,255));
     title.setPosition({startX, startY});
@@ -85,7 +84,6 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         float sx = startX + i * (SZ + GAP);
         bool  sel = (i == selectedSlot && focused);
 
-        // slot bg
         sf::RectangleShape slot({SZ, SZ});
         slot.setFillColor(sel ? sf::Color(30,60,80) : sf::Color(15,30,40));
         slot.setOutlineColor(sel ? sf::Color(100,200,255) : sf::Color(40,80,100));
@@ -93,11 +91,9 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         slot.setPosition({sx, sy});
         window.draw(slot);
 
-        // แกนใน slot
         if (m_slots[i].has_value())
         {
             const Item& core = m_slots[i].value();
-            // ลอง load sprite
             sf::Texture tex;
             if (!core.spriteName.empty() &&
                 tex.loadFromFile("assets/textures/"+core.spriteName))
@@ -121,7 +117,6 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         }
         else
         {
-            // ว่าง แสดงเลข slot
             sf::Text num(font, std::to_string(i+1), 8);
             num.setFillColor(sf::Color(50,80,100));
             num.setPosition({sx+SZ/2.f-4.f, sy+SZ/2.f-5.f});
@@ -129,16 +124,17 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         }
     }
 
-    // แสดงชื่อแกนที่ selected
+    // แสดง stats ของ core ที่ selected
     if (selectedSlot >= 0 && selectedSlot < (int)m_slots.size()
         && m_slots[selectedSlot].has_value())
     {
         const Item& core = m_slots[selectedSlot].value();
         CoreStats cs = readStats(core);
         std::string info = core.name;
-        if (cs.body)        info += " B+"+std::to_string(cs.body);
-        if (cs.mentality)   info += " M+"+std::to_string(cs.mentality);
-        if (cs.ability)     info += " A+"+std::to_string(cs.ability);
+        if (cs.hp)    info += " HP+"+std::to_string(cs.hp);
+        if (cs.atk)   info += " ATK+"+std::to_string(cs.atk);
+        if (cs.def)   info += " DEF+"+std::to_string(cs.def);
+        if (cs.dodge) info += " DOD+"+std::to_string(cs.dodge);
 
         sf::Text infoTxt(font, info, 8);
         infoTxt.setFillColor(sf::Color(100,200,255));

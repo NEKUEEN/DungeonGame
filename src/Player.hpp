@@ -4,6 +4,8 @@
 #include <string>
 #include "TileMap.hpp"
 #include "Skill.hpp"
+#include <algorithm>
+#include <SkillDB.hpp>
 
 struct Stats
 {
@@ -45,6 +47,15 @@ struct Stats
     // ── Timers ──
     int hungerTimer = 0;
     int regenTimer  = 0;
+
+    // ── Action Points ──
+    int maxAP     = 1;   // ปกติ 1 AP/turn
+    int currentAP = 0;   // AP เหลือใน turn นี้
+
+    // ── Attack Speed ──
+    // AP cost ของการโจมตี x100 (100 = ปกติ = หัก 1 AP, 50 = หัก 0.5 AP)
+    int atkSpeedCost  = 100;
+    int atkAPAccum    = 0;   // accumulator สำหรับ fractional AP cost
 };
 
 class Player
@@ -61,6 +72,7 @@ public:
 
     int getCol() const { return m_col; }
     int getRow() const { return m_row; }
+    void setPos(int col, int row) { m_col = col; m_row = row; }
 
     Stats&       getStats()       { return m_stats; }
     const Stats& getStats() const { return m_stats; }
@@ -83,6 +95,49 @@ public:
         return nullptr;
     }
 
+    // ── Hotbar ──
+    const std::string& getHotbar(int idx) const
+    {
+        static const std::string empty = "";
+        if (idx < 0 || idx >= 9) return empty;
+        return m_hotbar[idx];
+    }
+
+    void setHotbar(int idx, const std::string& skillId)
+    {
+        if (idx >= 0 && idx < 9) m_hotbar[idx] = skillId;
+    }
+
+    // เพิ่ม skill จาก core → หา hotbar slot ว่างแรก
+    bool addCoreSkill(const std::string& skillId)
+    {
+        if (!findSkill(skillId))
+        {
+            const SkillData* sd = SkillDB::instance().get(skillId);
+            if (!sd) return false;
+            SkillInstance inst;
+            inst.data = *sd;
+            m_skills.push_back(inst);
+        }
+        for (int i = 0; i < 9; ++i)
+            if (m_hotbar[i].empty())
+            { m_hotbar[i] = skillId; return true; }
+        return false;  // hotbar เต็ม
+    }
+
+    // ลบ skill ออกจาก hotbar + m_skills (ตอนถอดคอร์)
+    void removeCoreSkill(const std::string& skillId)
+    {
+        for (int i = 0; i < 9; ++i)
+            if (m_hotbar[i] == skillId)
+                m_hotbar[i] = "";
+
+        m_skills.erase(
+            std::remove_if(m_skills.begin(), m_skills.end(),
+                [&](const SkillInstance& sk){ return sk.data.id == skillId; }),
+            m_skills.end());
+    }
+
 private:
     void drawHPBar(sf::RenderWindow& window);
 
@@ -93,4 +148,8 @@ private:
     bool        m_hasSprite = false;
 
     std::vector<SkillInstance> m_skills;
+
+    // Hotbar — เก็บ skill id ที่ assign ไว้ใน slot 0-8
+    // "" = ว่าง
+    std::string m_hotbar[9];
 };

@@ -13,18 +13,19 @@ enum class ItemType
 
 struct Item
 {
+    std::string id;          // ← เพิ่ม: ใช้ lookup core_stats จาก DropTable
     ItemType    type;
     std::string name;
     std::string desc;
-    std::string spriteName;  // ชื่อไฟล์ png เช่น "item_goblin_core.png"
-    int         value   = 0;
-    int         hpBonus = 0;
-    int         atkBonus = 0;
-    int         defBonus = 0;
+    std::string spriteName;
+    int         value      = 0;
+    int         hpBonus    = 0;
+    int         atkBonus   = 0;
+    int         defBonus   = 0;
     int         dodgeBonus = 0;
-    int         col     = -1;
-    int         row     = -1;
-    bool        stackable = false;
+    int         col        = -1;
+    int         row        = -1;
+    bool        stackable  = false;
 
     static Item makeFood();
     static Item makePotion();
@@ -37,5 +38,5 @@ struct Item
     bool        isEquipment() const { return !isUsable()&&type!=ItemType::Material&&type!=ItemType::Core; }
     bool        isCore()      const { return type==ItemType::Core; }
     bool        isMaterial()  const { return type==ItemType::Material; }
-    std::string spritePath()  const;  // path ของ texture
+    std::string spritePath()  const;
 };

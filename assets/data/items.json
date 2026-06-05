@@ -131,22 +131,23 @@
       "id": "goblin_core",
       "name": "Goblin Core",
       "type": "Core",
-      "desc": "Essence of a goblin. Grants cunning.",
+      "desc": "Essence of a goblin. Grants cunning and Power Strike.",
       "value": 5,
       "sprite": "item_goblin_core.png",
       "stackable": false,
       "core_stats": {
         "hp": 30,
-      "atk": 10,
-      "def": 10,
-      "dodge": 4
-      }
+        "atk": 10,
+        "def": 10,
+        "dodge": 4
+      },
+      "skills": ["power_strike"]
     },
     {
       "id": "goblinWarrior_core",
       "name": "Goblin Warrior Core",
       "type": "Core",
-      "desc": "Essence of a goblin warrior. Grants cunning and combat skills.",
+      "desc": "Essence of a goblin warrior. Grants Power Strike.",
       "value": 5,
       "sprite": "item_goblin_core.png",
       "stackable": false,
@@ -155,13 +156,14 @@
         "atk": 15,
         "def": 20,
         "dodge": 4
-      }
+      },
+      "skills": ["power_strike"]
     },
     {
       "id": "goblinArcher_core",
       "name": "Goblin Archer Core",
       "type": "Core",
-      "desc": "Essence of a goblin archer. Grants cunning and ranged combat skills.",
+      "desc": "Essence of a goblin archer. Grants Stone Throw.",
       "value": 5,
       "sprite": "item_goblin_core.png",
       "stackable": false,
@@ -170,13 +172,14 @@
         "atk": 15,
         "def": 20,
         "dodge": 10
-      }
+      },
+      "skills": ["stone_throw"]
     },
     {
       "id": "orc_core",
       "name": "Orc Core",
       "type": "Core",
-      "desc": "Essence of an orc. Grants brute strength.",
+      "desc": "Essence of an orc. Grants Iron Skin.",
       "value": 18,
       "sprite": "item_orc_core.png",
       "stackable": false,
@@ -185,13 +188,14 @@
         "atk": 20,
         "def": 15,
         "dodge": 2
-      }
+      },
+      "skills": ["iron_skin"]
     },
     {
       "id": "rat_core",
       "name": "Rat Core",
       "type": "Core",
-      "desc": "Essence of a rat. Grants minor agility.",
+      "desc": "Essence of a rat. Grants Stone Throw.",
       "value": 2,
       "sprite": "item_rat_core.png",
       "stackable": false,
@@ -200,7 +204,8 @@
         "atk": 0,
         "def": 0,
         "dodge": 2
-      }
+      },
+      "skills": ["stone_throw"]
     }
   ]
 }

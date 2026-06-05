@@ -8,7 +8,27 @@ enum class SkillType
 {
     ActiveBuff,    // กด key -> buff ชั่วคราว
     Passive,       // auto-apply ตลอดเวลา
-    ActiveRanged,  // กด key -> เลือกทิศ -> ยิง projectile
+    ActiveRanged,  // กด key -> targeting -> ยิง projectile
+    ActiveHeal,    // กด key -> heal ทันที
+    ActiveWarp,    // กด key -> targeting -> teleport
+    ActiveAoe,     // กด key -> AOE รอบตัว
+};
+
+// ============================================================
+//  SkillEffect  -  ค่า effect ทุกประเภทรวมกัน
+// ============================================================
+struct SkillEffect
+{
+    int atkPct       = 0;   // % bonus ATK (buff)
+    int defPct       = 0;   // % bonus DEF (buff/passive)
+    int dodgePct     = 0;   // % bonus Dodge
+    int healFlat     = 0;   // heal คงที่
+    int healPct      = 0;   // heal % of maxHp
+    int damagePct    = 0;   // % of ATK (ranged/aoe)
+    int range        = 0;   // tiles (ranged/warp)
+    int speedBonus   = 0;   // AP bonus (+1 AP per turn)
+    int atkSpeedPct  = 100; // AP cost ของการโจมตี x100 (100=ปกติ, 50=ถูกกว่า)
+    int aoeRadius    = 0;   // radius ของ AOE
 };
 
 // ============================================================
@@ -22,11 +42,19 @@ struct SkillData
     SkillType   type      = SkillType::Passive;
     int         cooldown  = 0;   // turns
     int         duration  = 0;   // turns (สำหรับ buff)
-    int         atkPct    = 0;   // % bonus ATK
-    int         defPct    = 0;   // % bonus DEF
-    int         dodgePct  = 0;   // % bonus Dodge
-    int         damage    = 0;   // % of ATK (ranged)
-    int         range     = 0;   // tiles (ranged)
+    int         hotbarSlot = -1; // slot 0-8, -1 = ไม่ได้ assign
+
+    SkillEffect effect;
+
+    // backward-compat aliases (ชี้ไปที่ effect)
+    int& atkPct    () { return effect.atkPct; }
+    int& defPct    () { return effect.defPct; }
+    int& dodgePct  () { return effect.dodgePct; }
+    int& damage    () { return effect.damagePct; }
+    int& range     () { return effect.range; }
+    const int& atkPct () const { return effect.atkPct; }
+    const int& defPct () const { return effect.defPct; }
+    const int& range  () const { return effect.range; }
 };
 
 // ============================================================
@@ -35,14 +63,13 @@ struct SkillData
 struct SkillInstance
 {
     SkillData   data;
-    int         cooldownLeft  = 0;   // turns เหลือก่อนใช้ได้อีก
-    int         durationLeft  = 0;   // turns คงเหลือของ buff ปัจจุบัน
+    int         cooldownLeft  = 0;
+    int         durationLeft  = 0;
     bool        buffActive    = false;
 
     bool isReady()   const { return cooldownLeft <= 0; }
     bool isPassive() const { return data.type == SkillType::Passive; }
 
-    // เรียกทุก turn
     void tick()
     {
         if (cooldownLeft > 0) cooldownLeft--;
