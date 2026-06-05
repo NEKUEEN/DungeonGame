@@ -50,6 +50,22 @@
       "stackable": false
     },
     {
+      "id": "wand",
+      "name": "Wand",
+      "type": "Weapon",
+      "desc": "A magical wand.",
+      "value": 3,
+      "hp": 0,
+      "atk": 0,
+      "magic_dmg": 100,
+      "def": 0,
+      "magic_res": 0,
+      "mana": 20,
+      "dodge": 2,
+      "sprite": "item_weapon.png",
+      "stackable": false
+    },
+    {
       "id": "shield",
       "name": "Shield",
       "type": "OffWeapon",
@@ -57,6 +73,21 @@
       "value": 2,
       "hp": 0,
       "atk": 0,
+      "def": 3,
+      "dodge": 1,
+      "sprite": "item_offweapon.png",
+      "stackable": false
+    },
+    {
+      "id": "Orb",
+      "name": "Orb",
+      "type": "OffWeapon",
+      "desc": "A mystical orb.",
+      "value": 2,
+      "hp": 0,
+      "atk": 0,
+      "magic_dmg": 10,
+      "mana": 20,
       "def": 3,
       "dodge": 1,
       "sprite": "item_offweapon.png",
@@ -140,6 +171,25 @@
         "atk": 10,
         "def": 10,
         "dodge": 4
+      },
+      "skills": ["power_strike"]
+    },
+    {
+      "id": "goblinWizard_core",
+      "name": "Goblin Wizard Core",
+      "type": "Core",
+      "desc": "Essence of a goblin wizard. Grants cunning and Power Strike.",
+      "value": 5,
+      "sprite": "item_goblin_core.png",
+      "stackable": false,
+      "core_stats": {
+        "hp": 5,
+        "atk": 0,
+        "def": 0,
+        "dodge": 10,
+        "magic_res": 20,
+        "magic_dmg": 15,
+        "mana": 20
       },
       "skills": ["power_strike"]
     },

@@ -53,6 +53,13 @@ int Game::computeBody() const
     return (int)(hp*0.4f + atk*0.3f + def*0.2f + dodge*0.1f);
 }
 
+int Game::computeMentality() const
+{
+    if (!m_player) return 0;
+    const Stats& s = m_player->getStats();
+    return (int)(s.maxMana * 0.4f + s.maxMagicDmg * 0.3f + s.maxMagicRes * 0.3f);
+}
+
 int Game::getItemLevelTotal() const
 {
     int total = 0;
@@ -104,7 +111,7 @@ void Game::recalcAP()
 {
     if (!m_player) return;
     Stats& s = m_player->getStats();
-    int ap = 1; // base
+    int ap = 1;
 
     for (const auto& sk : m_player->getSkills())
     {
@@ -114,7 +121,6 @@ void Game::recalcAP()
     s.maxAP     = ap;
     s.currentAP = ap;
 
-    // attack speed — คำนวณ AP cost ต่อการโจมตี
     int atkCost = 100;
     for (const auto& sk : m_player->getSkills())
     {
@@ -172,7 +178,7 @@ void Game::useSkillBuff(const std::string& skillId)
 }
 
 // ============================================================
-//  executeSkill  –  ตัวกลางที่อ่าน type แล้วทำ
+//  executeSkill
 // ============================================================
 void Game::executeSkill(int hotbarIdx)
 {
@@ -198,7 +204,7 @@ void Game::executeSkill(int hotbarIdx)
         sk->durationLeft = sk->data.duration;
         sk->cooldownLeft = sk->data.cooldown;
         addLog("> "+sk->data.name+" activated!", sf::Color(255,200,50));
-        recalcAP(); // speed buff อาจเปลี่ยน AP
+        recalcAP();
         break;
 
     case SkillType::ActiveHeal:
@@ -290,7 +296,7 @@ void Game::executeWarp(int col, int row)
 }
 
 // ============================================================
-//  Line Helper  –  Bresenham
+//  Line Helper
 // ============================================================
 std::vector<sf::Vector2i> Game::getLine(int x0, int y0, int x1, int y1) const
 {
@@ -411,7 +417,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
             if (!e->isDead() && e->getCol()==tx && e->getRow()==ty)
             {
                 e->takeDamage(projDmg);
-                addLog("> Stone hits "+e->getName()+" for "+std::to_string(projDmg)+"!",
+                addLog("> " + sk->data.name + " hits " + e->getName() + " for " + std::to_string(projDmg) + "!",
                        sf::Color(180,220,255));
 
                 if (e->isDead())
@@ -505,6 +511,8 @@ void Game::newDungeon(bool keepPlayer)
     if (m_player)
     {
         Stats& s      = m_player->getStats();
+        s.maxMentality= computeMentality();
+        s.mentality   = s.maxMentality;
         s.body        = computeBody();
         s.itemLevel   = getItemLevelTotal();
         s.battleIndex = computeBattleIndex();
@@ -642,9 +650,6 @@ void Game::processEvents()
                 return;
             }
 
-            // ============================================================
-            //  TARGETING MODE
-            // ============================================================
             if (m_targetingMode)
             {
                 switch(key->code)
@@ -657,25 +662,23 @@ void Game::processEvents()
                     case sf::Keyboard::Key::U: moveTargetCursor(1,-1);  break;
                     case sf::Keyboard::Key::B: moveTargetCursor(-1, 1); break;
                     case sf::Keyboard::Key::N: moveTargetCursor(1,  1); break;
-
-                    case sf::Keyboard::Key::Enter:
-                    case sf::Keyboard::Key::Space:
-                        confirmTarget();
-                        break;
-
+                    case sf::Keyboard::Key::Num1: 
+                    case sf::Keyboard::Key::Num2:
+                    case sf::Keyboard::Key::Num3:
+                    case sf::Keyboard::Key::Num4:
+                    case sf::Keyboard::Key::Num5:
+                    case sf::Keyboard::Key::Num6:
+                    case sf::Keyboard::Key::Num7:
+                    case sf::Keyboard::Key::Num8:
+                    case sf::Keyboard::Key::Num9:   
+                    confirmTarget(); break;
                     case sf::Keyboard::Key::Escape:
-                    case sf::Keyboard::Key::F:
-                        cancelTargeting();
-                        break;
-
+                    case sf::Keyboard::Key::F:     cancelTargeting(); break;
                     default: break;
                 }
                 return;
             }
 
-            // ============================================================
-            //  NORMAL MODE
-            // ============================================================
             switch(key->code)
             {
                 case sf::Keyboard::Key::Escape: m_window.close();    break;
@@ -692,7 +695,6 @@ void Game::processEvents()
                 case sf::Keyboard::Key::B:  handlePlayerMove(-1, 1); break;
                 case sf::Keyboard::Key::N:  handlePlayerMove(1,  1); break;
 
-                // Num1-9 = hotbar skill slots
                 case sf::Keyboard::Key::Num1: executeSkill(0); break;
                 case sf::Keyboard::Key::Num2: executeSkill(1); break;
                 case sf::Keyboard::Key::Num3: executeSkill(2); break;
@@ -723,7 +725,8 @@ void Game::processEvents()
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
                 case sf::Keyboard::Key::Space:  waitTurn();         break;
-                case sf::Keyboard::Key::Num0: if(m_viewCores)equipCore(); else if(!m_viewEquipment)useOrEquipSelected(); break;
+                case sf::Keyboard::Key::Enter:
+                    if(m_viewCores)equipCore(); else if(!m_viewEquipment)useOrEquipSelected(); break;
                 case sf::Keyboard::Key::Tab:
                     m_selectedSlot=(m_selectedSlot+1)%MAX_INVENTORY; break;
                 default: break;
@@ -856,7 +859,6 @@ void Game::equipCore()
     m_coreSlots.equip(freeSlot,core);
     addLog("> Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),sf::Color(100,200,255));
 
-    // ให้สกิลจาก core
     const ItemData* idata = DropTable::instance().getItem(core.id);
     if (idata)
         for (const auto& skillId : idata->coreSkills)
@@ -878,7 +880,6 @@ void Game::unequipCore()
     m_inventory.addItem(core);
     addLog("> Removed "+core.name+" from core slot "+std::to_string(m_selectedCoreSlot+1),sf::Color(160,160,160));
 
-    // ลบสกิลที่ได้จาก core นี้
     const ItemData* idata = DropTable::instance().getItem(core.id);
     if (idata)
         for (const auto& skillId : idata->coreSkills)
@@ -906,7 +907,6 @@ void Game::handlePlayerMove(int dc, int dr)
 {
     if (!m_player) return;
 
-    // เช็ค AP
     if (m_player->getStats().currentAP <= 0) return;
 
     int tc=m_player->getCol()+dc, tr=m_player->getRow()+dr;
@@ -915,7 +915,6 @@ void Game::handlePlayerMove(int dc, int dr)
         if (!e->isDead()&&e->getCol()==tc&&e->getRow()==tr)
         {
             playerAttack(e);
-            // ตรวจ AP หลังโจมตี
             if (m_player->getStats().currentAP <= 0)
             {
                 processTurn(); tryRespawnEnemies(); recalcAP();
@@ -927,13 +926,11 @@ void Game::handlePlayerMove(int dc, int dr)
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
     if (!moved){addLog("> Blocked!");return;}
 
-    // หัก AP จากการเดิน
     m_player->getStats().currentAP--;
 
     m_turnCount++; m_player->onTurnPassed();
     m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
 
-    // ถ้า AP หมด → enemy turn แล้ว reset AP
     if (m_player->getStats().currentAP <= 0)
     {
         processTurn(); tryRespawnEnemies(); recalcAP();
@@ -971,7 +968,6 @@ void Game::playerAttack(Enemy* enemy)
     if (powered) msg+=" [POWERED]";
     addLog(msg,sf::Color(255,200,50));
 
-    // หัก AP ตาม atkSpeedCost
     Stats& s = m_player->getStats();
     s.atkAPAccum += s.atkSpeedCost;
     while (s.atkAPAccum >= 100)
@@ -1040,8 +1036,11 @@ void Game::processTurn()
 {
     if (!m_player) return;
     Stats& s=m_player->getStats();
-    s.body=computeBody(); s.itemLevel=getItemLevelTotal();
-    s.battleIndex=computeBattleIndex(); s.ability= (int)m_player->getSkills().size();
+    s.body         = computeBody();
+    s.itemLevel    = getItemLevelTotal();
+    s.battleIndex  = computeBattleIndex();
+    s.maxMentality = computeMentality();
+    s.ability      = (int)m_player->getSkills().size();
     drainMentality();
     if (m_playerDead) return;
     for (auto*e:m_enemies)
@@ -1089,7 +1088,7 @@ void Game::render()
 }
 
 // ============================================================
-//  Hotbar Render  –  แถบ skill ด้านล่าง game view
+//  Hotbar Render
 // ============================================================
 void Game::renderHotbar()
 {
@@ -1108,7 +1107,6 @@ void Game::renderHotbar()
         const std::string& id = m_player->getHotbar(i);
         const SkillInstance* sk = id.empty() ? nullptr : m_player->findSkill(id);
 
-        // bg slot
         sf::RectangleShape slot({SZ, SZ});
         slot.setFillColor(sf::Color(10, 10, 10, 200));
         slot.setOutlineColor(sf::Color(80, 70, 50));
@@ -1116,7 +1114,6 @@ void Game::renderHotbar()
         slot.setPosition({sx, startY});
         m_window.draw(slot);
 
-        // hotkey label
         sf::Text numTxt(m_font, std::to_string(i+1), 8);
         numTxt.setFillColor(sf::Color(120, 120, 120));
         numTxt.setPosition({sx + 2.f, startY + 1.f});
@@ -1124,7 +1121,6 @@ void Game::renderHotbar()
 
         if (sk)
         {
-            // cooldown overlay
             if (!sk->isReady())
             {
                 float ratio = sk->data.cooldown > 0
@@ -1149,7 +1145,6 @@ void Game::renderHotbar()
                 m_window.draw(activeGlow);
             }
 
-            // skill name (first 4 chars)
             std::string label = sk->data.name.substr(0, 4);
             sf::Text nameTxt(m_font, label, 7);
             nameTxt.setFillColor(sk->isReady() ? sf::Color(200, 200, 200) : sf::Color(100, 100, 100));
@@ -1373,16 +1368,13 @@ void Game::renderStatusPanel()
      h.setPosition({x,y});m_window.draw(h);
      y+=STATUS_HEADER_SIZE+STATUS_HEADER_SPACING;}
 
-    drawLine("level:",std::to_string(s.level));
-    drawLine("body:", std::to_string(s.body));
-    {sf::Color mc=s.hpDepleted?sf::Color(220,100,200):sf::Color::White;
-     std::string mv=std::to_string(s.maxMentality);if(s.hpDepleted)mv+=" (!drain)";
-     drawLine("mentality:",mv,mc);}
+    drawLine("level:",     std::to_string(s.level));
+    drawLine("body:",      std::to_string(s.body));
+    drawLine("mentality:", std::to_string(s.maxMentality));
     drawLine("ability:",   std::to_string(s.ability));
     drawLine("item level:",std::to_string(s.itemLevel));
     drawLine("Battle Index:",std::to_string(s.battleIndex));
 
-    // AP indicator
     std::string apStr = "AP: "+std::to_string(s.currentAP)+"/"+std::to_string(s.maxAP);
     sf::Color apColor = s.currentAP > 0 ? sf::Color(100,200,255) : sf::Color(100,100,100);
     drawLine("", apStr, apColor);

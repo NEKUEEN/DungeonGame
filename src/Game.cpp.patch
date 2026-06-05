@@ -1,0 +1,34 @@
+// ================================================================
+//  PATCH SNIPPET — Game.cpp
+//  วางลงใน Game.cpp ของโปรเจ็กต์เดิม
+//  1) เพิ่ม computeMentality() ต่อจาก computeBody()
+//  2) แก้ใน processTurn() — เพิ่มบรรทัด s.mentality = computeMentality();
+// ================================================================
+
+// ─────────────────────────────────────────────────────────────────
+//  (1)  วางต่อจากฟังก์ชัน computeBody() ในไฟล์เดิม
+// ─────────────────────────────────────────────────────────────────
+
+int Game::computeMentality() const
+{
+    if (!m_player) return 0;
+    const Stats& s = m_player->getStats();
+
+    // sub-stats ปัจจุบัน — เพิ่ม field ใหม่ตรงนี้อย่างเดียว
+    int mana      = s.maxMana;
+    int magicDmg  = s.maxMagicDmg;
+    int magicRes  = s.maxMagicRes;
+    // อนาคต: int poisonRes = s.maxPoisonRes;
+
+    // สูตรเหมือน body — ปรับ weight ทีหลังได้
+    return (int)(mana * 0.4f + magicDmg * 0.3f + magicRes * 0.3f);
+    // อนาคต: + poisonRes*0.1f ฯลฯ
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  (2)  ใน processTurn() — หา s.body = computeBody(); แล้วเพิ่มบรรทัดถัดไป
+//
+//       s.body       = computeBody();
+//       s.mentality  = computeMentality();   // ← เพิ่มบรรทัดนี้
+//       s.battleIndex = computeBattleIndex();
+// ─────────────────────────────────────────────────────────────────

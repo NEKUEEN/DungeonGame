@@ -93,6 +93,7 @@ private:
 
     // ── Stats helpers ──
     int  computeBody()        const;
+    int  computeMentality()   const;         // ← เพิ่ม
     int  computeBattleIndex() const;
     int  getItemLevelTotal()  const;
     void drainMentality();

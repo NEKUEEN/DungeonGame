@@ -24,9 +24,15 @@ struct Stats
     int hp = 25;
 
     // ── Mentality ──
-    int  maxMentality = 20;
-    int  mentality    = 20;
+    int  maxMentality = 0;
+    int  mentality    = 0;
     bool hpDepleted   = false;
+
+    // ── Mentality sub-stats ──
+    int maxMagicDmg  = 0;
+    int maxMana      = 20;   // เตรียมไว้ก่อน
+    int maxMagicRes  = 0;
+    // อนาคต: int maxPoisonRes = 0; int maxMagicSpd = 0;
 
     // ── Ability (จาก core bonus) ──
     int ability = 0;

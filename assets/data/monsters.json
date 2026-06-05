@@ -45,7 +45,7 @@
       "hp": 20, "attack": 9, "defense": 2, "exp": 2,
       "drops": [
         { "item": "magic_stone", "chance": 0.80 },
-        { "item": "goblinWizard_core", "chance": 0.35 }
+        { "item": "goblinWizard_core", "chance": 0.99 }
       ]
     },
     {
