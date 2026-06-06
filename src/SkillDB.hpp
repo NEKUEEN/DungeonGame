@@ -56,6 +56,9 @@ public:
                 if (e.contains("speed_bonus"))   d.effect.speedBonus  = e["speed_bonus"].get<int>();
                 if (e.contains("atk_speed_pct")) d.effect.atkSpeedPct = e["atk_speed_pct"].get<int>();
                 if (e.contains("aoe_radius"))    d.effect.aoeRadius   = e["aoe_radius"].get<int>();
+                if (e.contains("scaling_stat")) d.effect.scalingStat = e["scaling_stat"].get<std::string>();
+                if (e.contains("mana_cost"))      d.effect.manaCost    = e["mana_cost"].get<int>();
+
             }
             else
             {

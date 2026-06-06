@@ -21,6 +21,7 @@ Player::Player(int startCol, int startRow, int tileSize)
     {
         SkillInstance inst;
         inst.data = sd;
+        inst.fromCore = true;  // สกิลเริ่มต้นมาจาก core
         m_skills.push_back(inst);
 
         // assign hotbar จาก JSON
@@ -119,6 +120,10 @@ void Player::onTurnPassed()
     // ── tick skills (cooldown + buff duration) ──
     for (auto& sk : m_skills)
         sk.tick();
+
+    // ── Mana regen (ทุก 7 turns) ──
+    if (m_stats.mana < m_stats.maxMana)
+        m_stats.mana = std::min(m_stats.maxMana, m_stats.mana + m_stats.manaRegen);
 
     // ── Hunger drain (ทุก 100 turns) ──
     m_stats.hungerTimer++;

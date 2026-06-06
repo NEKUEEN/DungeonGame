@@ -20,6 +20,8 @@ enum class SkillType
 struct SkillEffect
 {
     int atkPct       = 0;   // % bonus ATK (buff)
+    int magicDmgPct  = 0;   // % bonus Magic Damage (buff/passive)
+    int manaCost     = 0;   // AP cost ของสกิลเวท (buff/passive)
     int defPct       = 0;   // % bonus DEF (buff/passive)
     int dodgePct     = 0;   // % bonus Dodge
     int healFlat     = 0;   // heal คงที่
@@ -29,6 +31,7 @@ struct SkillEffect
     int speedBonus   = 0;   // AP bonus (+1 AP per turn)
     int atkSpeedPct  = 100; // AP cost ของการโจมตี x100 (100=ปกติ, 50=ถูกกว่า)
     int aoeRadius    = 0;   // radius ของ AOE
+    std::string scalingStat = "atk"; // "atk", "def", "dodge", "magic_dmg" - stat ที่ใช้ในการคำนวณ damage ของ ranged/aoe
 };
 
 // ============================================================
@@ -55,6 +58,7 @@ struct SkillData
     const int& atkPct () const { return effect.atkPct; }
     const int& defPct () const { return effect.defPct; }
     const int& range  () const { return effect.range; }
+    const std::string& scalingStat () const { return effect.scalingStat; }
 };
 
 // ============================================================
@@ -66,7 +70,8 @@ struct SkillInstance
     int         cooldownLeft  = 0;
     int         durationLeft  = 0;
     bool        buffActive    = false;
-
+    bool fromCore = false;
+    
     bool isReady()   const { return cooldownLeft <= 0; }
     bool isPassive() const { return data.type == SkillType::Passive; }
 

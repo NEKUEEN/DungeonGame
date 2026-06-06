@@ -29,8 +29,10 @@ struct Stats
     bool hpDepleted   = false;
 
     // ── Mentality sub-stats ──
-    int maxMagicDmg  = 0;
+    int maxMagicDmg  = 10;
     int maxMana      = 20;   // เตรียมไว้ก่อน
+    int mana = 20;
+    int manaRegen = 1;   // เตรียมไว้ก่อน
     int maxMagicRes  = 0;
     // อนาคต: int maxPoisonRes = 0; int maxMagicSpd = 0;
 
@@ -116,8 +118,24 @@ public:
 
     // เพิ่ม skill จาก core → หา hotbar slot ว่างแรก
     bool addCoreSkill(const std::string& skillId)
-    {
-        if (!findSkill(skillId))
+    {   
+        {
+            // ไม่เช็ค existing แล้ว — สร้าง instance ใหม่เสมอ
+        const SkillData* sd = SkillDB::instance().get(skillId);
+        if (!sd) return false;
+
+        SkillInstance inst;
+        inst.data     = *sd;
+        inst.fromCore = true;  // ← set ตรงนี้
+        m_skills.push_back(inst);
+
+        for (int i = 0; i < 9; ++i)
+            if (m_hotbar[i].empty())
+            { m_hotbar[i] = skillId; return true; }
+
+            return false;
+        }
+       //if (!findSkill(skillId))
         {
             const SkillData* sd = SkillDB::instance().get(skillId);
             if (!sd) return false;

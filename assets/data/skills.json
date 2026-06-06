@@ -34,7 +34,8 @@
       "duration": 0,
       "effect": {
         "damage_pct": 50,
-        "range": 6
+        "range": 6,
+        "scaling_stat": "atk"
       }
     },
     {
@@ -42,12 +43,14 @@
       "name": "Magic Missile",
       "desc": "Fire a magic missile. Range 6, dmg MAG/2.",
       "type": "active_ranged",
-      "hotbar_slot": 0,
+      "hotbar_slot": -1,
       "cooldown": 1,
       "duration": 0,
       "effect": {
         "damage_pct": 50,
-        "range": 6
+        "range": 6,
+        "scaling_stat": "magic_dmg",
+        "mana_cost": 5
       }
     },
     {

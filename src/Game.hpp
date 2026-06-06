@@ -103,6 +103,8 @@ private:
     void fireRangedAt(int targetCol, int targetRow);
     int  getBuffedAtk() const;
     int  getBuffedDef() const;
+    int getBuffedMagicDmg() const;
+    int getScaledDamage(const SkillEffect& effect) const;
 
     // ── Line helper ──
     std::vector<sf::Vector2i> getLine(int x0, int y0, int x1, int y1) const;

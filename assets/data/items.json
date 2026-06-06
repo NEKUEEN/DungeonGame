@@ -57,7 +57,7 @@
       "value": 3,
       "hp": 0,
       "atk": 0,
-      "magic_dmg": 100,
+      "magic_dmg": 10,
       "def": 0,
       "magic_res": 0,
       "mana": 20,
@@ -191,7 +191,7 @@
         "magic_dmg": 15,
         "mana": 20
       },
-      "skills": ["power_strike"]
+      "skills": ["magic_missile", "quick_heal", "blink"]
     },
     {
       "id": "goblinWarrior_core",

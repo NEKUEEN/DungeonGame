@@ -139,6 +139,21 @@ void Game::recalcAP()
 // ============================================================
 //  Skill Helpers
 // ============================================================
+int Game::getScaledDamage(const SkillEffect& effect) const
+{
+    if (!m_player) return 0;
+    const Stats& s = m_player->getStats();
+
+    int baseStat = 0;
+    if (effect.scalingStat == "atk") baseStat = getBuffedAtk();
+    else if (effect.scalingStat == "def") baseStat = getBuffedDef();
+    else if (effect.scalingStat == "dodge") baseStat = s.maxDodge + m_equipment.getTotalDodgeBonus();
+    else if (effect.scalingStat == "magic_dmg") baseStat = getBuffedMagicDmg();
+//เพิ่มเติม scaling stat อื่นๆ ได้ที่นี่
+        return std::max(1, baseStat * effect.damagePct / 100);
+
+}
+
 int Game::getBuffedAtk() const
 {
     if (!m_player) return 0;
@@ -148,6 +163,17 @@ int Game::getBuffedAtk() const
     for (const auto& sk : m_player->getSkills())
         if (sk.buffActive && sk.data.type == SkillType::ActiveBuff)
             base = base + base * sk.data.effect.atkPct / 100;
+    return base;
+}
+int Game::getBuffedMagicDmg() const
+{
+    if (!m_player) return 0;
+    const Stats& s = m_player->getStats();
+    CoreStats cb   = m_coreSlots.getTotalBonus();
+    int base = s.maxMagicDmg + cb.magicDmg + m_equipment.getTotalMagicDmgBonus();
+    for (const auto& sk : m_player->getSkills())
+        if (sk.buffActive && sk.data.type == SkillType::ActiveBuff)
+            base = base + base * sk.data.effect.magicDmgPct / 100;
     return base;
 }
 
@@ -186,12 +212,22 @@ void Game::useSkillBuff(const std::string& skillId)
 // ============================================================
 void Game::executeSkill(int hotbarIdx)
 {
+
     if (!m_player) return;
     const std::string& id = m_player->getHotbar(hotbarIdx);
     if (id.empty()) { addLog("> Slot "+std::to_string(hotbarIdx+1)+" empty."); return; }
 
     SkillInstance* sk = m_player->findSkill(id);
     if (!sk) return;
+
+    Stats& s = m_player->getStats();
+    if (s.mana < sk->data.effect.manaCost)
+    {
+        addLog("> Not enough mana!", sf::Color(100,100,220));
+        return;
+    }
+    s.mana -= sk->data.effect.manaCost;
+
 
     if (!sk->isReady())
     {
@@ -264,6 +300,7 @@ void Game::executeAoe(SkillInstance* sk)
     int pr = m_player->getRow();
     int radius = sk->data.effect.aoeRadius;
     int baseAtk = getBuffedAtk();
+    int baseMagicDmg = getBuffedMagicDmg();
     int dmg = std::max(1, baseAtk * sk->data.effect.damagePct / 100);
     int hits = 0;
 
@@ -401,7 +438,8 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     int pc = m_player->getCol();
     int pr = m_player->getRow();
     int baseAtk = getBuffedAtk();
-    int projDmg = std::max(1, baseAtk * sk->data.effect.damagePct / 100);
+    int baseMagicDmg = getBuffedMagicDmg();
+    int projDmg = getScaledDamage(sk->data.effect);
 
     auto line = getLine(pc, pr, targetCol, targetRow);
     bool hit = false;
@@ -519,7 +557,7 @@ void Game::newDungeon(bool keepPlayer)
     {
         Stats& s      = m_player->getStats();
         s.maxMentality= computeMentality();
-        s.mentality   = s.maxMentality;
+        s.mentality   = computeMentality();
         s.body        = computeBody();
         s.itemLevel   = getItemLevelTotal();
         s.battleIndex = computeBattleIndex();
@@ -965,6 +1003,7 @@ void Game::playerAttack(Enemy* enemy)
 {
     if (!m_player) return;
     int atk=getBuffedAtk();
+    int magicDmg=getBuffedMagicDmg();
     int dmg=std::max(1,atk+std::rand()%4-enemy->getDefense());
     enemy->takeDamage(dmg);
 
@@ -1051,7 +1090,14 @@ void Game::processTurn()
     s.itemLevel    = getItemLevelTotal();
     s.battleIndex  = computeBattleIndex();
     s.maxMentality = computeMentality();
-    s.ability      = (int)m_player->getSkills().size();
+    int cout = 0;
+    for (const auto& sk : m_player->getSkills())
+    {
+        std::cout << sk.data.id << " fromCore=" <<sk.fromCore << "\n";
+        if (sk.fromCore) cout++;
+    }
+    s.ability = cout;
+
     drainMentality();
     if (m_playerDead) return;
     for (auto*e:m_enemies)
@@ -1332,6 +1378,7 @@ void Game::renderSkillPanel()
 
     for (const auto& sk:m_player->getSkills())
     {
+        if (!sk.fromCore) continue;
         std::string line=sk.data.name;
         sf::Color c=sf::Color(160,160,160);
         if (sk.data.type==SkillType::Passive)
@@ -1384,7 +1431,8 @@ void Game::renderStatusPanel()
     drawLine("mentality:", std::to_string(s.maxMentality));
     drawLine("ability:",   std::to_string(s.ability));
     drawLine("item level:",std::to_string(s.itemLevel));
-    drawLine("Battle Index:",std::to_string(s.battleIndex));
+    drawLine("Comprehensive Battle", "");
+    drawLine("Index:",std::to_string(s.battleIndex));
 
     std::string apStr = "AP: "+std::to_string(s.currentAP)+"/"+std::to_string(s.maxAP);
     sf::Color apColor = s.currentAP > 0 ? sf::Color(100,200,255) : sf::Color(100,100,100);
