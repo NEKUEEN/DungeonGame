@@ -33,13 +33,50 @@ DungeonGame/
 - วางไว้ที่ `assets/fonts/font.ttf`
 
 ## Roadmap
-- [x] Phase 1: Project Structure + Window
-- [ ] Phase 2: TileMap + Dungeon Floor
-- [ ] Phase 3: Player + Grid Movement + Turn System
-- [ ] Phase 4: Stats Panel (body/mentality/ability)
-- [ ] Phase 5: Log Window
-- [ ] Phase 6: HP Bar ใต้ตัวละคร
-- [ ] Phase 7: Inventory System
-- [ ] Phase 8: Hunger System
-- [ ] Phase 9: Enemy + AI
-- [ ] Phase 10: Combat System
+## Roadmap — DungeonGame (อัพเดท)
+
+### ✅ เสร็จแล้ว
+- Dungeon generation, Camera, Fog of War
+- Player: Move, Turn, HP Regen, Hunger, Level Up, EXP
+- Enemy: 3 ประเภท, 3 Rank, AI, Floor scaling, Respawn
+- MonsterDB / DropTable (JSON-driven)
+- Inventory, Equipment (7 slots), Core Slots (level-based)
+- Sprite system + TextureManager
+- หลายชั้น, บันไดขึ้น/ลง
+- Stats: Body, Mentality (skeleton), Ability, BattleIndex, ItemLevel
+- **Skill System ใหม่** — Num1-9 hotbar, executeSkill data-driven
+- **Action Point System** — Speed buff, Attack Speed buff
+- **Core → Stats** — CoreStats เป็น hp/atk/def/dodge อ่านจาก JSON
+- **Core → Skill** — equip core → สกิลขึ้น hotbar
+- **Mana System** — mana_cost, regen per turn
+- **Skill Scaling** — scaling_stat (atk/magic_dmg)
+- **getBuffedMagicDmg()**
+
+### 🔴 Priority 1
+- [ ] New Ai Enemy
+    
+- [ ] Death Screen / Game Over UI
+- [ ] Kill Count System (per family/id)
+- [ ] Boss Trigger
+- [ ] เลือกเผ่า
+
+### 🟡 Priority 2
+- [ ] Map hand craft
+- [ ] Mentality sub-stats เพิ่มเติม
+- [ ] Stamina System
+- [ ] Monster Skills
+- [ ] Monster Encyclopedia
+ เงื่อนไขที่ 1 — First Kill EXP
+ฆ่ามอน id ใหม่ที่ไม่เคยฆ่ามาก่อน → ได้ EXP ตาม rank
+Normal +1, Elite +2, Boss +3 เหมือนเดิม
+ฆ่าซ้ำ → ไม่ได้ EXP แบบนี้อีก
+ เงื่อนไขที่ 2 — Kill Count EXP
+ฆ่ามอน id เดิมครบ 100 ตัว → Level Up ทันที
+นับแยกต่างหากแต่ละ id
+เช่น Goblin Warrior 100 ตัว = Level Up
+- [ ] NPC + Shop
+- [ ] Save/Load
+
+### 🟠 Priority 3
+- [ ] Party System
+- [ ] Town Loop
