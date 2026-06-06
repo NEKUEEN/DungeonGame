@@ -535,6 +535,7 @@ void Game::newDungeon(bool keepPlayer)
         m_dungeonFloor=1;
         m_inventory=Inventory();
         m_equipment=Equipment();
+        m_coreSlots=CoreSlots();
     }
 
     bool placed=false;
@@ -678,6 +679,7 @@ void Game::run(){while(m_window.isOpen()){processEvents();update();render();}}
 void Game::update()
 {
     if (m_levelUpFlash){m_levelUpTimer--;if(m_levelUpTimer<=0)m_levelUpFlash=false;}
+    if (m_deltaTimer > 0) m_deltaTimer--;  // ← เพิ่ม
 }
 
 // ============================================================
@@ -764,16 +766,25 @@ void Game::processEvents()
                     addLog(m_viewCores?"> Core Slots view":"> Inventory view",sf::Color(100,200,255));
                     break;
                 case sf::Keyboard::Key::LBracket:
-                    if (m_viewCores&&m_selectedCoreSlot>0) m_selectedCoreSlot--; break;
+                    if (m_viewCores&&m_selectedCoreSlot>0) m_selectedCoreSlot--;
+                    else if (m_viewEquipment&&m_selectedEquipSlot>0) m_selectedEquipSlot--;
+                    break;
                 case sf::Keyboard::Key::RBracket:
-                    if (m_viewCores&&m_selectedCoreSlot<m_coreSlots.getSlotCount()-1) m_selectedCoreSlot++; break;
+                    if (m_viewCores&&m_selectedCoreSlot<m_coreSlots.getSlotCount()-1) m_selectedCoreSlot++;
+                    else if (m_viewEquipment&&m_selectedEquipSlot<6) m_selectedEquipSlot++;
+                    break;
                 case sf::Keyboard::Key::X:
-                    if (m_viewCores) unequipCore(); break;
+                    if (m_viewCores) unequipCore();
+                    else if (m_viewEquipment) unequipSelected();
+                    break;
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
                 case sf::Keyboard::Key::Space:  waitTurn();         break;
                 case sf::Keyboard::Key::Enter:
-                    if(m_viewCores)equipCore(); else if(!m_viewEquipment)useOrEquipSelected(); break;
+                    if(m_viewCores) equipCore();
+                    else if(m_viewEquipment) unequipSelected();
+                    else useOrEquipSelected();
+                    break;
                 case sf::Keyboard::Key::Tab:
                     m_selectedSlot=(m_selectedSlot+1)%MAX_INVENTORY; break;
                 default: break;
@@ -889,8 +900,27 @@ void Game::useOrEquipSelected()
         m_equipment.equip(toEquip,slot);
         addLog("> Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
                std::to_string(toEquip.value),sf::Color(180,220,180));
-        m_player->getStats().itemLevel=getItemLevelTotal();
+        m_deltaTimer = 0;  // reset ก่อน
+        refreshStats();
     }
+}
+
+void Game::unequipSelected()
+{
+    if (!m_player) return;
+    const EquipSlot slots[] = {
+        EquipSlot::Head, EquipSlot::Body, EquipSlot::Arms,
+        EquipSlot::Legs, EquipSlot::Feet,
+        EquipSlot::MainHand, EquipSlot::OffHand
+    };
+    if (m_selectedEquipSlot < 0 || m_selectedEquipSlot >= 7) return;
+    EquipSlot slot = slots[m_selectedEquipSlot];
+    if (!m_equipment.hasItem(slot)) { addLog("> Nothing to unequip."); return; }
+    if (m_inventory.isFull()) { addLog("> Inventory full!"); return; }
+    Item item = m_equipment.unequip(slot);
+    m_inventory.addItem(item);
+    addLog("> Unequipped "+item.name, sf::Color(180,180,180));
+    refreshStats();
 }
 
 void Game::equipCore()
@@ -915,7 +945,12 @@ void Game::equipCore()
             else
                 addLog("> Hotbar full — "+skillId+" not assigned", sf::Color(180,120,50));
         }
-    m_player->getStats().ability = (int)m_player->getSkills().size();
+    // นับเฉพาะ fromCore == true
+int abilityCount = 0;
+for (const auto& sk : m_player->getSkills())
+    if (sk.fromCore) abilityCount++;
+m_player->getStats().ability = abilityCount;
+refreshStats();
 }
 
 void Game::unequipCore()
@@ -934,7 +969,13 @@ void Game::unequipCore()
             m_player->removeCoreSkill(skillId);
             addLog("> Skill lost: "+skillId, sf::Color(160,100,100));
         }
-    m_player->getStats().ability = (int)m_player->getSkills().size();
+    // นับเฉพาะ fromCore == true
+int abilityCount = 0;
+for (const auto& sk : m_player->getSkills())
+    if (sk.fromCore) abilityCount++;
+m_player->getStats().ability = abilityCount;
+m_deltaTimer = 0;  // reset ก่อน
+refreshStats();
 }
 
 void Game::dropSelectedItem()
@@ -1086,17 +1127,6 @@ void Game::processTurn()
 {
     if (!m_player) return;
     Stats& s=m_player->getStats();
-    s.body         = computeBody();
-    s.itemLevel    = getItemLevelTotal();
-    s.battleIndex  = computeBattleIndex();
-    s.maxMentality = computeMentality();
-    int cout = 0;
-    for (const auto& sk : m_player->getSkills())
-    {
-        std::cout << sk.data.id << " fromCore=" <<sk.fromCore << "\n";
-        if (sk.fromCore) cout++;
-    }
-    s.ability = cout;
 
     drainMentality();
     if (m_playerDead) return;
@@ -1113,10 +1143,32 @@ void Game::processTurn()
         [](Enemy*e){bool d=e->isDead();if(d)delete e;return d;}),m_enemies.end());
 }
 
-void Game::addLog(const std::string& msg, sf::Color color)
+void Game::refreshStats()
 {
-    m_log.push_back({msg,color});
-    if((int)m_log.size()>LOG_MAX_LINES) m_log.erase(m_log.begin());
+    if (!m_player) return;
+    Stats& s = m_player->getStats();
+
+    int newBody      = computeBody();
+    int newMentality = computeMentality();
+    int newBattle    = computeBattleIndex();
+
+    int db = newBody      - s.body;
+    int dm = newMentality - s.maxMentality;
+    int di = newBattle    - s.battleIndex;
+
+    s.body         = newBody;
+    s.maxMentality = newMentality;
+    s.mentality    = std::min(s.mentality, s.maxMentality);
+    s.itemLevel    = getItemLevelTotal();
+    s.battleIndex  = newBattle;
+
+    if (db!=0 || dm!=0 || di!=0)
+    {
+        m_deltaBody        += db;
+        m_deltaMentality   += dm;
+        m_deltaBattleIndex += di;
+        m_deltaTimer       = 180;
+    }
 }
 
 // ============================================================
@@ -1426,14 +1478,28 @@ void Game::renderStatusPanel()
      h.setPosition({x,y});m_window.draw(h);
      y+=STATUS_HEADER_SIZE+STATUS_HEADER_SPACING;}
 
+    // เพิ่ม lambda ก่อน drawLine ของ body
+    auto deltaStr = [](int d) -> std::string {
+        if (d == 0) return "";
+        return d > 0 ? " (NEW+"+std::to_string(d)+")" : " (NEW"+std::to_string(d)+")";
+    };
+    bool showDelta = m_deltaTimer > 0;
+    sf::Color deltaColor = sf::Color(100,255,150);
+
     drawLine("level:",     std::to_string(s.level));
-    drawLine("body:",      std::to_string(s.body));
-    drawLine("mentality:", std::to_string(s.maxMentality));
+    drawLine("body:",      std::to_string(s.body) +
+        (showDelta && m_deltaBody!=0 ? deltaStr(m_deltaBody) : ""),
+        showDelta && m_deltaBody!=0 ? deltaColor : sf::Color::White);
+    drawLine("mentality:", std::to_string(s.maxMentality) +
+        (showDelta && m_deltaMentality!=0 ? deltaStr(m_deltaMentality) : ""),
+        showDelta && m_deltaMentality!=0 ? deltaColor : sf::Color::White);
     drawLine("ability:",   std::to_string(s.ability));
     drawLine("item level:",std::to_string(s.itemLevel));
     drawLine("Comprehensive Battle", "");
-    drawLine("Index:",std::to_string(s.battleIndex));
-
+    drawLine("Index:",     std::to_string(s.battleIndex) +
+        (showDelta && m_deltaBattleIndex!=0 ? deltaStr(m_deltaBattleIndex) : ""),
+        showDelta && m_deltaBattleIndex!=0 ? deltaColor : sf::Color::White);
+        
     std::string apStr = "AP: "+std::to_string(s.currentAP)+"/"+std::to_string(s.maxAP);
     sf::Color apColor = s.currentAP > 0 ? sf::Color(100,200,255) : sf::Color(100,100,100);
     drawLine("", apStr, apColor);
@@ -1523,7 +1589,7 @@ void Game::renderRightPanel()
     }
     else if (m_viewEquipment)
     {
-        sf::Text title(m_font,"EQUIPMENT  [E]=Bag",9);
+        sf::Text title(m_font,"EQUIPMENT  []/[] select  [X]=Unequip",9);
         title.setFillColor(sf::Color(120,160,120));
         title.setPosition({panelX+8.f,panelY+6.f}); m_window.draw(title);
         const EquipSlot slots[]={EquipSlot::Head,EquipSlot::Body,EquipSlot::Arms,
@@ -1532,9 +1598,23 @@ void Game::renderRightPanel()
         float sx=panelX+8.f,sy=panelY+20.f;
         for (int i=0;i<7;++i)
         {
+            bool sel=(i==m_selectedEquipSlot);
             const Item* item=m_equipment.getItem(slots[i]);
+
+            // highlight แถวที่เลือก
+            if (sel)
+            {
+                sf::RectangleShape hl({(float)RIGHT_PANEL_W-16.f, SZH});
+                hl.setFillColor(sf::Color(40,60,40));
+                hl.setOutlineColor(sf::Color(100,200,100));
+                hl.setOutlineThickness(1.f);
+                hl.setPosition({panelX+8.f, sy});
+                m_window.draw(hl);
+            }
+
             sf::Text label(m_font,Equipment::slotName(slots[i])+":",9);
-            label.setFillColor(sf::Color(140,120,80));label.setPosition({sx,sy});m_window.draw(label);
+            label.setFillColor(sel?sf::Color(180,255,180):sf::Color(140,120,80));
+            label.setPosition({sx,sy});m_window.draw(label);
             sf::Text itemTxt(m_font,item?item->name:"--",9);
             itemTxt.setFillColor(item?item->color():sf::Color(60,60,60));
             itemTxt.setPosition({sx+44.f,sy});m_window.draw(itemTxt);
@@ -1542,6 +1622,12 @@ void Game::renderRightPanel()
             sy+=SZH+GAP;
         }
     }
+}
+void Game::addLog(const std::string& msg, sf::Color color)
+{
+    m_log.push_back({msg, color});
+    while ((int)m_log.size() > LOG_MAX_LINES)
+        m_log.erase(m_log.begin());
 }
 
 void Game::renderLogPanel()

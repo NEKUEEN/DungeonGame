@@ -21,7 +21,7 @@ Player::Player(int startCol, int startRow, int tileSize)
     {
         SkillInstance inst;
         inst.data = sd;
-        inst.fromCore = true;  // สกิลเริ่มต้นมาจาก core
+        inst.fromCore = false;  // สกิลเริ่มต้นมาจาก core
         m_skills.push_back(inst);
 
         // assign hotbar จาก JSON

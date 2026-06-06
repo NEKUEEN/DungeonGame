@@ -68,6 +68,7 @@ private:
     void tryDescendStairs();
     void tryAscendStairs();
     void waitTurn();
+    void unequipSelected();
 
     // ── Skill (hotbar) ──
     void executeSkill(int hotbarIdx);        // กด Num1-9 → ใช้ skill ใน slot
@@ -97,6 +98,7 @@ private:
     int  computeBattleIndex() const;
     int  getItemLevelTotal()  const;
     void drainMentality();
+    void refreshStats();  // ← เพิ่มใน private
 
     // ── Skill helpers (legacy) ──
     void useSkillBuff(const std::string& skillId);
@@ -150,6 +152,12 @@ private:
     bool m_levelUpFlash  = false;
     int  m_levelUpTimer  = 0;
     bool m_playerDead    = false;
+
+    // ── Stat delta ──                     ← เพิ่มตรงนี้
+    int m_deltaBody        = 0;
+    int m_deltaMentality   = 0;
+    int m_deltaBattleIndex = 0;
+    int m_deltaTimer       = 0;
 
     struct LogEntry { std::string text; sf::Color color; };
     std::vector<LogEntry> m_log;
