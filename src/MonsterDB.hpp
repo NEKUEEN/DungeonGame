@@ -16,11 +16,21 @@ struct MonsterData
     std::string name;
     std::string family;   // "Goblin", "Orc", "Rat" ฯลฯ
     std::string rank;     // "Normal", "Elite", "Boss"
-    std::string sprite;   // ชื่อไฟล์รูป เช่น "goblin_warrior.png"
+    std::string sprite;
     int hp       = 10;
     int attack   = 3;
     int defense  = 0;
     int exp      = 1;
+
+    // ── AI ──
+    // "melee" (default) | "ranged" | "caster" | "coward"
+    std::string aiType        = "melee";
+    int         preferredRange = 1;  // Ranged/Caster รักษาระยะนี้
+    int         alertRange     = 8;  // ระยะที่เริ่ม alert (เห็น player)
+    int attackInterval = 1;  // ระยะเวลาระหว่างการโจมตี (หน่วยเป็นวินาที) สำหรับมอนที่มีสกิล เช่น caster ที่ไม่โจมตีทุกเทิร์น
+
+    // ── Skills ──
+    std::vector<std::string> skills;  // skill ids จาก skills.json
 };
 
 // ============================================================
@@ -32,12 +42,11 @@ public:
     static MonsterDB& instance()
     { static MonsterDB db; return db; }
 
-    // โหลดจาก JSON file
     bool load(const std::string& path)
     {
         std::ifstream f(path);
         if (!f.is_open())
-        { std::cerr<<"[MonsterDB] Cannot open: "<<path<<"\n"; return false; }
+        { std::cerr << "[MonsterDB] Cannot open: " << path << "\n"; return false; }
 
         try
         {
@@ -54,6 +63,18 @@ public:
                 d.attack  = m["attack"].get<int>();
                 d.defense = m["defense"].get<int>();
                 d.exp     = m["exp"].get<int>();
+
+                // ── AI fields (optional — backward-compat) ──
+                d.aiType         = m.contains("ai_type")         ? m["ai_type"].get<std::string>()  : "melee";
+                d.preferredRange = m.contains("preferred_range") ? m["preferred_range"].get<int>()  : 1;
+                d.alertRange     = m.contains("alert_range")     ? m["alert_range"].get<int>()      : 8;
+                d.attackInterval = m.contains("attack_interval") ? m["attack_interval"].get<int>() : 1;
+
+                // ── Skills (optional) ──
+                if (m.contains("skills"))
+                    for (const auto& sk : m["skills"])
+                        d.skills.push_back(sk.get<std::string>());
+
                 m_monsters[d.id] = d;
                 m_byFamily[d.family].push_back(d.id);
                 m_byRank[d.rank].push_back(d.id);
@@ -72,35 +93,31 @@ public:
                     DropTable::instance().registerDrops(d.id, drops);
                 }
             }
-            std::cout<<"[MonsterDB] Loaded "<<m_monsters.size()<<" monsters\n";
+            std::cout << "[MonsterDB] Loaded " << m_monsters.size() << " monsters\n";
             return true;
         }
         catch (const std::exception& e)
-        { std::cerr<<"[MonsterDB] Parse error: "<<e.what()<<"\n"; return false; }
+        { std::cerr << "[MonsterDB] Parse error: " << e.what() << "\n"; return false; }
     }
 
-    // ดึงข้อมูลมอนตาม id
     const MonsterData* get(const std::string& id) const
     {
         auto it = m_monsters.find(id);
         return it == m_monsters.end() ? nullptr : &it->second;
     }
 
-    // ดึง id ทั้งหมดของ family นั้น
     std::vector<std::string> getFamily(const std::string& family) const
     {
         auto it = m_byFamily.find(family);
         return it == m_byFamily.end() ? std::vector<std::string>{} : it->second;
     }
 
-    // ดึง id ทั้งหมดของ rank นั้น
     std::vector<std::string> getByRank(const std::string& rank) const
     {
         auto it = m_byRank.find(rank);
         return it == m_byRank.end() ? std::vector<std::string>{} : it->second;
     }
 
-    // ดึง id ทั้งหมด
     std::vector<std::string> getAllIds() const
     {
         std::vector<std::string> ids;

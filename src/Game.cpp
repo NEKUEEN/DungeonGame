@@ -27,7 +27,7 @@ Game::Game()
     DropTable::instance().loadItems("assets/data/items.json");
     SkillDB::instance().load("assets/data/skills.json");
 
-    m_gameView.setSize({(float)GAME_VIEW_W*1.25f,(float)GAME_VIEW_H*1.25f});
+    m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
     m_gameView.setViewport(sf::FloatRect({0.f,0.f},
         {(float)GAME_VIEW_W/WINDOW_W,(float)GAME_VIEW_H/WINDOW_H}));
     m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
@@ -900,7 +900,7 @@ void Game::useOrEquipSelected()
         m_equipment.equip(toEquip,slot);
         addLog("> Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
                std::to_string(toEquip.value),sf::Color(180,220,180));
-        m_deltaTimer = 0;  // reset ก่อน
+        
         refreshStats();
     }
 }
@@ -974,7 +974,7 @@ int abilityCount = 0;
 for (const auto& sk : m_player->getSkills())
     if (sk.fromCore) abilityCount++;
 m_player->getStats().ability = abilityCount;
-m_deltaTimer = 0;  // reset ก่อน
+
 refreshStats();
 }
 
@@ -1120,27 +1120,105 @@ void Game::enemyAttack(Enemy* enemy)
     }
 }
 
-// ============================================================
-//  Process Turn
-// ============================================================
+// ================================================================
+//  PATCH — Game.cpp  processTurn()
+//  แทนที่ฟังก์ชัน processTurn() เดิมทั้งหมดด้วยอันนี้
+// ================================================================
+
 void Game::processTurn()
 {
     if (!m_player) return;
-    Stats& s=m_player->getStats();
 
     drainMentality();
     if (m_playerDead) return;
-    for (auto*e:m_enemies)
+
+    int pc = m_player->getCol();
+    int pr = m_player->getRow();
+
+    for (auto* e : m_enemies)
     {
         if (e->isDead()) continue;
-        if (!m_fog.isVisible(e->getCol(),e->getRow())) continue;
-        int dx=std::abs(e->getCol()-m_player->getCol());
-        int dy=std::abs(e->getRow()-m_player->getRow());
-        if (dx<=1&&dy<=1&&(dx+dy)>0) enemyAttack(e);
-        else e->updateAI(m_player->getCol(),m_player->getRow(),m_tileMap,m_enemies);
+        if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted()) continue;
+
+        int dx = std::abs(e->getCol() - pc);
+        int dy = std::abs(e->getRow() - pr);
+
+        if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
+        {
+            // ติดกัน → โจมตีโดยตรง
+            enemyAttack(e);
+        }
+        else
+        {
+            // ให้ AI เดิน (อาจ queue pending skill)
+            e->updateAI(pc, pr, m_tileMap, m_enemies);
+
+            // ── จัดการ pending skill ที่ enemy queue ไว้ ──
+            if (e->hasPendingSkill())
+            {
+                auto ps = e->consumePendingSkill();
+                SkillInstance* sk = e->findSkill(ps.skillId);
+                if (!sk) continue;
+
+                if (sk->data.type == SkillType::ActiveRanged)
+                {
+                    // ยิง projectile ตรงไปที่ player (ถ้าไม่มีกำแพงขวาง)
+                    int dmg = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
+                    auto line = getLine(e->getCol(), e->getRow(), ps.targetCol, ps.targetRow);
+                    bool blocked = false;
+                    for (int i = 1; i < (int)line.size(); ++i)
+                    {
+                        if (m_tileMap.getTile(line[i].x, line[i].y) == TileType::Wall)
+                        { blocked = true; break; }
+                        if (line[i].x == pc && line[i].y == pr)
+                        {
+                            // โดน player
+                            Stats& s = m_player->getStats();
+                            int def = getBuffedDef();
+                            int actualDmg = std::max(1, dmg - def);
+                            s.hp -= actualDmg;
+                            addLog("> " + e->getName() + " uses " + sk->data.name +
+                                   " → " + std::to_string(actualDmg) + " dmg!",
+                                   sf::Color(220, 100, 80));
+                            if (s.hp <= 0) { s.hp = 0; s.hpDepleted = true; }
+                            break;
+                        }
+                    }
+                    if (blocked)
+                        addLog("> " + e->getName() + "'s " + sk->data.name + " was blocked.",
+                               sf::Color(120, 120, 120));
+                }
+                else if (sk->data.type == SkillType::ActiveAoe)
+                {
+                    // AoE รอบตัว enemy
+                    int radius = sk->data.effect.aoeRadius;
+                    int dmg    = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
+                    int dxP = pc - e->getCol(), dyP = pr - e->getRow();
+                    if (dxP*dxP + dyP*dyP <= radius*radius)
+                    {
+                        Stats& s = m_player->getStats();
+                        int def = getBuffedDef();
+                        int actualDmg = std::max(1, dmg - def);
+                        s.hp -= actualDmg;
+                        addLog("> " + e->getName() + " uses " + sk->data.name +
+                               " → " + std::to_string(actualDmg) + " dmg!",
+                               sf::Color(220, 100, 80));
+                        if (s.hp <= 0) { s.hp = 0; s.hpDepleted = true; }
+                    }
+                }
+                // ActiveBuff — ถูกจัดการใน updateAI() แล้ว (ไม่ต้อง queue)
+            }
+        }
+
+        // tick cooldowns ของ enemy ทุก turn
+        e->tickSkills();
     }
-    m_enemies.erase(std::remove_if(m_enemies.begin(),m_enemies.end(),
-        [](Enemy*e){bool d=e->isDead();if(d)delete e;return d;}),m_enemies.end());
+
+    // ลบ enemy ที่ตาย
+    m_enemies.erase(
+        std::remove_if(m_enemies.begin(), m_enemies.end(),
+            [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
+        m_enemies.end());
 }
 
 void Game::refreshStats()

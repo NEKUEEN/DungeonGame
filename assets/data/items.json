@@ -112,9 +112,9 @@
       "type": "BodyArmor",
       "desc": "Protects the body.",
       "value": 4,
-      "hp": 30,
+      "hp": 5,
       "atk": 0,
-      "def": 20,
+      "def": 15,
       "dodge": 0,
       "sprite": "item_armor.png",
       "stackable": false
@@ -180,7 +180,7 @@
       "type": "Core",
       "desc": "Essence of a goblin wizard. Grants cunning and Power Strike.",
       "value": 5,
-      "sprite": "item_goblin_core.png",
+      "sprite": "item_goblinWizard_core.png",
       "stackable": false,
       "core_stats": {
         "hp": 5,

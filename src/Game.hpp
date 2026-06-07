@@ -32,7 +32,7 @@ constexpr int LOG_MAX_LINES   = 7;
 constexpr int TILE_SIZE       = 64;
 constexpr int MAP_COLS        = 50;
 constexpr int MAP_ROWS        = 50;
-constexpr int VIEW_RADIUS     = 6;
+constexpr int VIEW_RADIUS     = 10;
 constexpr int MAX_ENEMIES     = 12;
 constexpr int RESPAWN_TURNS   = 15;
 

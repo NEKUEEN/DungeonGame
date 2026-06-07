@@ -7,6 +7,9 @@
       "rank": "Normal",
       "sprite": "rat.png",
       "hp": 6, "attack": 3, "defense": 0, "exp": 1,
+      "ai_type": "coward",
+      "preferred_range": 1,
+      "alert_range": 6,
       "drops": [
         { "item": "magic_stone", "chance": 0.55 },
         { "item": "rat_core",    "chance": 0.12 }
@@ -19,6 +22,10 @@
       "rank": "Normal",
       "sprite": "goblin.png",
       "hp": 12, "attack": 5, "defense": 1, "exp": 1,
+      "ai_type": "melee",
+      "preferred_range": 1,
+      "alert_range": 8,
+      "skills": ["power_strike"],
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
         { "item": "goblinWarrior_core", "chance": 0.15 }
@@ -31,6 +38,10 @@
       "rank": "Normal",
       "sprite": "goblin.png",
       "hp": 10, "attack": 6, "defense": 0, "exp": 1,
+      "ai_type": "ranged",
+      "preferred_range": 5,
+      "alert_range": 10,
+      "skills": ["stone_throw"],
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
         { "item": "goblinArcher_core", "chance": 0.15 }
@@ -43,6 +54,11 @@
       "rank": "Elite",
       "sprite": "goblin.png",
       "hp": 20, "attack": 9, "defense": 2, "exp": 2,
+      "ai_type": "caster",
+      "preferred_range": 4,
+      "alert_range": 10,
+      "attack_interval": 3,
+      "skills": ["magic_missile", "quick_heal"],
       "drops": [
         { "item": "magic_stone", "chance": 0.80 },
         { "item": "goblinWizard_core", "chance": 0.99 }
@@ -55,6 +71,10 @@
       "rank": "Elite",
       "sprite": "goblin.png",
       "hp": 25, "attack": 10, "defense": 4, "exp": 2,
+      "ai_type": "melee",
+      "preferred_range": 1,
+      "alert_range": 9,
+      "skills": ["power_strike", "iron_skin"],
       "drops": [
         { "item": "magic_stone", "chance": 0.80 },
         { "item": "goblinHero_core", "chance": 0.35 }
@@ -67,6 +87,10 @@
       "rank": "Boss",
       "sprite": "goblin.png",
       "hp": 60, "attack": 18, "defense": 8, "exp": 3,
+      "ai_type": "caster",
+      "preferred_range": 3,
+      "alert_range": 12,
+      "skills": ["magic_missile", "power_strike", "quick_heal"],
       "drops": [
         { "item": "magic_stone", "chance": 1.00 },
         { "item": "goblinElder_core", "chance": 0.75 }
@@ -79,6 +103,10 @@
       "rank": "Normal",
       "sprite": "orc.png",
       "hp": 22, "attack": 8, "defense": 3, "exp": 1,
+      "ai_type": "melee",
+      "preferred_range": 1,
+      "alert_range": 7,
+      "skills": ["iron_skin"],
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
         { "item": "orc_core",    "chance": 0.12 }

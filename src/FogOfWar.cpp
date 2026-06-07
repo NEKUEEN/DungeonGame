@@ -17,64 +17,112 @@ void FogOfWar::reset()
 }
 
 // ============================================================
-//  Compute  –  คำนวณ visibility รอบ player
+//  markVisible helper
 // ============================================================
+inline void FogOfWar::markVisible(int col, int row)
+{
+    if (col < 0 || col >= m_cols || row < 0 || row >= m_rows) return;
+    m_grid[row][col] = FogState::Visible;
+}
+
+// ============================================================
+//  Shadowcasting 1 octant
+//  transform: col' = col*cx + row*cy, row' = col*rx + row*ry
+// ============================================================
+void FogOfWar::castOctant(int px, int py,
+                           int cx, int cy, int rx, int ry,
+                           int radius, const TileMap& map)
+{
+    // stack-based iterative shadowcasting (Bjorn Bergstrom algorithm)
+    struct Shadow { float lo, hi; };
+    std::vector<Shadow> shadows;
+
+    for (int row = 1; row <= radius; ++row)
+    {
+        bool anyVisible = false;
+
+        for (int col = 0; col <= row; ++col)
+        {
+            int mc = px + col*cx + row*cy;
+            int mr = py + col*rx + row*ry;
+
+            if (mc < 0 || mc >= m_cols || mr < 0 || mr >= m_rows) continue;
+
+            float lo = (float)col       / (float)(row + 1);
+            float hi = (float)(col + 1) / (float)row;
+
+            // check ว่า tile นี้ถูก shadow บังไหม
+            bool shadowed = false;
+            for (auto& sh : shadows)
+            {
+                if (sh.lo <= lo && sh.hi >= hi)
+                { shadowed = true; break; }
+            }
+
+            if (!shadowed)
+            {
+                markVisible(mc, mr);
+                anyVisible = true;
+
+                if (map.getTile(mc, mr) == TileType::Wall)
+                {
+                    // เพิ่ม shadow ใหม่
+                    Shadow ns{lo, hi};
+                    // merge กับ shadow ที่ overlap
+                    std::vector<Shadow> merged;
+                    for (auto& sh : shadows)
+                    {
+                        if (sh.hi < ns.lo || sh.lo > ns.hi)
+                            merged.push_back(sh);
+                        else
+                        {
+                            ns.lo = std::min(ns.lo, sh.lo);
+                            ns.hi = std::max(ns.hi, sh.hi);
+                        }
+                    }
+                    merged.push_back(ns);
+                    shadows = merged;
+
+                    // ถ้า shadow ครอบ 0-1 ทั้งหมดแล้ว หยุด row นี้
+                    for (auto& sh : shadows)
+                        if (sh.lo <= 0.f && sh.hi >= 1.f)
+                            return;
+                }
+            }
+        }
+        if (!anyVisible) break;
+    }
+}
+
 void FogOfWar::compute(int playerCol, int playerRow, int radius,
                        const TileMap& map)
 {
-    // รีเซ็ต Visible → Explored ก่อน
     for (auto& row : m_grid)
         for (auto& cell : row)
             if (cell == FogState::Visible)
                 cell = FogState::Explored;
 
-    // cast rays จาก player ไปรอบๆ
-    for (int row = playerRow - radius; row <= playerRow + radius; ++row)
-    {
-        for (int col = playerCol - radius; col <= playerCol + radius; ++col)
-        {
-            if (col < 0 || col >= m_cols || row < 0 || row >= m_rows) continue;
+    markVisible(playerCol, playerRow);
 
-            int dx = col - playerCol;
-            int dy = row - playerRow;
-            if (dx*dx + dy*dy > radius*radius) continue;
+    // 8 octants: transform {cx, cy, rx, ry}
+    const int T[8][4] = {
+        { 1,  0,  0,  1},  // E-SE
+        { 0,  1,  1,  0},  // SE-S
+        { 0, -1,  1,  0},  // SW-S
+        {-1,  0,  0,  1},  // W-SW
+        {-1,  0,  0, -1},  // W-NW
+        { 0, -1, -1,  0},  // NW-N
+        { 0,  1, -1,  0},  // NE-N
+        { 1,  0,  0, -1},  // E-NE
+    };
 
-            if (hasLineOfSight(playerCol, playerRow, col, row, map))
-                m_grid[row][col] = FogState::Visible;
-        }
-    }
+    // ทางโล่ง → radius ใหญ่ขึ้น shadowcasting จัดการกำแพงเอง
+    int r = radius * 3;
+
+    for (auto& t : T)
+        castOctant(playerCol, playerRow, t[0], t[1], t[2], t[3], r, map);
 }
 
-// ============================================================
-//  Line of Sight  –  Bresenham's line algorithm
-// ============================================================
-bool FogOfWar::hasLineOfSight(int x0, int y0, int x1, int y1,
-                               const TileMap& map) const
-{
-    int dx = std::abs(x1 - x0);
-    int dy = std::abs(y1 - y0);
-    int sx = x0 < x1 ? 1 : -1;
-    int sy = y0 < y1 ? 1 : -1;
-    int err = dx - dy;
-
-    int cx = x0, cy = y0;
-    while (true)
-    {
-        if (cx == x1 && cy == y1) return true;
-
-        // ถ้าชนกำแพง (ยกเว้น tile เริ่มต้น) = บัง LOS
-        if (!(cx == x0 && cy == y0) && map.getTile(cx, cy) == TileType::Wall)
-            return false;
-
-        int e2 = 2 * err;
-        if (e2 > -dy) { err -= dy; cx += sx; }
-        if (e2 <  dx) { err += dx; cy += sy; }
-    }
-}
-
-// ============================================================
-//  Getters
-// ============================================================
 FogState FogOfWar::getState(int col, int row) const
 {
     if (col < 0 || col >= m_cols || row < 0 || row >= m_rows)
@@ -83,9 +131,7 @@ FogState FogOfWar::getState(int col, int row) const
 }
 
 bool FogOfWar::isVisible(int col, int row) const
-{
-    return getState(col, row) == FogState::Visible;
-}
+{ return getState(col, row) == FogState::Visible; }
 
 bool FogOfWar::isExplored(int col, int row) const
 {
@@ -93,33 +139,22 @@ bool FogOfWar::isExplored(int col, int row) const
     return s == FogState::Explored || s == FogState::Visible;
 }
 
-// ============================================================
-//  Render  –  วาด overlay ทับ map
-// ============================================================
 void FogOfWar::render(sf::RenderWindow& window, int tileSize)
 {
     sf::RectangleShape tile({(float)tileSize, (float)tileSize});
-
     for (int row = 0; row < m_rows; ++row)
+    for (int col = 0; col < m_cols; ++col)
     {
-        for (int col = 0; col < m_cols; ++col)
+        tile.setPosition({(float)(col*tileSize), (float)(row*tileSize)});
+        switch (m_grid[row][col])
         {
-            tile.setPosition({(float)(col * tileSize), (float)(row * tileSize)});
-
-            switch (m_grid[row][col])
-            {
-                case FogState::Hidden:
-                    tile.setFillColor(sf::Color(0, 0, 0, 255));  // มืดสนิท
-                    window.draw(tile);
-                    break;
-                case FogState::Explored:
-                    tile.setFillColor(sf::Color(0, 0, 0, 160));  // มืดครึ่ง
-                    window.draw(tile);
-                    break;
-                case FogState::Visible:
-                    // สว่าง ไม่วาดอะไรทับ
-                    break;
-            }
+            case FogState::Hidden:
+                tile.setFillColor(sf::Color(0,0,0,255));
+                window.draw(tile); break;
+            case FogState::Explored:
+                tile.setFillColor(sf::Color(0,0,0,160));
+                window.draw(tile); break;
+            case FogState::Visible: break;
         }
     }
 }
