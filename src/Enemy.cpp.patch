@@ -1,0 +1,52 @@
+// ================================================================
+//  PATCH สำหรับ Enemy.cpp
+//  แก้ 2 จุด:
+//  1) ใน Constructor — แก้ rank parsing เพิ่ม "Rare"
+//  2) rankColor() — เพิ่มสี Rare
+// ================================================================
+
+// ─────────────────────────────────────────────
+//  (1)  ใน Enemy() constructor
+//       แทนที่บล็อก rank parsing เดิม:
+//
+//  if      (data->rank == "Boss")  m_rank = EnemyRank::Boss;
+//  else if (data->rank == "Elite") m_rank = EnemyRank::Elite;
+//  else                            m_rank = EnemyRank::Normal;
+//
+//  ด้วยอันนี้:
+// ─────────────────────────────────────────────
+
+        if      (data->rank == "Boss")  m_rank = EnemyRank::Boss;
+        else if (data->rank == "Elite") m_rank = EnemyRank::Elite;
+        else if (data->rank == "Rare")  m_rank = EnemyRank::Rare;
+        else                            m_rank = EnemyRank::Normal;
+
+// ─────────────────────────────────────────────
+//  (2)  rankColor() — แทนที่ฟังก์ชันเดิมทั้งหมด
+// ─────────────────────────────────────────────
+
+sf::Color Enemy::rankColor() const
+{
+    switch(m_rank)
+    {
+        case EnemyRank::Boss:  return sf::Color(255, 200, 80);   // ทอง
+        case EnemyRank::Elite: return sf::Color(200, 100, 255);  // ม่วง
+        case EnemyRank::Rare:  return sf::Color(80,  160, 255);  // ฟ้า
+        default:               return sf::Color::White;           // ขาว
+    }
+}
+
+// ─────────────────────────────────────────────
+//  (3)  drawHPBar() — แทนที่บรรทัด sf::Color c= เดิม:
+//
+//  sf::Color c = m_rank==EnemyRank::Boss  ? sf::Color(255,150,0) :
+//                m_rank==EnemyRank::Elite ? sf::Color(180,80,220) :
+//                                           sf::Color(200,60,60);
+//
+//  ด้วยอันนี้:
+// ─────────────────────────────────────────────
+
+    sf::Color c = m_rank==EnemyRank::Boss  ? sf::Color(255, 150, 0)   :
+                  m_rank==EnemyRank::Elite ? sf::Color(180, 80,  220) :
+                  m_rank==EnemyRank::Rare  ? sf::Color(80,  160, 255) :
+                                             sf::Color(200, 60,  60);

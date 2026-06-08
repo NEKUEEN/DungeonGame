@@ -35,16 +35,32 @@
       "id": "goblin_archer",
       "name": "Goblin Archer",
       "family": "Goblin",
-      "rank": "Normal",
+      "rank": "Rare",
       "sprite": "goblin.png",
-      "hp": 10, "attack": 6, "defense": 0, "exp": 1,
+      "hp": 10, "attack": 6, "defense": 0, "exp": 2,
       "ai_type": "ranged",
       "preferred_range": 5,
       "alert_range": 10,
       "skills": ["stone_throw"],
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblinArcher_core", "chance": 0.15 }
+        { "item": "goblinArcher_core", "chance": 0.20 }
+      ]
+    },
+    {
+      "id": "goblin_swordman",
+      "name": "Goblin Swordman",
+      "family": "Goblin",
+      "rank": "Rare",
+      "sprite": "goblin.png",
+      "hp": 16, "attack": 7, "defense": 3, "exp": 2,
+      "ai_type": "melee",
+      "preferred_range": 1,
+      "alert_range": 8,
+      "skills": ["power_strike"],
+      "drops": [
+        { "item": "magic_stone", "chance": 0.60 },
+        { "item": "goblinWarrior_core", "chance": 0.20 }
       ]
     },
     {
@@ -53,7 +69,7 @@
       "family": "Goblin",
       "rank": "Elite",
       "sprite": "goblin.png",
-      "hp": 20, "attack": 9, "defense": 2, "exp": 2,
+      "hp": 20, "attack": 9, "defense": 2, "exp": 3,
       "ai_type": "caster",
       "preferred_range": 4,
       "alert_range": 10,
@@ -70,7 +86,7 @@
       "family": "Goblin",
       "rank": "Elite",
       "sprite": "goblin.png",
-      "hp": 25, "attack": 10, "defense": 4, "exp": 2,
+      "hp": 25, "attack": 10, "defense": 4, "exp": 3,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 9,
@@ -86,7 +102,7 @@
       "family": "Goblin",
       "rank": "Boss",
       "sprite": "goblin.png",
-      "hp": 60, "attack": 18, "defense": 8, "exp": 3,
+      "hp": 60, "attack": 18, "defense": 8, "exp": 5,
       "ai_type": "caster",
       "preferred_range": 3,
       "alert_range": 12,
@@ -110,6 +126,71 @@
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
         { "item": "orc_core",    "chance": 0.12 }
+      ]
+    },
+    {
+      "id": "orc_shaman",
+      "name": "Orc Shaman",
+      "family": "Orc",
+      "rank": "Rare",
+      "sprite": "orc.png",
+      "hp": 18, "attack": 10, "defense": 1, "exp": 2,
+      "ai_type": "caster",
+      "preferred_range": 4,
+      "alert_range": 9,
+      "attack_interval": 2,
+      "skills": ["magic_missile"],
+      "drops": [
+        { "item": "magic_stone", "chance": 0.65 },
+        { "item": "orc_core",    "chance": 0.20 }
+      ]
+    },
+    {
+      "id": "orc_berserker",
+      "name": "Orc Berserker",
+      "family": "Orc",
+      "rank": "Elite",
+      "sprite": "orc.png",
+      "hp": 40, "attack": 14, "defense": 4, "exp": 3,
+      "ai_type": "melee",
+      "preferred_range": 1,
+      "alert_range": 9,
+      "skills": ["power_strike", "iron_skin"],
+      "drops": [
+        { "item": "magic_stone", "chance": 0.80 },
+        { "item": "orc_core",    "chance": 0.35 }
+      ]
+    },
+    {
+      "id": "orc_warchief",
+      "name": "Orc Warchief",
+      "family": "Orc",
+      "rank": "Boss",
+      "sprite": "orc.png",
+      "hp": 80, "attack": 20, "defense": 10, "exp": 5,
+      "ai_type": "melee",
+      "preferred_range": 1,
+      "alert_range": 14,
+      "skills": ["power_strike", "iron_skin"],
+      "drops": [
+        { "item": "magic_stone", "chance": 1.00 },
+        { "item": "orc_core",    "chance": 0.80 }
+      ]
+    },
+    {
+      "id": "rat_king",
+      "name": "Rat King",
+      "family": "Rat",
+      "rank": "Boss",
+      "sprite": "rat.png",
+      "hp": 35, "attack": 12, "defense": 3, "exp": 5,
+      "ai_type": "coward",
+      "preferred_range": 2,
+      "alert_range": 12,
+      "skills": ["stone_throw"],
+      "drops": [
+        { "item": "magic_stone", "chance": 1.00 },
+        { "item": "rat_core",    "chance": 0.75 }
       ]
     }
   ]

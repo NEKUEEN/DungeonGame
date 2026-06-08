@@ -401,8 +401,8 @@ void Game::moveTargetCursor(int dc, int dr)
         return;
     }
 
-    nc = std::clamp(nc, 0, MAP_COLS-1);
-    nr = std::clamp(nr, 0, MAP_ROWS-1);
+    nc = std::clamp(nc, 0, m_mapCols-1);
+    nr = std::clamp(nr, 0, m_mapRows-1);
 
     m_targetCol = nc;
     m_targetRow = nr;
@@ -501,6 +501,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         addLog("> *** LEVEL UP! Level "+std::to_string(lv)+" ***",
                                sf::Color(255,255,50));
                     }
+                    onEnemyKilled(e);
                 }
                 hit = true;
                 break;
@@ -524,7 +525,22 @@ void Game::fireRangedAt(int targetCol, int targetRow)
 // ============================================================
 void Game::newDungeon(bool keepPlayer)
 {
-    m_tileMap.generate();
+    if (m_dungeonFloor == 1)
+    {
+        if (!m_tileMap.loadFromTiled("assets/data/map_floor1.tmj"))
+        {
+            //addLog("> map_floor1.tmj not found, using random", sf::Color(200,100,50));
+            m_tileMap.generate();
+        }
+    }
+    else
+        m_tileMap.generate();
+
+    // อ่านขนาดจริงจาก tileMap (สำคัญมาก: ต้องทำก่อน fog และ spawn loops)
+    m_mapCols = m_tileMap.getCols();////////
+    m_mapRows = m_tileMap.getRows();
+    m_fog = FogOfWar(m_mapCols, m_mapRows);
+
     m_fog.reset();
     m_playerDead    = false;
     m_targetingMode = false;
@@ -536,19 +552,25 @@ void Game::newDungeon(bool keepPlayer)
         m_inventory=Inventory();
         m_equipment=Equipment();
         m_coreSlots=CoreSlots();
+        m_familyKillCount.clear();
+        m_bossActive.clear();
     }
 
-    bool placed=false;
-    for (int row=1;row<MAP_ROWS-1&&!placed;++row)
-        for (int col=1;col<MAP_COLS-1&&!placed;++col)
-            if (m_tileMap.getTile(col,row)==TileType::StairsUp)
-            { delete m_player; m_player=new Player(col,row,TILE_SIZE); placed=true; }
+    // เก็บ walkable tiles ทั้งหมดแล้วสุ่มเกิด
+    std::vector<std::pair<int,int>> floorTiles;
+    for (int row=1;row<m_mapRows-1;++row)
+        for (int col=1;col<m_mapCols-1;++col)
+            if (m_tileMap.isWalkable(col,row))
+                floorTiles.push_back({col,row});
 
-    if (!placed)
-        for (int row=1;row<MAP_ROWS-1&&!m_player;++row)
-            for (int col=1;col<MAP_COLS-1&&!m_player;++col)
-                if (m_tileMap.isWalkable(col,row))
-                    m_player=new Player(col,row,TILE_SIZE);
+    if (!floorTiles.empty())
+    {
+        auto [col,row] = floorTiles[
+            std::uniform_int_distribution<int>(0,(int)floorTiles.size()-1)(m_rng)
+        ];
+        delete m_player;
+        m_player = new Player(col, row, TILE_SIZE);
+    }
 
     clearEnemies(); spawnEnemies(8+m_dungeonFloor);
     m_mapItems.clear(); spawnItems();
@@ -582,8 +604,8 @@ void Game::updateCamera()
     float px=(float)(m_player->getCol()*TILE_SIZE)+TILE_SIZE/2.f;
     float py=(float)(m_player->getRow()*TILE_SIZE)+TILE_SIZE/2.f;
     float hw=m_gameView.getSize().x/2.f,hh=m_gameView.getSize().y/2.f;
-    px=std::clamp(px,hw,(float)(MAP_COLS*TILE_SIZE)-hw);
-    py=std::clamp(py,hh,(float)(MAP_ROWS*TILE_SIZE)-hh);
+    px=std::clamp(px,hw,(float)(m_mapCols*TILE_SIZE)-hw);
+    py=std::clamp(py,hh,(float)(m_mapRows*TILE_SIZE)-hh);
     m_gameView.setCenter({px,py});
 }
 
@@ -594,17 +616,113 @@ void Game::spawnEnemies(int count){ for(int i=0;i<count;++i) spawnEnemy(m_dungeo
 
 void Game::spawnEnemy(int floor)
 {
-    for (int att=0;att<100;++att)
+    std::uniform_int_distribution<int> colDist(1, m_mapCols - 2);
+    std::uniform_int_distribution<int> rowDist(1, m_mapRows - 2);
+
+    for (int att = 0; att < 100; ++att)
     {
-        int col=1+std::rand()%(MAP_COLS-2),row=1+std::rand()%(MAP_ROWS-2);
-        if (!m_tileMap.isWalkable(col,row)) continue;
-        if (m_player){int dx=col-m_player->getCol(),dy=row-m_player->getRow();if(dx*dx+dy*dy<36)continue;}
-        int r=std::rand()%100;
-        std::string rankStr = r<5?"Boss":r<30?"Elite":"Normal";
-        auto ids = MonsterDB::instance().getByRank(rankStr);
-        if (ids.empty()) return;
-        m_enemies.push_back(new Enemy(ids[std::rand()%ids.size()],col,row,TILE_SIZE,floor));
+        int col = colDist(m_rng);
+        int row = rowDist(m_rng);
+        if (!m_tileMap.isWalkable(col, row)) continue;
+
+        if (m_player)
+        {
+            int dx = col - m_player->getCol();
+            int dy = row - m_player->getRow();
+            if (dx*dx + dy*dy < 36) continue;
+        }
+
+        std::string id = pickRandomMonster(floor);
+        if (id.empty()) return;
+
+        m_enemies.push_back(new Enemy(id, col, row, TILE_SIZE, floor));
         return;
+    }
+}
+
+
+std::string Game::pickRandomMonster(int floor)
+{
+    float wNormal = std::max(30.f, 60.f - (floor - 1) * 3.f);
+    float wRare   = 25.f;
+    float wElite  = std::min(40.f, 12.f + (floor - 1) * 2.f);
+    float total   = wNormal + wRare + wElite;
+
+    float roll = m_fDist(m_rng) * total;
+
+    std::string rankStr;
+    if      (roll < wNormal)          rankStr = "Normal";
+    else if (roll < wNormal + wRare)  rankStr = "Rare";
+    else                              rankStr = "Elite";
+
+    auto ids = MonsterDB::instance().getByRank(rankStr);
+    if (ids.empty()) ids = MonsterDB::instance().getByRank("Normal");
+    if (ids.empty()) return "";
+
+    std::uniform_int_distribution<int> pick(0, (int)ids.size() - 1);
+    return ids[pick(m_rng)];
+}
+
+void Game::spawnBoss(const std::string& family)
+{
+    auto bossIds = MonsterDB::instance().getByRank("Boss");
+    std::string bossId;
+    for (const auto& bid : bossIds)
+    {
+        const MonsterData* d = MonsterDB::instance().get(bid);
+        if (d && d->family == family) { bossId = bid; break; }
+    }
+    if (bossId.empty())
+    {
+        addLog("> [" + family + "] Boss not defined in JSON!", sf::Color(200,100,50));
+        return;
+    }
+
+    std::uniform_int_distribution<int> colDist(1, m_mapCols - 2);
+    std::uniform_int_distribution<int> rowDist(1, m_mapRows - 2);
+
+    for (int att = 0; att < 300; ++att)
+    {
+        int col = colDist(m_rng);
+        int row = rowDist(m_rng);
+        if (!m_tileMap.isWalkable(col, row)) continue;
+        if (m_player)
+        {
+            int dx = col - m_player->getCol();
+            int dy = row - m_player->getRow();
+            if (dx*dx + dy*dy < 64) continue;
+        }
+        m_enemies.push_back(new Enemy(bossId, col, row, TILE_SIZE, m_dungeonFloor));
+        m_bossActive[family] = true;
+        addLog("> *** " + family + " BOSS APPEARS! ***", sf::Color(255, 100, 50));
+        addLog("> The slaughter has summoned a guardian!", sf::Color(255, 160, 50));
+        return;
+    }
+}
+
+void Game::onEnemyKilled(Enemy* enemy)
+{
+    if (!enemy) return;
+    if (enemy->getRank() == EnemyRank::Boss)
+    {
+        m_bossActive[enemy->getFamily()] = false;
+        addLog("> Boss defeated! The " + enemy->getFamily() +
+               " threat fades...", sf::Color(255, 200, 80));
+        return;
+    }
+    const std::string& fam = enemy->getFamily();
+    m_familyKillCount[fam]++;
+    int count = m_familyKillCount[fam];
+
+    if (count % 10 == 0 && count < BOSS_KILL_THRESHOLD)
+    {
+        addLog("> " + fam + " kills: " + std::to_string(count) +
+               "/" + std::to_string(BOSS_KILL_THRESHOLD),
+               sf::Color(200, 160, 60));
+    }
+    if (count >= BOSS_KILL_THRESHOLD && !m_bossActive[fam])
+    {
+        spawnBoss(fam);
     }
 }
 
@@ -621,50 +739,81 @@ void Game::tryRespawnEnemies()
 
 void Game::spawnItems()
 {
-    int count=10+std::rand()%8,att=0;
-    while ((int)m_mapItems.size()<count&&att<300)
+    std::uniform_int_distribution<int> colDist(1, m_mapCols - 2);
+    std::uniform_int_distribution<int> rowDist(1, m_mapRows - 2);
+    std::uniform_int_distribution<int> typeDist(0, 9);
+    std::uniform_int_distribution<int> armorDist(0, 4);
+
+    int count = 10 + std::uniform_int_distribution<int>(0,7)(m_rng);
+    int att = 0;
+
+    while ((int)m_mapItems.size() < count && att < 300)
     {
         att++;
-        int col=1+std::rand()%(MAP_COLS-2),row=1+std::rand()%(MAP_ROWS-2);
-        if (!m_tileMap.isWalkable(col,row)) continue;
+        int col = colDist(m_rng);
+        int row = rowDist(m_rng);
+        if (!m_tileMap.isWalkable(col, row)) continue;
+
         Item item;
         std::optional<std::string> itemId;
-        int r=std::rand()%10;
-        if (r<3)       itemId=DropTable::instance().getRandomItemIdByType("Food");
-        else if (r<5)  itemId=DropTable::instance().getRandomItemIdByType("Potion");
-        else if (r<7)  itemId=DropTable::instance().getRandomItemIdByType("Weapon");
-        else if (r<8)  itemId=DropTable::instance().getRandomItemIdByType("OffWeapon");
-        else {
-            const char* armorTypes[]={"Helmet","BodyArmor","Gloves","Greaves","Boots"};
-            itemId=DropTable::instance().getRandomItemIdByType(armorTypes[std::rand()%5]);
+        int r = typeDist(m_rng);
+
+        if      (r < 3) itemId = DropTable::instance().getRandomItemIdByType("Food");
+        else if (r < 5) itemId = DropTable::instance().getRandomItemIdByType("Potion");
+        else if (r < 7) itemId = DropTable::instance().getRandomItemIdByType("Weapon");
+        else if (r < 8) itemId = DropTable::instance().getRandomItemIdByType("OffWeapon");
+        else
+        {
+            const char* armorTypes[] = {"Helmet","BodyArmor","Gloves","Greaves","Boots"};
+            itemId = DropTable::instance().getRandomItemIdByType(
+                armorTypes[armorDist(m_rng)]);
         }
+
         if (itemId)
         {
-            const ItemData* idata=DropTable::instance().getItem(*itemId);
+            const ItemData* idata = DropTable::instance().getItem(*itemId);
             if (idata)
             {
-                item.id = idata->id;
-                item.type = idata->type=="Core"?ItemType::Core:idata->type=="Material"?ItemType::Material:
-                            idata->type=="Food"?ItemType::Food:idata->type=="Potion"?ItemType::Potion:
-                            idata->type=="Helmet"?ItemType::Helmet:idata->type=="BodyArmor"?ItemType::BodyArmor:
-                            idata->type=="Gloves"?ItemType::Gloves:idata->type=="Greaves"?ItemType::Greaves:
-                            idata->type=="Boots"?ItemType::Boots:idata->type=="Weapon"?ItemType::Weapon:
-                            idata->type=="OffWeapon"?ItemType::OffWeapon:ItemType::Material;
-                item.name=idata->name; item.desc=idata->desc; item.value=idata->value;
-                item.hpBonus=idata->hpBonus; item.atkBonus=idata->atkBonus;
-                item.defBonus=idata->defBonus; item.dodgeBonus=idata->dodgeBonus;
-                item.manaBonus=idata->manaBonus; item.magicDmgBonus=idata->magicDmgBonus;
-                item.magicResBonus=idata->magicResBonus;
-                item.spriteName=idata->sprite; item.stackable=idata->stackable;
+                item.id   = idata->id;
+                item.type = idata->type=="Core"      ? ItemType::Core      :
+                            idata->type=="Material"  ? ItemType::Material  :
+                            idata->type=="Food"      ? ItemType::Food      :
+                            idata->type=="Potion"    ? ItemType::Potion    :
+                            idata->type=="Helmet"    ? ItemType::Helmet    :
+                            idata->type=="BodyArmor" ? ItemType::BodyArmor :
+                            idata->type=="Gloves"    ? ItemType::Gloves    :
+                            idata->type=="Greaves"   ? ItemType::Greaves   :
+                            idata->type=="Boots"     ? ItemType::Boots     :
+                            idata->type=="Weapon"    ? ItemType::Weapon    :
+                            idata->type=="OffWeapon" ? ItemType::OffWeapon :
+                                                       ItemType::Material;
+                item.name          = idata->name;
+                item.desc          = idata->desc;
+                item.value         = idata->value;
+                item.hpBonus       = idata->hpBonus;
+                item.atkBonus      = idata->atkBonus;
+                item.defBonus      = idata->defBonus;
+                item.dodgeBonus    = idata->dodgeBonus;
+                item.manaBonus     = idata->manaBonus;
+                item.magicDmgBonus = idata->magicDmgBonus;
+                item.magicResBonus = idata->magicResBonus;
+                item.spriteName    = idata->sprite;
+                item.stackable     = idata->stackable;
             }
         }
+
+        // fallback ถ้าหา itemId ไม่เจอ
         if (item.name.empty())
         {
-            if(r<3) item=Item::makeFood(); else if(r<5) item=Item::makePotion();
-            else if(r<7) item=Item::makeWeapon(); else if(r<8) item=Item::makeOffWeapon();
-            else item=Item::makeArmor();
+            if      (r < 3) item = Item::makeFood();
+            else if (r < 5) item = Item::makePotion();
+            else if (r < 7) item = Item::makeWeapon();
+            else if (r < 8) item = Item::makeOffWeapon();
+            else            item = Item::makeArmor();
         }
-        item.col=col; item.row=row;
+
+        item.col = col;
+        item.row = row;
         m_mapItems.push_back(item);
     }
 }
@@ -801,28 +950,34 @@ void Game::handleInventoryInput(sf::Keyboard::Key){}
 void Game::tryDescendStairs()
 {
     if (!m_player) return;
-    if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::StairsDown)
-    {addLog("> No stairs here.");return;}
+    if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::GateDown)
+    {addLog("> No gate here.");return;}
     m_dungeonFloor++;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
     auto savedHotbar = std::vector<std::string>();
     for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
     newDungeon(true);
+    // เกิดหน้า GateUp (ทางกลับ)
     if (m_player)
     {
+        for (int row=1;row<m_mapRows-1;++row)
+            for (int col=1;col<m_mapCols-1;++col)
+                if (m_tileMap.getTile(col,row)==TileType::GateUp)
+                { m_player->setPos(col,row); goto descend_placed; }
+        descend_placed:
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
     }
-    addLog("> Descended to floor "+std::to_string(m_dungeonFloor)+"!",sf::Color(255,220,50));
+    addLog("> Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,220,50));
 }
 
 void Game::tryAscendStairs()
 {
     if (!m_player) return;
-    if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::StairsUp)
-    {addLog("> No stairs up here.");return;}
+    if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::GateUp)
+    {addLog("> No gate here.");return;}
     if (m_dungeonFloor<=1){addLog("> Already on floor 1.");return;}
     m_dungeonFloor--;
     Stats saved=m_player->getStats();
@@ -830,13 +985,19 @@ void Game::tryAscendStairs()
     auto savedHotbar = std::vector<std::string>();
     for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
     newDungeon(true);
+    // เกิดหน้า GateDown (ทางไปต่อ)
     if (m_player)
     {
+        for (int row=1;row<m_mapRows-1;++row)
+            for (int col=1;col<m_mapCols-1;++col)
+                if (m_tileMap.getTile(col,row)==TileType::GateDown)
+                { m_player->setPos(col,row); goto ascend_placed; }
+        ascend_placed:
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
     }
-    addLog("> Ascended to floor "+std::to_string(m_dungeonFloor)+"!",sf::Color(100,220,255));
+    addLog("> Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(100,220,255));
 }
 
 void Game::waitTurn()
@@ -1031,8 +1192,8 @@ void Game::handlePlayerMove(int dc, int dr)
         {addLog("> "+it.name+" here. [G] pick up.",sf::Color(200,200,80));break;}
 
     TileType tile=m_tileMap.getTile(pc,pr);
-    if (tile==TileType::StairsDown) addLog("> Stairs down! [.] descend.",sf::Color(255,220,50));
-    if (tile==TileType::StairsUp)   addLog("> Stairs up! [,] ascend.",  sf::Color(100,220,255));
+    if (tile==TileType::GateDown) addLog("> Gate ahead! [.] enter.",sf::Color(255,220,50));
+    if (tile==TileType::GateUp)   addLog("> Gate! [,] return.",  sf::Color(100,220,255));
 
     int hunger=m_player->getStats().hunger;
     if(hunger==50) addLog("> You feel hungry.",      sf::Color(220,180,50));
@@ -1093,6 +1254,7 @@ void Game::playerAttack(Enemy* enemy)
             m_coreSlots.setSlotCount(lv);
             addLog("> *** LEVEL UP! Level "+std::to_string(lv)+" ***",sf::Color(255,255,50));
         }
+        onEnemyKilled(enemy);
     }
 }
 

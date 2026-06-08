@@ -40,6 +40,13 @@ public:
         load("orc",          "assets/textures/orc.png");
         load("tile_floor",   "assets/textures/tile_floor.png");
         load("tile_wall",    "assets/textures/tile_wall.png");
+        // zone floor textures
+        load("darkness_floor",      "assets/textures/darkness_floor_tile.png");
+        load("crystalBright_floor", "assets/textures/crystalBright_floor_tile.png");
+        load("deadMan_floor",       "assets/textures/deadMan_floor_tile.png");
+        load("blackRock_floor",     "assets/textures/blackRock_floor_tile.png");
+        // zone wall textures
+        load("crystalBright_wall",  "assets/textures/crystalBright_wall_tile.png");
         load("stairs_down",  "assets/textures/stairs_down.png");
         load("stairs_up",    "assets/textures/stairs_up.png");
         load("item_food",    "assets/textures/item_food.png");
@@ -55,6 +62,7 @@ public:
         load("item_goblin_core", "assets/textures/item_goblin_core.png");
         load("item_orc_core",    "assets/textures/item_orc_core.png");
         load("item_rat_core",    "assets/textures/item_rat_core.png");
+        load("item_goblinWizard_core", "assets/textures/item_goblinWizard_core.png");
     }
 
 private:

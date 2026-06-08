@@ -2,6 +2,8 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 #include <string>
+#include <map>
+#include <random>
 #include "TileMap.hpp"
 #include "Player.hpp"
 #include "Enemy.hpp"
@@ -28,13 +30,18 @@ constexpr int STATUS_LINE_SPACING      = 10;
 constexpr int STATUS_HEADER_SPACING    = 16;
 constexpr int STATUS_PANEL_H           = GAME_VIEW_H - INV_GRID_H;
 
-constexpr int LOG_MAX_LINES   = 7;
+constexpr int LOG_MAX_LINES   = 9;
 constexpr int TILE_SIZE       = 64;
-constexpr int MAP_COLS        = 50;
-constexpr int MAP_ROWS        = 50;
-constexpr int VIEW_RADIUS     = 10;
+constexpr int MAP_COLS        = 50;   // default fallback (random gen)
+constexpr int MAP_ROWS        = 50;   // runtime size stored in m_mapCols/m_mapRows
+constexpr int VIEW_RADIUS     = 4;
 constexpr int MAX_ENEMIES     = 12;
 constexpr int RESPAWN_TURNS   = 15;
+
+// ── Boss trigger: ฆ่ามอนใน family ครบกี่ตัวถึง spawn boss ──
+constexpr int BOSS_KILL_THRESHOLD = 50;
+
+constexpr bool USE_HANDCRAFT_MAP = false; // เปลี่ยนเป็น true เมื่อพร้อม
 
 class Game
 {
@@ -71,9 +78,9 @@ private:
     void unequipSelected();
 
     // ── Skill (hotbar) ──
-    void executeSkill(int hotbarIdx);        // กด Num1-9 → ใช้ skill ใน slot
-    void executeAoe(SkillInstance* sk);      // AOE รอบตัว
-    void executeWarp(int col, int row);      // teleport ไปที่ target
+    void executeSkill(int hotbarIdx);
+    void executeAoe(SkillInstance* sk);
+    void executeWarp(int col, int row);
 
     // ── Targeting ──
     void enterTargetingMode();
@@ -90,23 +97,33 @@ private:
     void clearEnemies();
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
-    void recalcAP();                         // คำนวณ/reset AP จาก buff/passive
+    void recalcAP();
+
+    // ── Rank spawn helpers ──
+    // เลือก rank ตาม weighted random แล้วคืน monster id ใน rank นั้น
+    std::string pickRandomMonster(int floor);
+
+    // ── Kill counter / Boss trigger ──
+    // เรียกหลัง enemy ตาย — อัพเดท counter และ trigger boss ถ้าถึง threshold
+    void onEnemyKilled(Enemy* enemy);
+    // spawn boss ของ family นั้นที่ตำแหน่งเหมาะสม
+    void spawnBoss(const std::string& family);
 
     // ── Stats helpers ──
     int  computeBody()        const;
-    int  computeMentality()   const;         // ← เพิ่ม
+    int  computeMentality()   const;
     int  computeBattleIndex() const;
     int  getItemLevelTotal()  const;
     void drainMentality();
-    void refreshStats();  // ← เพิ่มใน private
+    void refreshStats();
 
     // ── Skill helpers (legacy) ──
     void useSkillBuff(const std::string& skillId);
     void fireRangedAt(int targetCol, int targetRow);
     int  getBuffedAtk() const;
     int  getBuffedDef() const;
-    int getBuffedMagicDmg() const;
-    int getScaledDamage(const SkillEffect& effect) const;
+    int  getBuffedMagicDmg() const;
+    int  getScaledDamage(const SkillEffect& effect) const;
 
     // ── Line helper ──
     std::vector<sf::Vector2i> getLine(int x0, int y0, int x1, int y1) const;
@@ -122,6 +139,10 @@ private:
     bool             m_fontLoaded = false;
     sf::View         m_gameView;
     sf::View         m_uiView;
+
+    // ── RNG (ใช้ <random> แทน rand()) ──
+    std::mt19937                          m_rng{ std::random_device{}() };
+    std::uniform_real_distribution<float> m_fDist{ 0.f, 1.f };
 
     // ── Game objects ──
     TileMap              m_tileMap;
@@ -148,12 +169,21 @@ private:
 
     // ── Dungeon state ──
     int  m_dungeonFloor  = 1;
+    int  m_mapCols       = MAP_COLS;   // actual runtime map size
+    int  m_mapRows       = MAP_ROWS;
     int  m_respawnTimer  = 0;
     bool m_levelUpFlash  = false;
     int  m_levelUpTimer  = 0;
     bool m_playerDead    = false;
 
-    // ── Stat delta ──                     ← เพิ่มตรงนี้
+    // ── Kill counters ──
+    // key = family name ("Goblin", "Orc", "Rat" ฯลฯ)
+    // value = จำนวนที่ฆ่าไปในทุก non-Boss rank
+    std::map<std::string, int>  m_familyKillCount;
+    // ป้องกัน boss เกิดซ้ำก่อนที่จะฆ่าบอสตัวเดิม
+    std::map<std::string, bool> m_bossActive;
+
+    // ── Stat delta ──
     int m_deltaBody        = 0;
     int m_deltaMentality   = 0;
     int m_deltaBattleIndex = 0;

@@ -117,7 +117,7 @@ void FogOfWar::compute(int playerCol, int playerRow, int radius,
     };
 
     // ทางโล่ง → radius ใหญ่ขึ้น shadowcasting จัดการกำแพงเอง
-    int r = radius * 3;
+    int r = radius * 1;
 
     for (auto& t : T)
         castOctant(playerCol, playerRow, t[0], t[1], t[2], t[3], r, map);
@@ -141,20 +141,43 @@ bool FogOfWar::isExplored(int col, int row) const
 
 void FogOfWar::render(sf::RenderWindow& window, int tileSize)
 {
-    sf::RectangleShape tile({(float)tileSize, (float)tileSize});
+    // ใช้ VertexArray วาดครั้งเดียว แทน draw call ทีละ tile
+    sf::VertexArray va(sf::PrimitiveType::Triangles);
+    va.resize(m_rows * m_cols * 6);
+
+    int idx = 0;
+    float ts = (float)tileSize;
+
     for (int row = 0; row < m_rows; ++row)
     for (int col = 0; col < m_cols; ++col)
     {
-        tile.setPosition({(float)(col*tileSize), (float)(row*tileSize)});
+        sf::Color color;
         switch (m_grid[row][col])
         {
-            case FogState::Hidden:
-                tile.setFillColor(sf::Color(0,0,0,255));
-                window.draw(tile); break;
-            case FogState::Explored:
-                tile.setFillColor(sf::Color(0,0,0,160));
-                window.draw(tile); break;
-            case FogState::Visible: break;
+            case FogState::Hidden:   color = sf::Color(0, 0, 0, 255); break;
+            case FogState::Explored: color = sf::Color(0, 0, 0, 160); break;
+            case FogState::Visible:  color = sf::Color(0, 0, 0, 0);   break;
         }
+
+        if (color.a == 0) { idx += 6; continue; } // Visible ไม่ต้องวาด
+
+        float x = (float)(col * tileSize);
+        float y = (float)(row * tileSize);
+
+        sf::Vector2f tl(x,    y);
+        sf::Vector2f tr(x+ts, y);
+        sf::Vector2f bl(x,    y+ts);
+        sf::Vector2f br(x+ts, y+ts);
+
+        va[idx+0].position = tl; va[idx+0].color = color;
+        va[idx+1].position = tr; va[idx+1].color = color;
+        va[idx+2].position = bl; va[idx+2].color = color;
+        va[idx+3].position = tr; va[idx+3].color = color;
+        va[idx+4].position = br; va[idx+4].color = color;
+        va[idx+5].position = bl; va[idx+5].color = color;
+
+        idx += 6;
     }
+
+    window.draw(va);
 }

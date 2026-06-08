@@ -1,8 +1,19 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <vector>
+#include <map>
+#include <random>
+#include "lib/json.hpp"
 
-enum class TileType { Wall=0, Floor=1, StairsDown=2, StairsUp=3 };
+enum class TileType { Wall=0, Floor=1, GateDown=2, GateUp=3 };
+
+enum class ZoneType {
+    None = 0,
+    Darkness,
+    CrystalBright,
+    DeadMan,
+    BlackRock
+};
 
 class TileMap
 {
@@ -13,13 +24,16 @@ public:
     TileType getTile(int col,int row) const;
     void     setTile(int col,int row,TileType type);
     bool     isWalkable(int col,int row) const;
-    int getCols() const { return m_cols; }
-    int getRows() const { return m_rows; }
+    bool     loadFromTiled(const std::string& path);
+    int      getCols() const { return m_cols; }
+    int      getRows() const { return m_rows; }
+    ZoneType getZone(int col, int row) const;
 
 private:
     struct Rect { int x,y,w,h; };
     struct BSPNode { Rect area,room; int left=-1,right=-1; bool hasRoom=false; };
 
+    void processLayers(const nlohmann::json& layers);
     void fillWalls();
     void bspSplit(int nodeIdx,int depth,int maxDepth);
     void bspCarveRooms(int nodeIdx);
@@ -33,9 +47,14 @@ private:
 
     int m_cols,m_rows,m_tileSize;
     std::vector<std::vector<TileType>> m_grid;
+    std::vector<std::vector<ZoneType>> m_zoneGrid;
     std::vector<BSPNode> m_bspNodes;
+    std::mt19937 m_rng{ std::random_device{}() };
 
-    // Textures
-    bool       m_hasTextures = false;
-    sf::Texture m_texFloor, m_texWall, m_texStairsDown, m_texStairsUp;
+    // Textures — ดึงจาก TextureManager แทนเก็บเอง
+    bool m_hasTextures = false;
+
+    // Render cache — rebuild เฉพาะตอน map เปลี่ยน
+    bool m_cacheDirty = true;
+    std::map<const sf::Texture*, sf::VertexArray> m_renderCache;
 };

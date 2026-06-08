@@ -7,7 +7,8 @@
 #include <unordered_map>
 #include "Skill.hpp"
 
-enum class EnemyRank { Normal, Elite, Boss };
+// ── เพิ่ม Rare เข้าไประหว่าง Normal และ Elite ──
+enum class EnemyRank { Normal, Rare, Elite, Boss };
 enum class EnemyAIType { Melee, Ranged, Caster, Coward };
 
 class Enemy
@@ -52,7 +53,6 @@ private:
     void drawHPBar(sf::RenderWindow& window);
     sf::Color rankColor() const;
 
-    // A* — คืน next step ที่ควรเดิน, {-1,-1} ถ้าไปไม่ได้
     std::pair<int,int> astar(int fromC, int fromR, int toC, int toR,
                               const TileMap& map) const;
 
@@ -79,7 +79,7 @@ private:
     bool m_alerted      = false;
     int  m_lastKnownCol = -1;
     int  m_lastKnownRow = -1;
-    bool m_searching    = false;  // ถึง lastKnown แล้วยังไม่เจอ → วนหา
+    bool m_searching    = false;
     int  m_searchTimer  = 0;
 
     std::vector<SkillInstance> m_skills;

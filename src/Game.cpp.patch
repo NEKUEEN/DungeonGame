@@ -1,34 +1,253 @@
 // ================================================================
-//  PATCH SNIPPET — Game.cpp
-//  วางลงใน Game.cpp ของโปรเจ็กต์เดิม
-//  1) เพิ่ม computeMentality() ต่อจาก computeBody()
-//  2) แก้ใน processTurn() — เพิ่มบรรทัด s.mentality = computeMentality();
+//  PATCH สำหรับ Game.cpp — Rank System + Kill Counter + Boss Trigger
+//
+//  วิธีใช้: แทนที่ / เพิ่มฟังก์ชันตามที่ระบุด้านล่างใน Game.cpp ของคุณ
 // ================================================================
 
-// ─────────────────────────────────────────────────────────────────
-//  (1)  วางต่อจากฟังก์ชัน computeBody() ในไฟล์เดิม
-// ─────────────────────────────────────────────────────────────────
 
-int Game::computeMentality() const
+// ════════════════════════════════════════════════════════════════
+//  [A]  pickRandomMonster()  —  NEW FUNCTION
+//       วางต่อจาก spawnEnemy() หรือที่ไหนก็ได้ใน Game.cpp
+//
+//  Spawn weight ตาม floor:
+//    Normal : 60%  (ทุก floor)
+//    Rare   : 25%  (ทุก floor)
+//    Elite  : 12%  (floor 1+)
+//    Boss   :  0%  (เกิดจาก kill trigger เท่านั้น — ไม่ใส่ใน random pool)
+//
+//  ยิ่ง floor สูง Elite % เพิ่มขึ้น Normal ลด
+// ════════════════════════════════════════════════════════════════
+
+std::string Game::pickRandomMonster(int floor)
 {
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
+    // น้ำหนักปรับตาม floor (Boss = 0 เสมอ ไม่ spawn แบบ random)
+    float wNormal = std::max(30.f, 60.f - (floor - 1) * 3.f);  // ลดลงตาม floor
+    float wRare   = 25.f;
+    float wElite  = std::min(40.f, 12.f + (floor - 1) * 2.f);  // เพิ่มขึ้นตาม floor
+    float total   = wNormal + wRare + wElite;
 
-    // sub-stats ปัจจุบัน — เพิ่ม field ใหม่ตรงนี้อย่างเดียว
-    int mana      = s.maxMana;
-    int magicDmg  = s.maxMagicDmg;
-    int magicRes  = s.maxMagicRes;
-    // อนาคต: int poisonRes = s.maxPoisonRes;
+    float roll = m_fDist(m_rng) * total;
 
-    // สูตรเหมือน body — ปรับ weight ทีหลังได้
-    return (int)(mana * 0.4f + magicDmg * 0.3f + magicRes * 0.3f);
-    // อนาคต: + poisonRes*0.1f ฯลฯ
+    std::string rankStr;
+    if      (roll < wNormal)          rankStr = "Normal";
+    else if (roll < wNormal + wRare)  rankStr = "Rare";
+    else                              rankStr = "Elite";
+
+    auto ids = MonsterDB::instance().getByRank(rankStr);
+
+    // fallback: ถ้า rank ว่าง (เช่น JSON ยังไม่มีมอน Rare) ใช้ Normal
+    if (ids.empty()) ids = MonsterDB::instance().getByRank("Normal");
+    if (ids.empty()) return "";
+
+    std::uniform_int_distribution<int> pick(0, (int)ids.size() - 1);
+    return ids[pick(m_rng)];
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  (2)  ใน processTurn() — หา s.body = computeBody(); แล้วเพิ่มบรรทัดถัดไป
+
+// ════════════════════════════════════════════════════════════════
+//  [B]  spawnEnemy()  —  แทนที่ฟังก์ชันเดิม
+//       ใช้ pickRandomMonster() แทน rand()%100
+// ════════════════════════════════════════════════════════════════
+
+void Game::spawnEnemy(int floor)
+{
+    std::uniform_int_distribution<int> colDist(1, MAP_COLS - 2);
+    std::uniform_int_distribution<int> rowDist(1, MAP_ROWS - 2);
+
+    for (int att = 0; att < 100; ++att)
+    {
+        int col = colDist(m_rng);
+        int row = rowDist(m_rng);
+        if (!m_tileMap.isWalkable(col, row)) continue;
+
+        // อย่า spawn ใกล้ player เกินไป
+        if (m_player)
+        {
+            int dx = col - m_player->getCol();
+            int dy = row - m_player->getRow();
+            if (dx*dx + dy*dy < 36) continue;
+        }
+
+        std::string id = pickRandomMonster(floor);
+        if (id.empty()) return;
+
+        m_enemies.push_back(new Enemy(id, col, row, TILE_SIZE, floor));
+        return;
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  [C]  spawnBoss()  —  NEW FUNCTION
+//       วางต่อจาก spawnEnemy()
+// ════════════════════════════════════════════════════════════════
+
+void Game::spawnBoss(const std::string& family)
+{
+    // หา boss id ของ family นี้
+    auto bossIds = MonsterDB::instance().getByRank("Boss");
+    std::string bossId;
+    for (const auto& bid : bossIds)
+    {
+        const MonsterData* d = MonsterDB::instance().get(bid);
+        if (d && d->family == family)
+        { bossId = bid; break; }
+    }
+
+    if (bossId.empty())
+    {
+        addLog("> [" + family + "] Boss not found in JSON!", sf::Color(200,100,50));
+        return;
+    }
+
+    // หา tile ว่างที่ไม่ใกล้ player
+    std::uniform_int_distribution<int> colDist(1, MAP_COLS - 2);
+    std::uniform_int_distribution<int> rowDist(1, MAP_ROWS - 2);
+
+    for (int att = 0; att < 300; ++att)
+    {
+        int col = colDist(m_rng);
+        int row = rowDist(m_rng);
+        if (!m_tileMap.isWalkable(col, row)) continue;
+
+        // spawn ไกลจาก player อย่างน้อย 8 tile
+        if (m_player)
+        {
+            int dx = col - m_player->getCol();
+            int dy = row - m_player->getRow();
+            if (dx*dx + dy*dy < 64) continue;
+        }
+
+        m_enemies.push_back(new Enemy(bossId, col, row, TILE_SIZE, m_dungeonFloor));
+        m_bossActive[family] = true;
+
+        addLog("> *** " + family + " BOSS APPEARS! ***", sf::Color(255, 100, 50));
+        addLog("> [" + family + "] slaughter has summoned a guardian!", sf::Color(255, 160, 50));
+        return;
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  [D]  onEnemyKilled()  —  NEW FUNCTION
+//       เรียกในทุกจุดที่ enemy ตาย แทนบล็อก "enemy dead" เดิม
 //
-//       s.body       = computeBody();
-//       s.mentality  = computeMentality();   // ← เพิ่มบรรทัดนี้
-//       s.battleIndex = computeBattleIndex();
-// ─────────────────────────────────────────────────────────────────
+//  วิธีใช้ร่วมกับโค้ดเดิม:
+//  หลัง addLog("> "+enemy->getName()+" dead! ...") ทุกจุด
+//  ให้เพิ่ม:  onEnemyKilled(enemy);
+// ════════════════════════════════════════════════════════════════
+
+void Game::onEnemyKilled(Enemy* enemy)
+{
+    if (!enemy) return;
+
+    // Boss ที่ตายให้ reset flag ของ family นั้น
+    if (enemy->getRank() == EnemyRank::Boss)
+    {
+        m_bossActive[enemy->getFamily()] = false;
+        addLog("> Boss defeated! The " + enemy->getFamily() +
+               " threat is quelled... for now.", sf::Color(255, 200, 80));
+        return;
+    }
+
+    // Non-boss: นับ kill count ของ family
+    const std::string& fam = enemy->getFamily();
+    m_familyKillCount[fam]++;
+
+    int count = m_familyKillCount[fam];
+
+    // แจ้ง milestone ทุก 10 ตัว
+    if (count % 10 == 0 && count < BOSS_KILL_THRESHOLD)
+    {
+        int remaining = BOSS_KILL_THRESHOLD - count;
+        addLog("> " + fam + " kills: " + std::to_string(count) +
+               " / " + std::to_string(BOSS_KILL_THRESHOLD) +
+               " (" + std::to_string(remaining) + " more to summon boss)",
+               sf::Color(200, 160, 60));
+    }
+
+    // Boss trigger
+    if (count >= BOSS_KILL_THRESHOLD && !m_bossActive[fam])
+    {
+        spawnBoss(fam);
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  [E]  playerAttack()  —  แก้ส่วน "enemy dead" ให้เรียก onEnemyKilled
+//
+//  หาบล็อกนี้ใน playerAttack():
+//
+//      if (enemy->isDead())
+//      {
+//          addLog("> "+enemy->getName()+" dead! +"+...);
+//          auto dropped = DropTable::instance().roll(...);
+//          ...
+//          if (m_player->addExp(enemy->getExp())) { ... }
+//      }
+//
+//  เพิ่มบรรทัด onEnemyKilled(enemy); ต่อท้ายก่อนปิด if block:
+// ════════════════════════════════════════════════════════════════
+
+/* ตัวอย่างบล็อกที่แก้ใน playerAttack():
+
+    if (enemy->isDead())
+    {
+        addLog("> "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
+        auto dropped=DropTable::instance().roll(enemy->getId());
+        for (const auto& itemId:dropped)
+        {
+            // ... (โค้ด drop เดิม ไม่เปลี่ยน)
+        }
+        if (m_player->addExp(enemy->getExp()))
+        {
+            m_levelUpFlash=true; m_levelUpTimer=120;
+            int lv=m_player->getStats().level;
+            m_coreSlots.setSlotCount(lv);
+            addLog("> *** LEVEL UP! Level "+std::to_string(lv)+" ***",sf::Color(255,255,50));
+        }
+        onEnemyKilled(enemy);   // ← เพิ่มบรรทัดนี้
+    }
+*/
+
+
+// ════════════════════════════════════════════════════════════════
+//  [F]  fireRangedAt()  —  แก้เหมือนกัน (enemy dead section)
+//
+//  หาบล็อก if (e->isDead()) ใน fireRangedAt() แล้วเพิ่ม:
+//       onEnemyKilled(e);
+//  ก่อนปิด if block เช่นเดียวกัน
+// ════════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════════
+//  [G]  newDungeon()  —  เพิ่ม reset kill counter เมื่อ restart
+//
+//  ใน newDungeon() ส่วนที่ !keepPlayer:
+//  หลังบรรทัด m_coreSlots=CoreSlots();  ให้เพิ่ม:
+//
+//      m_familyKillCount.clear();
+//      m_bossActive.clear();
+// ════════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════════
+//  [H]  renderStatusPanel()  —  แสดง kill counter (optional)
+//
+//  เพิ่มต่อจาก drawLine("", apStr, apColor); ใน renderStatusPanel():
+// ════════════════════════════════════════════════════════════════
+
+/*
+    // Kill counter summary
+    for (const auto& [fam, count] : m_familyKillCount)
+    {
+        bool bossUp = !m_bossActive[fam] && count < BOSS_KILL_THRESHOLD;
+        std::string killLine = fam + ": " + std::to_string(count) +
+                               "/" + std::to_string(BOSS_KILL_THRESHOLD);
+        sf::Color kc = m_bossActive[fam]    ? sf::Color(255, 100, 50) :
+                       count >= BOSS_KILL_THRESHOLD ? sf::Color(255, 200, 80) :
+                                                      sf::Color(140, 140, 140);
+        drawLine("kills:", killLine, kc);
+    }
+*/
