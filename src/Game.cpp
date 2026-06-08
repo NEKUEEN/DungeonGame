@@ -529,15 +529,15 @@ void Game::newDungeon(bool keepPlayer)
     {
         if (!m_tileMap.loadFromTiled("assets/data/map_floor1.tmj"))
         {
-            //addLog("> map_floor1.tmj not found, using random", sf::Color(200,100,50));
-            m_tileMap.generate();
+            addLog("> map_floor1.tmj not found, using random", sf::Color(200,100,50));
+            //m_tileMap.generate();
         }
     }
     else
         m_tileMap.generate();
 
     // อ่านขนาดจริงจาก tileMap (สำคัญมาก: ต้องทำก่อน fog และ spawn loops)
-    m_mapCols = m_tileMap.getCols();////////
+    m_mapCols = m_tileMap.getCols();
     m_mapRows = m_tileMap.getRows();
     m_fog = FogOfWar(m_mapCols, m_mapRows);
 
