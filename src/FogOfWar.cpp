@@ -117,7 +117,7 @@ void FogOfWar::compute(int playerCol, int playerRow, int radius,
     };
 
     // ทางโล่ง → radius ใหญ่ขึ้น shadowcasting จัดการกำแพงเอง
-    int r = radius * 1;
+    int r = radius * 3;
 
     for (auto& t : T)
         castOctant(playerCol, playerRow, t[0], t[1], t[2], t[3], r, map);
