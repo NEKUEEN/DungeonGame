@@ -13,7 +13,7 @@
 // ============================================================
 Game::Game()
     : m_window(sf::VideoMode({WINDOW_W, WINDOW_H}), "Dungeon and Stone",
-               sf::Style::Titlebar | sf::Style::Close)
+               sf::Style::None)
     , m_tileMap(MAP_COLS, MAP_ROWS, TILE_SIZE)
     , m_fog(MAP_COLS, MAP_ROWS)
     , m_player(nullptr)
@@ -68,13 +68,13 @@ void Game::drainMentality()
     if (s.mentality < 0) s.mentality = 0;
 
     // บรรทัดนี้ควรแสดงทุกครั้งที่ลด
-    addLog("  Mentality -3/turn ("+std::to_string(s.mentality)+"/"+std::to_string(s.maxMentality)+")",
+    addLog("  Mentality -3 per turn ("+std::to_string(s.mentality)+"/"+std::to_string(s.maxMentality)+")",
            sf::Color(180,80,220));
 
     if (s.mentality <= 0)
     {
         m_playerDead = true;
-        addLog(" *** Mind shattered   DEAD *** [R] restart", sf::Color(255,50,50));
+        addLog(" *** Mind shattered - DEAD *** [R] restart", sf::Color(255,50,50));
     }
 }
 
