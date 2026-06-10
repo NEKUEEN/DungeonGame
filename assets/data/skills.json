@@ -43,7 +43,7 @@
       "name": "Magic Missile",
       "desc": "Fire a magic missile. Range 6, dmg MAG/2.",
       "type": "active_ranged",
-      "hotbar_slot": -1,
+      "hotbar_slot": 0,
       "cooldown": 1,
       "duration": 0,
       "effect": {

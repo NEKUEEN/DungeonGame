@@ -52,6 +52,7 @@ void Player::levelUp()
     m_stats.level++;
 
     m_stats.maxHp      += 30;
+    m_stats.baseMaxHp  += 30;
     m_stats.maxAtk     += 10;
     m_stats.maxDef     += 1;
     m_stats.maxDodge   += 1;

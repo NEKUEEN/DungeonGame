@@ -1,15 +1,10 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <string>
+#include "StatBonus.hpp"   // เพิ่ม
 
 enum class ItemType
-{
-    Food, Potion,
-    Helmet, BodyArmor, Gloves, Greaves, Boots,
-    Weapon, OffWeapon,
-    Core,       // แกนมอน — ใส่ Core Slots ได้
-    Material,   // หินเวทย์ ฯลฯ — ไว้ขาย ไม่ equip
-};
+{ Food, Potion, Helmet, BodyArmor, Gloves, Greaves, Boots, Weapon, OffWeapon, Core, Material, };
 
 struct Item
 {
@@ -25,10 +20,25 @@ struct Item
     int         dodgeBonus = 0;
     int         manaBonus  = 0;  // เพิ่ม: สำหรับ Core ที่มี bonus mana
     int         magicDmgBonus = 0; // เพิ่ม: สำหรับ Core ที่มี bonus magic damage
-    int         magicResBonus = 0; // เพิ่ม: สำหรับ Core ที่มี bonus magic resistance
+    int         magicResBonus = 0;
+    int         spdBonus   = 0;  // +/- speed (บวก=เร็ว, ลบ=ช้า) // เพิ่ม: สำหรับ Core ที่มี bonus magic resistance
     bool        stackable  = false;
     int         col        = -1;
     int         row        = -1;
+
+    StatBonus toStatBonus() const {
+        return {
+            .hp    = hpBonus,
+            .atk   = atkBonus,
+            .def   = defBonus,
+            .dodge = dodgeBonus,
+            .mana  = manaBonus,
+            .matk  = magicDmgBonus,   // เปลี่ยน
+            .magicRes = magicResBonus,
+            .spd   = spdBonus
+        };
+    }
+
 
     static Item makeFood();
     static Item makePotion();

@@ -12,10 +12,13 @@ struct Stats
     int level = 1;
 
     // ── Base stats (ก่อน equipment/core) ──
-    int maxHp    = 25;
+    int maxHp    = 25;   // จะถูก sync โดย recalcAllStats (รวม bonus แล้ว)
+    int baseMaxHp = 25;  // ค่าดิบก่อน bonus — ใช้ใน recalcAllStats เท่านั้น
     int maxAtk   = 5;
     int maxDef   = 2;
     int maxDodge = 2;
+    int maxSpd = 0;
+    int spd    = 0;
 
     // ── Computed by Game::computeBody() ──
     int body = 0;
@@ -30,7 +33,8 @@ struct Stats
 
     // ── Mentality sub-stats ──
     int maxMagicDmg  = 10;
-    int maxMana      = 20;   // เตรียมไว้ก่อน
+    int maxMana      = 20;
+    int baseMaxMana  = 20;  // ค่าดิบก่อน bonus
     int mana = 20;
     int manaRegen = 1;   // เตรียมไว้ก่อน
     int maxMagicRes  = 0;
@@ -64,6 +68,12 @@ struct Stats
     // AP cost ของการโจมตี x100 (100 = ปกติ = หัก 1 AP, 50 = หัก 0.5 AP)
     int atkSpeedCost  = 100;
     int atkAPAccum    = 0;   // accumulator สำหรับ fractional AP cost
+
+    // ── Move Speed ──
+    // AP cost ของการเดิน x100 (100=ปกติ, 50=เร็ว×2, 200=ช้า)
+    // ปรับได้จาก item/equipment/status
+    int moveSpeedCost = 100;
+    int moveAPAccum   = 0;
 };
 
 class Player

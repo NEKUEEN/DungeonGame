@@ -46,6 +46,7 @@
       "atk": 10,
       "def": 0,
       "dodge": 2,
+      "spd": 2,
       "sprite": "item_weapon.png",
       "stackable": false
     },
@@ -90,6 +91,7 @@
       "mana": 20,
       "def": 3,
       "dodge": 1,
+      "spd": 2,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -155,6 +157,7 @@
       "atk": 0,
       "def": 0,
       "dodge": 2,
+      "spd": 2,
       "sprite": "item_boots.png",
       "stackable": false
     },
@@ -187,6 +190,7 @@
         "atk": 0,
         "def": 0,
         "dodge": 10,
+        "spd": 2,
         "magic_res": 20,
         "magic_dmg": 15,
         "mana": 20
@@ -205,6 +209,7 @@
         "hp": 50,
         "atk": 15,
         "def": 20,
+        "spd": 2,
         "dodge": 4
       },
       "skills": ["power_strike"]
@@ -237,7 +242,8 @@
         "hp": 100,
         "atk": 20,
         "def": 15,
-        "dodge": 2
+        "dodge": 2,
+        "spd": 2
       },
       "skills": ["iron_skin"]
     },

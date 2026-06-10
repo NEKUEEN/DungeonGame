@@ -28,10 +28,9 @@ Game::Game()
     SkillDB::instance().load("assets/data/skills.json");
 
     m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
-    m_gameView.setViewport(sf::FloatRect({0.f,0.f},
-        {(float)GAME_VIEW_W/WINDOW_W,(float)GAME_VIEW_H/WINDOW_H}));
     m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
     m_uiView.setCenter({(float)WINDOW_W/2.f,(float)WINDOW_H/2.f});
+    applyLetterbox();
 
     newDungeon(false);
 }
@@ -41,29 +40,6 @@ Game::~Game() { delete m_player; clearEnemies(); }
 // ============================================================
 //  Stats Helpers
 // ============================================================
-int Game::computeBody() const
-{
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
-    CoreStats cb   = m_coreSlots.getTotalBonus();
-    int hp    = s.maxHp    + cb.hp    + m_equipment.getTotalHpBonus();
-    int atk   = s.maxAtk   + cb.atk   + m_equipment.getTotalAtkBonus();
-    int def   = s.maxDef   + cb.def   + m_equipment.getTotalDefBonus();
-    int dodge = s.maxDodge + cb.dodge + m_equipment.getTotalDodgeBonus();
-    return (int)(hp*0.4f + atk*0.3f + def*0.2f + dodge*0.1f);
-}
-
-int Game::computeMentality() const
-{
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
-    CoreStats cb   = m_coreSlots.getTotalBonus();
-    int mana = s.maxMana + cb.mana             + m_equipment.getTotalManaBonus();
-    int magicDmg = s.maxMagicDmg + cb.magicDmg + m_equipment.getTotalMagicDmgBonus();
-    int magicRes = s.maxMagicRes + cb.magicRes + m_equipment.getTotalMagicResBonus();
-    return (int)(mana * 0.4f + magicDmg * 0.3f + magicRes * 0.3f);
-}
-
 int Game::getItemLevelTotal() const
 {
     int total = 0;
@@ -80,31 +56,115 @@ int Game::getItemLevelTotal() const
     return total;
 }
 
-int Game::computeBattleIndex() const
-{
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
-    CoreStats cb   = m_coreSlots.getTotalBonus();
-    int body      = computeBody();
-    int mentality = computeMentality();
-    int itemLv    = getItemLevelTotal();
-    float bonusPct = 0.30f + (s.level - 1) * 0.05f;
-    return (int)(body + mentality + itemLv * bonusPct);
-}
-
 void Game::drainMentality()
 {
     if (!m_player) return;
     Stats& s = m_player->getStats();
-    if (!s.hpDepleted || m_playerDead) return;
+    if (!s.hpDepleted || m_playerDead) return;   // ← คืนเงื่อนไขเดิม
+
+    if (s.maxMentality <= 0) return;  // ป้องกันค่า 0
+
     s.mentality -= 3;
     if (s.mentality < 0) s.mentality = 0;
-    addLog("> Mentality -3/turn ("+std::to_string(s.mentality)+"/"+std::to_string(s.maxMentality)+")",
+
+    // บรรทัดนี้ควรแสดงทุกครั้งที่ลด
+    addLog("  Mentality -3/turn ("+std::to_string(s.mentality)+"/"+std::to_string(s.maxMentality)+")",
            sf::Color(180,80,220));
+
     if (s.mentality <= 0)
     {
         m_playerDead = true;
         addLog(" *** Mind shattered   DEAD *** [R] restart", sf::Color(255,50,50));
+    }
+}
+
+// ============================================================
+//  recalcAllStats – รวมศูนย์คำนวณสเตตทั้งหมด
+// ============================================================
+void Game::recalcAllStats()
+{
+    if (!m_player) return;
+    Stats& base = m_player->getStats();
+    
+    int oldMaxHp   = base.maxHp;
+    int oldMaxMana = base.maxMana;
+    
+    StatBonus bonus = m_equipment.getTotalBonus() + m_coreSlots.getTotalBonus();
+
+    int atkPercentBonus = 0, defPercentBonus = 0, magicPercentBonus = 0;
+    for (const auto& sk : m_player->getSkills())
+    {
+        if (sk.data.type == SkillType::Passive)
+        {
+            atkPercentBonus += sk.data.effect.atkPct;
+            defPercentBonus += sk.data.effect.defPct;
+            magicPercentBonus += sk.data.effect.magicDmgPct;
+        }
+    }
+
+    // ใช้ baseMaxHp และ baseMaxMana แทน maxHp/maxMana
+    m_finalStats.maxHp   = base.baseMaxHp + bonus.hp;
+    m_finalStats.atk     = base.maxAtk + bonus.atk;
+    m_finalStats.atk    += m_finalStats.atk * atkPercentBonus / 100;
+
+    m_finalStats.def     = base.maxDef + bonus.def;
+    m_finalStats.def    += m_finalStats.def * defPercentBonus / 100;
+
+    m_finalStats.dodge   = base.maxDodge + bonus.dodge;
+    m_finalStats.maxMana = base.baseMaxMana + bonus.mana;
+    m_finalStats.matk    = base.maxMagicDmg + bonus.matk;
+    m_finalStats.matk   += m_finalStats.matk * magicPercentBonus / 100;
+    m_finalStats.mdef    = base.maxMagicRes + bonus.magicRes;
+    m_finalStats.spd     = base.maxSpd + bonus.spd;
+    m_finalStats.itemLevel = getItemLevelTotal();
+
+    m_finalStats.body = (m_finalStats.maxHp * 0.4f + m_finalStats.atk * 0.3f +
+                              m_finalStats.def * 0.2f + m_finalStats.dodge * 0.1f);
+    m_finalStats.mentality = (m_finalStats.maxMana * 0.4f + m_finalStats.matk * 0.3f +
+                                   m_finalStats.mdef * 0.3f);
+    float bonusPct = 0.30f + (base.level - 1) * 0.05f;
+    m_finalStats.battleIndex = (m_finalStats.body + m_finalStats.mentality +
+                                     m_finalStats.itemLevel * bonusPct);
+
+    if (m_finalStats.maxHp > oldMaxHp)
+        base.hp += (m_finalStats.maxHp - oldMaxHp);
+    if (base.hp > m_finalStats.maxHp) base.hp = m_finalStats.maxHp;
+    
+    if (m_finalStats.maxMana > oldMaxMana)
+        base.mana += (m_finalStats.maxMana - oldMaxMana);
+    if (base.mana > m_finalStats.maxMana) base.mana = m_finalStats.maxMana;
+
+    // อัปเดต base stats — ไม่แตะ baseMaxHp และ baseMaxMana!
+    base.maxHp        = m_finalStats.maxHp;
+    base.maxMana      = m_finalStats.maxMana;
+    base.body         = m_finalStats.body;
+    base.maxMentality = m_finalStats.mentality;
+    base.mentality    = m_finalStats.mentality;
+    base.itemLevel    = m_finalStats.itemLevel;
+    base.battleIndex  = m_finalStats.battleIndex;
+}
+
+void Game::refreshStats()
+{
+    if (!m_player) return;
+
+    // เก็บ finalStats เก่าก่อน recalc
+    int oldBody        = m_finalStats.body;
+    int oldMentality   = m_finalStats.mentality;
+    int oldBattle      = m_finalStats.battleIndex;
+
+    recalcAllStats();
+
+    int db = m_finalStats.body        - oldBody;
+    int dm = m_finalStats.mentality   - oldMentality;
+    int di = m_finalStats.battleIndex - oldBattle;
+
+    if (db != 0 || dm != 0 || di != 0)
+    {
+        m_deltaBody        = db;
+        m_deltaMentality   = dm;
+        m_deltaBattleIndex = di;
+        m_deltaTimer = 180;
     }
 }
 
@@ -134,6 +194,15 @@ void Game::recalcAP()
     }
     s.atkSpeedCost = atkCost;
     s.atkAPAccum   = 0;
+
+    int spd = m_finalStats.spd;
+    s.spd = std::clamp(spd, -s.maxSpd, s.maxSpd);
+
+    int moveCost = 100;
+    if (s.spd > 0) moveCost = 100 / (s.spd + 1);
+    else if (s.spd < 0) moveCost = 100 * (-s.spd + 1);
+    s.moveSpeedCost = std::clamp(moveCost, 25, 400);
+    s.moveAPAccum   = 0;
 }
 
 // ============================================================
@@ -145,47 +214,18 @@ int Game::getScaledDamage(const SkillEffect& effect) const
     const Stats& s = m_player->getStats();
 
     int baseStat = 0;
-    if (effect.scalingStat == "atk") baseStat = getBuffedAtk();
-    else if (effect.scalingStat == "def") baseStat = getBuffedDef();
-    else if (effect.scalingStat == "dodge") baseStat = s.maxDodge + m_equipment.getTotalDodgeBonus();
-    else if (effect.scalingStat == "magic_dmg") baseStat = getBuffedMagicDmg();
-//เพิ่มเติม scaling stat อื่นๆ ได้ที่นี่
-        return std::max(1, baseStat * effect.damagePct / 100);
+    if (effect.scalingStat == "atk")
+        baseStat = getBuffedAtk();
+    else if (effect.scalingStat == "def")
+        baseStat = getBuffedDef();
+    else if (effect.scalingStat == "dodge")
+        baseStat = s.maxDodge + m_equipment.getTotalDodgeBonus();
+    else if (effect.scalingStat == "magic_dmg")
+        baseStat = getBuffedMagicDmg();
+    else
+        baseStat = getBuffedAtk();
 
-}
-
-int Game::getBuffedAtk() const
-{
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
-    CoreStats cb   = m_coreSlots.getTotalBonus();
-    int base = s.maxAtk + cb.atk + m_equipment.getTotalAtkBonus();
-    for (const auto& sk : m_player->getSkills())
-        if (sk.buffActive && sk.data.type == SkillType::ActiveBuff)
-            base = base + base * sk.data.effect.atkPct / 100;
-    return base;
-}
-int Game::getBuffedMagicDmg() const
-{
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
-    CoreStats cb   = m_coreSlots.getTotalBonus();
-    int base = s.maxMagicDmg + cb.magicDmg + m_equipment.getTotalMagicDmgBonus();
-    for (const auto& sk : m_player->getSkills())
-        if (sk.buffActive && sk.data.type == SkillType::ActiveBuff)
-            base = base + base * sk.data.effect.magicDmgPct / 100;
-    return base;
-}
-
-int Game::getBuffedDef() const
-{
-    if (!m_player) return 0;
-    const Stats& s = m_player->getStats();
-    int base = s.maxDef + m_equipment.getTotalDefBonus();
-    for (const auto& inst : m_player->getSkills())
-        if (inst.data.type == SkillType::Passive && inst.data.effect.defPct > 0)
-            base = base + base * inst.data.effect.defPct / 100;
-    return base;
+    return std::max(1, baseStat * effect.damagePct / 100);
 }
 
 void Game::useSkillBuff(const std::string& skillId)
@@ -195,14 +235,14 @@ void Game::useSkillBuff(const std::string& skillId)
     if (!sk || sk->data.type != SkillType::ActiveBuff) return;
     if (!sk->isReady())
     {
-        addLog("> "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns",
+        addLog("  "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns",
                sf::Color(160,160,160));
         return;
     }
     sk->buffActive   = true;
     sk->durationLeft = sk->data.duration;
     sk->cooldownLeft = sk->data.cooldown;
-    addLog("> "+sk->data.name+" activated! ATK +"+std::to_string(sk->data.effect.atkPct)+
+    addLog("  "+sk->data.name+" activated! ATK +"+std::to_string(sk->data.effect.atkPct)+
            "% for "+std::to_string(sk->data.duration)+" turns", sf::Color(255,200,50));
     recalcAP();
 }
@@ -212,83 +252,74 @@ void Game::useSkillBuff(const std::string& skillId)
 // ============================================================
 void Game::executeSkill(int hotbarIdx)
 {
-
     if (!m_player) return;
     const std::string& id = m_player->getHotbar(hotbarIdx);
-    if (id.empty()) { addLog("> Slot "+std::to_string(hotbarIdx+1)+" empty."); return; }
+    if (id.empty()) { addLog("  Slot "+std::to_string(hotbarIdx+1)+" empty."); return; }
 
     SkillInstance* sk = m_player->findSkill(id);
     if (!sk) return;
 
     Stats& s = m_player->getStats();
+
     if (s.mana < sk->data.effect.manaCost)
     {
-        addLog("> Not enough mana!", sf::Color(100,100,220));
+        addLog("  Not enough mana! Need " + std::to_string(sk->data.effect.manaCost), sf::Color(100,100,220));
         return;
     }
-    s.mana -= sk->data.effect.manaCost;
-
 
     if (!sk->isReady())
     {
-        addLog("> "+sk->data.name+" cooldown: "
-               +std::to_string(sk->cooldownLeft)+" turns",
-               sf::Color(160,160,160));
+        addLog("  "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns", sf::Color(160,160,160));
         return;
     }
 
     switch (sk->data.type)
     {
     case SkillType::ActiveBuff:
-        sk->buffActive   = true;
+        s.mana -= sk->data.effect.manaCost;
+        sk->buffActive = true;
         sk->durationLeft = sk->data.duration;
         sk->cooldownLeft = sk->data.cooldown;
-        addLog("> "+sk->data.name+" activated!", sf::Color(255,200,50));
+        addLog("  "+sk->data.name+" activated!", sf::Color(255,200,50));
         recalcAP();
         break;
 
     case SkillType::ActiveHeal:
-    {
-        Stats& s = m_player->getStats();
-        int heal = sk->data.effect.healFlat
-                 + s.maxHp * sk->data.effect.healPct / 100;
-        s.hp = std::min(s.maxHp, s.hp + heal);
-        if (s.hp > 0 && s.hpDepleted)
+        s.mana -= sk->data.effect.manaCost;
         {
-            s.hpDepleted = false;
-            addLog("> HP recovered", sf::Color(100,220,180));
+            int heal = sk->data.effect.healFlat + s.maxHp * sk->data.effect.healPct / 100;
+            s.hp = std::min(s.maxHp, s.hp + heal);
+            if (s.hp > 0 && s.hpDepleted)
+            {
+                s.hpDepleted = false;
+                addLog("  HP recovered", sf::Color(100,220,180));
+            }
+            sk->cooldownLeft = sk->data.cooldown;
+            addLog("  "+sk->data.name+" +"+std::to_string(heal)+" HP", sf::Color(80,220,120));
         }
-        sk->cooldownLeft = sk->data.cooldown;
-        addLog("> "+sk->data.name+" +"+std::to_string(heal)+" HP",
-               sf::Color(80,220,120));
         break;
-    }
 
     case SkillType::ActiveRanged:
-        m_targetingMode = true;
-        m_targetSkillId = id;
-        m_targetCol = m_player->getCol();
-        m_targetRow = m_player->getRow();
-        addLog(" [Targeting] arrow/HJKL | Enter=fire | Esc=cancel",
-               sf::Color(255,220,50));
-        break;
-
     case SkillType::ActiveWarp:
-        m_targetingMode = true;
-        m_targetSkillId = id;
-        m_targetCol = m_player->getCol();
-        m_targetRow = m_player->getRow();
-        addLog(" [Warp] choose destination | Enter=warp | Esc=cancel",
-               sf::Color(100,200,255));
+        s.mana -= sk->data.effect.manaCost;
+        m_ui.targeting.active = true;
+        m_ui.targeting.skillId = id;
+        m_ui.targeting.targetCol = m_player->getCol();
+        m_ui.targeting.targetRow = m_player->getRow();
+        if (sk->data.type == SkillType::ActiveRanged)
+            addLog(" [Targeting] "+sk->data.name+"", sf::Color(255,220,50));
+        else
+            addLog(" [Warp] "+sk->data.name+"", sf::Color(100,200,255));
         break;
 
     case SkillType::ActiveAoe:
+        s.mana -= sk->data.effect.manaCost;
         executeAoe(sk);
         sk->cooldownLeft = sk->data.cooldown;
         break;
 
     case SkillType::Passive:
-        addLog("> "+sk->data.name+" is passive.", sf::Color(120,200,120));
+        addLog("  "+sk->data.name+" is passive.", sf::Color(120,200,120));
         break;
     }
 }
@@ -300,7 +331,6 @@ void Game::executeAoe(SkillInstance* sk)
     int pr = m_player->getRow();
     int radius = sk->data.effect.aoeRadius;
     int baseAtk = getBuffedAtk();
-    int baseMagicDmg = getBuffedMagicDmg();
     int dmg = std::max(1, baseAtk * sk->data.effect.damagePct / 100);
     int hits = 0;
 
@@ -311,13 +341,13 @@ void Game::executeAoe(SkillInstance* sk)
         if (dx*dx + dy*dy <= radius*radius)
         {
             e->takeDamage(dmg);
-            addLog("> "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
+            addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
                    sf::Color(255,180,50));
             hits++;
         }
     }
     if (hits == 0)
-        addLog("> "+sk->data.name+" — no targets in range.", sf::Color(140,140,140));
+        addLog("  "+sk->data.name+"  no targets in range.", sf::Color(140,140,140));
 
     processTurn(); tryRespawnEnemies();
     m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
@@ -326,14 +356,18 @@ void Game::executeAoe(SkillInstance* sk)
 void Game::executeWarp(int col, int row)
 {
     if (!m_tileMap.isWalkable(col, row))
-    { addLog("> Cannot warp there!"); return; }
+    {
+        addLog("  Cannot warp there!");
+        return;
+    }
     m_player->setPos(col, row);
-    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
+    SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     if (sk) sk->cooldownLeft = sk->data.cooldown;
-    addLog("> Warped!", sf::Color(100,200,255));
+    addLog("  Warped!", sf::Color(100,200,255));
     m_fog.compute(col, row, VIEW_RADIUS, m_tileMap);
     updateCamera();
-    processTurn(); tryRespawnEnemies();
+    processTurn();
+    tryRespawnEnemies();
 }
 
 // ============================================================
@@ -362,83 +396,79 @@ std::vector<sf::Vector2i> Game::getLine(int x0, int y0, int x1, int y1) const
 // ============================================================
 void Game::enterTargetingMode()
 {
-    if (!m_player) return;
     SkillInstance* sk = m_player->findSkill("stone_throw");
-    if (!sk) return;
-
-    if (!sk->isReady())
-    {
-        addLog("> Stone Throw cooldown: "+std::to_string(sk->cooldownLeft)+" turns",
-               sf::Color(160,160,160));
+    if (!sk || !sk->isReady()) {
+        addLog("  Stone Throw not ready", sf::Color(160,160,160));
         return;
     }
-
-    m_targetingMode  = true;
-    m_targetSkillId  = "stone_throw";
-    m_targetCol = m_player->getCol();
-    m_targetRow = m_player->getRow();
-
-    addLog(" [Targeting] Move cursor: arrow/HJKLYUBN", sf::Color(255,220,50));
-    addLog(" Fire: Enter/Space  |  Cancel: Esc", sf::Color(255,220,50));
+    m_ui.targeting.active = true;
+    m_ui.targeting.skillId = "stone_throw";
+    m_ui.targeting.targetCol = m_player->getCol();
+    m_ui.targeting.targetRow = m_player->getRow();
+    addLog(" [Targeting] Move cursor: arrow keys | Enter=fire | Esc=cancel", sf::Color(255,220,50));
 }
 
 void Game::moveTargetCursor(int dc, int dr)
 {
     if (!m_player) return;
-    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
+    SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     if (!sk) return;
 
-    int nc = m_targetCol + dc;
-    int nr = m_targetRow + dr;
-
-    int ddx = nc - m_player->getCol();
-    int ddy = nr - m_player->getRow();
-    float dist = std::sqrt((float)(ddx*ddx + ddy*ddy));
-    if (dist > sk->data.effect.range)
-    {
-        addLog("> Out of range (max "+std::to_string(sk->data.effect.range)+" tiles)",
-               sf::Color(220,100,50));
+    int nc = m_ui.targeting.targetCol + dc;
+    int nr = m_ui.targeting.targetRow + dr;
+    float dist = std::sqrt((float)((nc - m_player->getCol())*(nc - m_player->getCol()) + 
+                                   (nr - m_player->getRow())*(nr - m_player->getRow())));
+    if (dist > sk->data.effect.range) {
+        addLog("  Out of range (max " + std::to_string(sk->data.effect.range) + " tiles)", sf::Color(220,100,50));
         return;
     }
-
     nc = std::clamp(nc, 0, m_mapCols-1);
     nr = std::clamp(nr, 0, m_mapRows-1);
-
-    m_targetCol = nc;
-    m_targetRow = nr;
+    m_ui.targeting.targetCol = nc;
+    m_ui.targeting.targetRow = nr;
 }
 
 void Game::confirmTarget()
 {
     if (!m_player) return;
-    m_targetingMode = false;
-    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
-    if (!sk) return;
-
+    
+    SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
+    if (!sk)
+    {
+        cancelTargeting();
+        return;
+    }
+    
+    m_ui.targeting.active = false;
+    
     if (sk->data.type == SkillType::ActiveRanged)
-        fireRangedAt(m_targetCol, m_targetRow);
+    {
+        fireRangedAt(m_ui.targeting.targetCol, m_ui.targeting.targetRow);
+    }
     else if (sk->data.type == SkillType::ActiveWarp)
-        executeWarp(m_targetCol, m_targetRow);
+    {
+        executeWarp(m_ui.targeting.targetCol, m_ui.targeting.targetRow);
+    }
 }
 
 void Game::cancelTargeting()
 {
-    m_targetingMode = false;
-    addLog("> Targeting cancelled.", sf::Color(140,140,140));
+    m_ui.targeting.active = false;
+    m_ui.targeting.skillId.clear();
+    addLog("  Targeting cancelled.", sf::Color(140,140,140));
 }
 
 void Game::fireRangedAt(int targetCol, int targetRow)
 {
     if (!m_player) return;
-    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
+    
+    SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     if (!sk) return;
 
     sk->cooldownLeft = sk->data.cooldown;
 
     int pc = m_player->getCol();
     int pr = m_player->getRow();
-    int baseAtk = getBuffedAtk();
-    int baseMagicDmg = getBuffedMagicDmg();
     int projDmg = getScaledDamage(sk->data.effect);
 
     auto line = getLine(pc, pr, targetCol, targetRow);
@@ -451,55 +481,57 @@ void Game::fireRangedAt(int targetCol, int targetRow)
 
         if (m_tileMap.getTile(tx, ty) == TileType::Wall) break;
 
-        int ddx = tx - pc, ddy = ty - pr;
-        if (std::sqrt((float)(ddx*ddx+ddy*ddy)) > sk->data.effect.range) break;
+        float dist = std::sqrt((float)((tx-pc)*(tx-pc) + (ty-pr)*(ty-pr)));
+        if (dist > sk->data.effect.range) break;
 
         for (auto* e : m_enemies)
         {
-            if (!e->isDead() && e->getCol()==tx && e->getRow()==ty)
+            if (!e->isDead() && e->getCol() == tx && e->getRow() == ty)
             {
                 e->takeDamage(projDmg);
-                addLog("> " + sk->data.name + " hits " + e->getName() + " for " + std::to_string(projDmg) + "!",
+                addLog("  " + sk->data.name + " hits " + e->getName() + " for " + std::to_string(projDmg) + "!",
                        sf::Color(180,220,255));
 
                 if (e->isDead())
                 {
-                    addLog("> "+e->getName()+" dead! +"+std::to_string(e->getExp())+" EXP",
-                           sf::Color(220,80,80));
-
+                    addLog("  "+e->getName()+" dead! +"+std::to_string(e->getExp())+" EXP", sf::Color(220,80,80));
+                    
                     auto dropped = DropTable::instance().roll(e->getId());
                     for (const auto& itemId : dropped)
                     {
                         const ItemData* idata = DropTable::instance().getItem(itemId);
                         if (!idata) continue;
                         Item drop;
-                        drop.id         = idata->id;
-                        drop.type       = (idata->type=="Core") ? ItemType::Core : ItemType::Material;
-                        drop.name       = idata->name;
-                        drop.desc       = idata->desc;
-                        drop.value      = idata->value;
-                        drop.hpBonus    = idata->hpBonus;
-                        drop.atkBonus   = idata->atkBonus;
-                        drop.defBonus   = idata->defBonus;
+                        drop.id = idata->id;
+                        drop.type = (idata->type=="Core") ? ItemType::Core : ItemType::Material;
+                        drop.name = idata->name;
+                        drop.desc = idata->desc;
+                        drop.value = idata->value;
+                        drop.hpBonus = idata->hpBonus;
+                        drop.atkBonus = idata->atkBonus;
+                        drop.defBonus = idata->defBonus;
                         drop.dodgeBonus = idata->dodgeBonus;
-                        drop.manaBonus  = idata->manaBonus;
+                        drop.manaBonus = idata->manaBonus;
                         drop.magicDmgBonus = idata->magicDmgBonus;
                         drop.magicResBonus = idata->magicResBonus;
+                        drop.spdBonus = idata->spdBonus;
                         drop.spriteName = idata->sprite;
-                        drop.stackable  = idata->stackable;
-                        drop.col        = e->getCol();
-                        drop.row        = e->getRow();
+                        drop.stackable = idata->stackable;
+                        drop.col = e->getCol();
+                        drop.row = e->getRow();
                         m_mapItems.push_back(drop);
-                        addLog("> Dropped: "+idata->name, sf::Color(180,220,255));
+                        addLog("  Dropped: "+idata->name, sf::Color(180,220,255));
                     }
 
                     if (m_player->addExp(e->getExp()))
                     {
-                        m_levelUpFlash=true; m_levelUpTimer=120;
+                        m_ui.levelUpFlash = true;
+                        m_ui.levelUpTimer = 120;
                         int lv = m_player->getStats().level;
                         m_coreSlots.setSlotCount(lv);
-                        addLog("> *** LEVEL UP! Level "+std::to_string(lv)+" ***",
-                               sf::Color(255,255,50));
+                        refreshStats();
+                        recalcAP();
+                        addLog("  *** LEVEL UP! Level "+std::to_string(lv)+" ***", sf::Color(255,255,50));
                     }
                     onEnemyKilled(e);
                 }
@@ -511,7 +543,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     }
 
     if (!hit)
-        addLog("> Stone flies and hits nothing.", sf::Color(140,140,140));
+        addLog("  " + sk->data.name + " hits nothing.", sf::Color(140,140,140));
 
     m_turnCount++;
     m_player->onTurnPassed();
@@ -529,21 +561,18 @@ void Game::newDungeon(bool keepPlayer)
     {
         if (!m_tileMap.loadFromTiled("assets/data/map_floor1.tmj"))
         {
-            addLog("> map_floor1.tmj not found, using random", sf::Color(200,100,50));
-            //m_tileMap.generate();
+            m_tileMap.generate();
         }
     }
     else
         m_tileMap.generate();
 
-    // อ่านขนาดจริงจาก tileMap (สำคัญมาก: ต้องทำก่อน fog และ spawn loops)
     m_mapCols = m_tileMap.getCols();
     m_mapRows = m_tileMap.getRows();
     m_fog = FogOfWar(m_mapCols, m_mapRows);
 
     m_fog.reset();
-    m_playerDead    = false;
-    m_targetingMode = false;
+    m_playerDead = false;
 
     if (!keepPlayer)
     {
@@ -556,7 +585,6 @@ void Game::newDungeon(bool keepPlayer)
         m_bossActive.clear();
     }
 
-    // เก็บ walkable tiles ทั้งหมดแล้วสุ่มเกิด
     std::vector<std::pair<int,int>> floorTiles;
     for (int row=1;row<m_mapRows-1;++row)
         for (int col=1;col<m_mapCols-1;++col)
@@ -578,25 +606,48 @@ void Game::newDungeon(bool keepPlayer)
 
     if (m_player)
     {
-        Stats& s      = m_player->getStats();
-        s.maxMentality= computeMentality();
-        s.mentality   = computeMentality();
-        s.body        = computeBody();
-        s.itemLevel   = getItemLevelTotal();
-        s.battleIndex = computeBattleIndex();
-        m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
-        m_coreSlots.setSlotCount(m_player->getStats().level);
+        recalcAllStats();
         recalcAP();
+        m_coreSlots.setSlotCount(m_player->getStats().level);
+        m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
     }
 
     updateCamera();
-    m_selectedSlot=0; m_viewEquipment=false; m_viewCores=false;
+    m_ui.activePanel = UIState::Panel::Inventory;
+    m_ui.selectedInvSlot = 0;
+    m_ui.selectedEquipSlot = 0;
+    m_ui.selectedCoreSlot = 0;
+    m_ui.levelUpFlash = false;
+    m_ui.targeting.reset();
 
     if (keepPlayer)
-        addLog("> Floor "+std::to_string(m_dungeonFloor)+" - Deeper...", sf::Color(180,140,60));
+        addLog("  Floor "+std::to_string(m_dungeonFloor)+" - Deeper...", sf::Color(180,140,60));
     else
-        addLog("> Floor 1 | 1-9=Skills [E]=Equip [Tab]=Inv", sf::Color(100,220,100));
+        addLog("  Floor 1", sf::Color(100,220,100));
 }
+
+void Game::applyLetterbox()
+{
+    auto winSize = m_window.getSize();
+    float winW = (float)winSize.x;
+    float winH = (float)winSize.y;
+    float scale = std::min(winW / (float)WINDOW_W, winH / (float)WINDOW_H);
+    float viewW = WINDOW_W * scale;
+    float viewH = WINDOW_H * scale;
+    float offX  = (winW - viewW) / 2.f;
+    float offY  = (winH - viewH) / 2.f;
+
+    m_gameView.setViewport(sf::FloatRect(
+        {offX/winW, offY/winH},
+        {viewW/winW * ((float)GAME_VIEW_W/WINDOW_W),
+         viewH/winH * ((float)GAME_VIEW_H/WINDOW_H)}
+    ));
+    m_uiView.setViewport(sf::FloatRect(
+        {offX/winW, offY/winH},
+        {viewW/winW, viewH/winH}
+    ));
+}
+
 
 void Game::updateCamera()
 {
@@ -640,7 +691,6 @@ void Game::spawnEnemy(int floor)
     }
 }
 
-
 std::string Game::pickRandomMonster(int floor)
 {
     float wNormal = std::max(30.f, 60.f - (floor - 1) * 3.f);
@@ -674,7 +724,7 @@ void Game::spawnBoss(const std::string& family)
     }
     if (bossId.empty())
     {
-        addLog("> [" + family + "] Boss not defined in JSON!", sf::Color(200,100,50));
+        addLog("  [" + family + "] Boss not defined in JSON!", sf::Color(200,100,50));
         return;
     }
 
@@ -694,8 +744,8 @@ void Game::spawnBoss(const std::string& family)
         }
         m_enemies.push_back(new Enemy(bossId, col, row, TILE_SIZE, m_dungeonFloor));
         m_bossActive[family] = true;
-        addLog("> *** " + family + " BOSS APPEARS! ***", sf::Color(255, 100, 50));
-        addLog("> The slaughter has summoned a guardian!", sf::Color(255, 160, 50));
+        addLog("  *** " + family + " BOSS APPEARS! ***", sf::Color(255, 100, 50));
+        addLog("  The slaughter has summoned a guardian!", sf::Color(255, 160, 50));
         return;
     }
 }
@@ -706,7 +756,7 @@ void Game::onEnemyKilled(Enemy* enemy)
     if (enemy->getRank() == EnemyRank::Boss)
     {
         m_bossActive[enemy->getFamily()] = false;
-        addLog("> Boss defeated! The " + enemy->getFamily() +
+        addLog("  Boss defeated! The " + enemy->getFamily() +
                " threat fades...", sf::Color(255, 200, 80));
         return;
     }
@@ -716,7 +766,7 @@ void Game::onEnemyKilled(Enemy* enemy)
 
     if (count % 10 == 0 && count < BOSS_KILL_THRESHOLD)
     {
-        addLog("> " + fam + " kills: " + std::to_string(count) +
+        addLog("  " + fam + " kills: " + std::to_string(count) +
                "/" + std::to_string(BOSS_KILL_THRESHOLD),
                sf::Color(200, 160, 60));
     }
@@ -797,12 +847,12 @@ void Game::spawnItems()
                 item.manaBonus     = idata->manaBonus;
                 item.magicDmgBonus = idata->magicDmgBonus;
                 item.magicResBonus = idata->magicResBonus;
+                item.spdBonus      = idata->spdBonus;
                 item.spriteName    = idata->sprite;
                 item.stackable     = idata->stackable;
             }
         }
 
-        // fallback ถ้าหา itemId ไม่เจอ
         if (item.name.empty())
         {
             if      (r < 3) item = Item::makeFood();
@@ -827,8 +877,12 @@ void Game::run(){while(m_window.isOpen()){processEvents();update();render();}}
 
 void Game::update()
 {
-    if (m_levelUpFlash){m_levelUpTimer--;if(m_levelUpTimer<=0)m_levelUpFlash=false;}
-    if (m_deltaTimer > 0) m_deltaTimer--;  // ← เพิ่ม
+    if (m_ui.levelUpFlash)
+    {
+        m_ui.levelUpTimer--;
+        if (m_ui.levelUpTimer <= 0) m_ui.levelUpFlash = false;
+    }
+    if (m_deltaTimer > 0) m_deltaTimer--;
 }
 
 // ============================================================
@@ -841,6 +895,18 @@ void Game::processEvents()
         if (event->is<sf::Event::Closed>()) m_window.close();
         if (const auto* key = event->getIf<sf::Event::KeyPressed>())
         {
+            // F11 toggle fullscreen
+            if (key->code == sf::Keyboard::Key::F11)
+            {
+                m_isFullscreen = !m_isFullscreen;
+                if (m_isFullscreen)
+                    m_window.create(sf::VideoMode::getDesktopMode(), "Dungeon and Stone", sf::Style::None);
+                else
+                    m_window.create(sf::VideoMode({WINDOW_W, WINDOW_H}), "Dungeon and Stone", sf::Style::Titlebar | sf::Style::Close);
+                m_window.setFramerateLimit(60);
+                applyLetterbox();
+                return;
+            }
             if (m_playerDead)
             {
                 if (key->code==sf::Keyboard::Key::R)      newDungeon(false);
@@ -848,7 +914,7 @@ void Game::processEvents()
                 return;
             }
 
-            if (m_targetingMode)
+            if (m_ui.targeting.active)
             {
                 switch(key->code)
                 {
@@ -907,36 +973,49 @@ void Game::processEvents()
                 case sf::Keyboard::Key::G:  tryPickupItem();          break;
                 case sf::Keyboard::Key::D:  dropSelectedItem();       break;
                 case sf::Keyboard::Key::E:
-                    m_viewEquipment=!m_viewEquipment; m_viewCores=false;
-                    addLog(m_viewEquipment?"> Equipment view":"> Inventory view",sf::Color(160,160,160));
+                    m_ui.togglePanel(UIState::Panel::Equipment);
+                    break;
+                case sf::Keyboard::Key::M:
+                    if (m_ui.activePanel == UIState::Panel::Stats)
+                        m_ui.activePanel = UIState::Panel::Inventory;
+                    else
+                        m_ui.activePanel = UIState::Panel::Stats;
                     break;
                 case sf::Keyboard::Key::C:
-                    m_viewCores=!m_viewCores; m_viewEquipment=false;
-                    addLog(m_viewCores?"> Core Slots view":"> Inventory view",sf::Color(100,200,255));
+                    m_ui.togglePanel(UIState::Panel::Cores);
                     break;
                 case sf::Keyboard::Key::LBracket:
-                    if (m_viewCores&&m_selectedCoreSlot>0) m_selectedCoreSlot--;
-                    else if (m_viewEquipment&&m_selectedEquipSlot>0) m_selectedEquipSlot--;
+                    if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot > 0)
+                        m_ui.selectedCoreSlot--;
+                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot > 0)
+                        m_ui.selectedEquipSlot--;
                     break;
                 case sf::Keyboard::Key::RBracket:
-                    if (m_viewCores&&m_selectedCoreSlot<m_coreSlots.getSlotCount()-1) m_selectedCoreSlot++;
-                    else if (m_viewEquipment&&m_selectedEquipSlot<6) m_selectedEquipSlot++;
-                    break;
-                case sf::Keyboard::Key::X:
-                    if (m_viewCores) unequipCore();
-                    else if (m_viewEquipment) unequipSelected();
+                    if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot < m_coreSlots.getSlotCount()-1)
+                        m_ui.selectedCoreSlot++;
+                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot < 6)
+                        m_ui.selectedEquipSlot++;
                     break;
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
                 case sf::Keyboard::Key::Space:  waitTurn();         break;
+                case sf::Keyboard::Key::X:
+                    if (m_ui.isPanelOpen(UIState::Panel::Cores))
+                        unequipCore();
+                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment))
+                        unequipSelected();
+                    break;
                 case sf::Keyboard::Key::Enter:
-                    if(m_viewCores) equipCore();
-                    else if(m_viewEquipment) unequipSelected();
-                    else useOrEquipSelected();
+                    if (m_ui.isPanelOpen(UIState::Panel::Cores))
+                        equipCore();
+                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment))
+                        unequipSelected();
+                    else
+                        useOrEquipSelected();
                     break;
                 case sf::Keyboard::Key::Tab:
-                    m_selectedSlot=(m_selectedSlot+1)%MAX_INVENTORY; break;
-                default: break;
+                    m_ui.selectedInvSlot = (m_ui.selectedInvSlot + 1) % MAX_INVENTORY;
+                    break;
             }
         }
     }
@@ -951,14 +1030,13 @@ void Game::tryDescendStairs()
 {
     if (!m_player) return;
     if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::GateDown)
-    {addLog("> No gate here.");return;}
+    {addLog("  No gate here.");return;}
     m_dungeonFloor++;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
     auto savedHotbar = std::vector<std::string>();
     for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
     newDungeon(true);
-    // เกิดหน้า GateUp (ทางกลับ)
     if (m_player)
     {
         for (int row=1;row<m_mapRows-1;++row)
@@ -970,22 +1048,21 @@ void Game::tryDescendStairs()
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
     }
-    addLog("> Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,220,50));
+    addLog("  Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,220,50));
 }
 
 void Game::tryAscendStairs()
 {
     if (!m_player) return;
     if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::GateUp)
-    {addLog("> No gate here.");return;}
-    if (m_dungeonFloor<=1){addLog("> Already on floor 1.");return;}
+    {addLog("  No gate here.");return;}
+    if (m_dungeonFloor<=1){addLog("  Already on floor 1.");return;}
     m_dungeonFloor--;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
     auto savedHotbar = std::vector<std::string>();
     for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
     newDungeon(true);
-    // เกิดหน้า GateDown (ทางไปต่อ)
     if (m_player)
     {
         for (int row=1;row<m_mapRows-1;++row)
@@ -997,16 +1074,26 @@ void Game::tryAscendStairs()
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
     }
-    addLog("> Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(100,220,255));
+    addLog("  Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(100,220,255));
 }
 
 void Game::waitTurn()
 {
     if (!m_player) return;
+
+    int pc = m_player->getCol(), pr = m_player->getRow();
+    for (auto* e : m_enemies)
+    {
+        if (m_fog.isVisible(e->getCol(), e->getRow()))
+        {
+            addLog("  Can't wait - enemy in sight!", sf::Color(220, 80, 80));
+            return;
+        }
+    }
     m_turnCount++; m_player->onTurnPassed();
     processTurn(); tryRespawnEnemies();
     m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
-    addLog("> You wait.",sf::Color(140,140,140));
+    addLog("  You wait.",sf::Color(140,140,140));
 }
 
 // ============================================================
@@ -1019,34 +1106,34 @@ void Game::tryPickupItem()
     for (int i=0;i<(int)m_mapItems.size();++i)
         if (m_mapItems[i].col==pc&&m_mapItems[i].row==pr)
         {
-            if (m_inventory.isFull()){addLog("> Inventory full!",sf::Color(220,120,50));return;}
+            if (m_inventory.isFull()){addLog("  Inventory full!",sf::Color(220,120,50));return;}
             Item item=m_mapItems[i]; item.col=-1; item.row=-1;
             m_inventory.addItem(item);
             m_mapItems.erase(m_mapItems.begin()+i);
-            addLog("> Picked up: "+item.name,sf::Color(180,220,100));
+            addLog("  Picked up: "+item.name,sf::Color(180,220,100));
             return;
         }
-    addLog("> Nothing here.");
+    addLog("  Nothing here.");
 }
 
 void Game::useOrEquipSelected()
 {
-    Item* item=m_inventory.getItem(m_selectedSlot);
+    Item* item = m_inventory.getItem(m_ui.selectedInvSlot);
     if (!item||!m_player) return;
     Stats& s=m_player->getStats();
     if (item->isUsable())
     {
         if(item->type==ItemType::Food)
         {s.hunger=std::min(100,s.hunger+item->value);
-         addLog("> Ate "+item->name+". Hunger +"+std::to_string(item->value),sf::Color(200,180,80));}
+         addLog("  Ate "+item->name+". Hunger +"+std::to_string(item->value),sf::Color(200,180,80));}
         else
         {s.hp=std::min(s.maxHp,s.hp+item->value);
-         if(s.hp>0&&s.hpDepleted){s.hpDepleted=false;addLog("> HP recovered",sf::Color(100,220,180));}
-         addLog("> Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(80,180,220));}
-        m_inventory.removeItem(m_selectedSlot);
+         if(s.hp>0&&s.hpDepleted){s.hpDepleted=false;addLog("  HP recovered",sf::Color(100,220,180));}
+         addLog("  Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(80,180,220));}
+        m_inventory.removeItem(m_ui.selectedInvSlot);
     }
     else if (item->isCore()) equipCore();
-    else if (item->isMaterial()) addLog("> "+item->name+" is a trade item.",sf::Color(160,160,160));
+    else if (item->isMaterial()) addLog("  "+item->name+" is a trade item.",sf::Color(160,160,160));
     else if (item->isEquipment())
     {
         EquipSlot slot=Equipment::itemToSlot(*item);
@@ -1054,15 +1141,16 @@ void Game::useOrEquipSelected()
         {
             Item old=m_equipment.unequip(slot);
             if (!m_inventory.isFull()) m_inventory.addItem(old);
-            else{addLog("> Inventory full!",sf::Color(220,120,50));return;}
+            else{addLog("  Inventory full!",sf::Color(220,120,50));return;}
         }
         Item toEquip=*item;
-        m_inventory.removeItem(m_selectedSlot);
+        m_inventory.removeItem(m_ui.selectedInvSlot);
         m_equipment.equip(toEquip,slot);
-        addLog("> Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
+        addLog("  Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
                std::to_string(toEquip.value),sf::Color(180,220,180));
         
         refreshStats();
+        recalcAP();
     }
 }
 
@@ -1074,79 +1162,79 @@ void Game::unequipSelected()
         EquipSlot::Legs, EquipSlot::Feet,
         EquipSlot::MainHand, EquipSlot::OffHand
     };
-    if (m_selectedEquipSlot < 0 || m_selectedEquipSlot >= 7) return;
-    EquipSlot slot = slots[m_selectedEquipSlot];
-    if (!m_equipment.hasItem(slot)) { addLog("> Nothing to unequip."); return; }
-    if (m_inventory.isFull()) { addLog("> Inventory full!"); return; }
+    if (m_ui.selectedEquipSlot < 0 || m_ui.selectedEquipSlot >= 7) return;
+    EquipSlot slot = slots[m_ui.selectedEquipSlot];
+    if (!m_equipment.hasItem(slot)) { addLog("  Nothing to unequip."); return; }
+    if (m_inventory.isFull()) { addLog("  Inventory full!"); return; }
     Item item = m_equipment.unequip(slot);
     m_inventory.addItem(item);
-    addLog("> Unequipped "+item.name, sf::Color(180,180,180));
+    addLog("  Unequipped "+item.name, sf::Color(180,180,180));
     refreshStats();
+    recalcAP();
 }
 
 void Game::equipCore()
 {
-    Item* item=m_inventory.getItem(m_selectedSlot);
-    if (!item||!item->isCore()){addLog("> Not a core item!");return;}
+    Item* item = m_inventory.getItem(m_ui.selectedInvSlot);
+    if (!item||!item->isCore()){addLog("  Not a core item!");return;}
     int freeSlot=-1;
     for (int i=0;i<m_coreSlots.getSlotCount();++i)
         if (!m_coreSlots.hasCore(i)){freeSlot=i;break;}
-    if (freeSlot==-1){addLog("> All core slots full!",sf::Color(220,120,50));return;}
+    if (freeSlot==-1){addLog("  All core slots full!",sf::Color(220,120,50));return;}
     Item core=*item;
-    m_inventory.removeItem(m_selectedSlot);
+    m_inventory.removeItem(m_ui.selectedInvSlot);
     m_coreSlots.equip(freeSlot,core);
-    addLog("> Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),sf::Color(100,200,255));
+    addLog("  Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),sf::Color(100,200,255));
 
     const ItemData* idata = DropTable::instance().getItem(core.id);
     if (idata)
         for (const auto& skillId : idata->coreSkills)
         {
             if (m_player->addCoreSkill(skillId))
-                addLog("> Skill unlocked: "+skillId, sf::Color(100,220,255));
+                addLog("  Skill unlocked: "+skillId, sf::Color(100,220,255));
             else
-                addLog("> Hotbar full — "+skillId+" not assigned", sf::Color(180,120,50));
+                addLog("  Hotbar full — "+skillId+" not assigned", sf::Color(180,120,50));
         }
-    // นับเฉพาะ fromCore == true
-int abilityCount = 0;
-for (const auto& sk : m_player->getSkills())
-    if (sk.fromCore) abilityCount++;
-m_player->getStats().ability = abilityCount;
-refreshStats();
+    int abilityCount = 0;
+    for (const auto& sk : m_player->getSkills())
+        if (sk.fromCore) abilityCount++;
+    m_player->getStats().ability = abilityCount;
+    refreshStats();
+    recalcAP();
 }
 
 void Game::unequipCore()
 {
-    if (!m_coreSlots.hasCore(m_selectedCoreSlot))
-    {addLog("> No core in slot "+std::to_string(m_selectedCoreSlot+1));return;}
-    if (m_inventory.isFull()){addLog("> Inventory full!");return;}
-    Item core=m_coreSlots.unequip(m_selectedCoreSlot);
+    if (!m_coreSlots.hasCore(m_ui.selectedCoreSlot))
+    {addLog("  No core in slot "+std::to_string(m_ui.selectedCoreSlot+1));return;}
+    if (m_inventory.isFull()){addLog("  Inventory full!");return;}
+    Item core=m_coreSlots.unequip(m_ui.selectedCoreSlot);
     m_inventory.addItem(core);
-    addLog("> Removed "+core.name+" from core slot "+std::to_string(m_selectedCoreSlot+1),sf::Color(160,160,160));
+    addLog("  Removed "+core.name+" from core slot "+std::to_string(m_ui.selectedCoreSlot+1),sf::Color(160,160,160));
 
     const ItemData* idata = DropTable::instance().getItem(core.id);
     if (idata)
         for (const auto& skillId : idata->coreSkills)
         {
             m_player->removeCoreSkill(skillId);
-            addLog("> Skill lost: "+skillId, sf::Color(160,100,100));
+            addLog("  Skill lost: "+skillId, sf::Color(160,100,100));
         }
-    // นับเฉพาะ fromCore == true
-int abilityCount = 0;
-for (const auto& sk : m_player->getSkills())
-    if (sk.fromCore) abilityCount++;
-m_player->getStats().ability = abilityCount;
-
-refreshStats();
+    int abilityCount = 0;
+    for (const auto& sk : m_player->getSkills())
+        if (sk.fromCore) abilityCount++;
+    m_player->getStats().ability = abilityCount;
+    refreshStats();
+    recalcAP();
 }
 
 void Game::dropSelectedItem()
 {
-    Item* item=m_inventory.getItem(m_selectedSlot);
+    Item* item = m_inventory.getItem(m_ui.selectedInvSlot);
     if (!item||!m_player) return;
     Item d=*item; d.col=m_player->getCol(); d.row=m_player->getRow();
     m_mapItems.push_back(d);
-    addLog("> Dropped: "+d.name,sf::Color(160,160,160));
-    m_inventory.removeItem(m_selectedSlot);
+    addLog("  Dropped: "+d.name,sf::Color(160,160,160));
+    m_inventory.removeItem(m_ui.selectedInvSlot);
 }
 
 // ============================================================
@@ -1173,9 +1261,15 @@ void Game::handlePlayerMove(int dc, int dr)
         }
 
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
-    if (!moved){addLog("> Blocked!");return;}
+    if (!moved) return;
 
-    m_player->getStats().currentAP--;
+    Stats& ms = m_player->getStats();
+    ms.moveAPAccum += ms.moveSpeedCost;
+    while (ms.moveAPAccum >= 100)
+    {
+        ms.moveAPAccum -= 100;
+        ms.currentAP--;
+    }
 
     m_turnCount++; m_player->onTurnPassed();
     m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
@@ -1189,23 +1283,22 @@ void Game::handlePlayerMove(int dc, int dr)
     int pc=m_player->getCol(),pr=m_player->getRow();
     for (auto& it:m_mapItems)
         if (it.col==pc&&it.row==pr)
-        {addLog("> "+it.name+" here. [G] pick up.",sf::Color(200,200,80));break;}
+        {addLog("  "+it.name+" here. [G] pick up.",sf::Color(200,200,80));break;}
 
     TileType tile=m_tileMap.getTile(pc,pr);
-    if (tile==TileType::GateDown) addLog("> Gate ahead! [.] enter.",sf::Color(255,220,50));
-    if (tile==TileType::GateUp)   addLog("> Gate! [,] return.",  sf::Color(100,220,255));
+    if (tile==TileType::GateDown) addLog("  Gate ahead! [.] enter.",sf::Color(255,220,50));
+    if (tile==TileType::GateUp)   addLog("  Gate! [,] return.",  sf::Color(100,220,255));
 
     int hunger=m_player->getStats().hunger;
-    if(hunger==50) addLog("> You feel hungry.",      sf::Color(220,180,50));
-    if(hunger==20) addLog("> Very hungry!",          sf::Color(220,100,50));
-    if(hunger== 0) addLog("> Starving! HP draining!",sf::Color(220,50,50));
+    if(hunger==50) addLog("  You feel hungry.",      sf::Color(220,180,50));
+    if(hunger==20) addLog("  Very hungry!",          sf::Color(220,100,50));
+    if(hunger== 0) addLog("  Starving! HP draining!",sf::Color(220,50,50));
 }
 
 void Game::playerAttack(Enemy* enemy)
 {
     if (!m_player) return;
     int atk=getBuffedAtk();
-    int magicDmg=getBuffedMagicDmg();
     int dmg=std::max(1,atk+std::rand()%4-enemy->getDefense());
     enemy->takeDamage(dmg);
 
@@ -1214,7 +1307,7 @@ void Game::playerAttack(Enemy* enemy)
         if (sk.buffActive && sk.data.type == SkillType::ActiveBuff && sk.data.effect.atkPct > 0)
             powered = true;
 
-    std::string msg="> You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!";
+    std::string msg="  You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!";
     if (powered) msg+=" [POWERED]";
     addLog(msg,sf::Color(255,200,50));
 
@@ -1228,7 +1321,7 @@ void Game::playerAttack(Enemy* enemy)
 
     if (enemy->isDead())
     {
-        addLog("> "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
+        addLog("  "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
         auto dropped=DropTable::instance().roll(enemy->getId());
         for (const auto& itemId:dropped)
         {
@@ -1241,18 +1334,21 @@ void Game::playerAttack(Enemy* enemy)
             drop.hpBonus=idata->hpBonus; drop.atkBonus=idata->atkBonus;
             drop.defBonus=idata->defBonus; drop.dodgeBonus=idata->dodgeBonus;
             drop.manaBonus=idata->manaBonus; drop.magicDmgBonus=idata->magicDmgBonus;
-            drop.magicResBonus=idata->magicResBonus;
+            drop.magicResBonus=idata->magicResBonus; drop.spdBonus=idata->spdBonus;
             drop.spriteName=idata->sprite; drop.stackable=idata->stackable;
             drop.col=enemy->getCol(); drop.row=enemy->getRow();
             m_mapItems.push_back(drop);
-            addLog("> Dropped: "+idata->name,sf::Color(180,220,255));
+            addLog("  Dropped: "+idata->name,sf::Color(180,220,255));
         }
         if (m_player->addExp(enemy->getExp()))
         {
-            m_levelUpFlash=true; m_levelUpTimer=120;
+            m_ui.levelUpFlash = true;
+            m_ui.levelUpTimer = 120;
             int lv=m_player->getStats().level;
             m_coreSlots.setSlotCount(lv);
-            addLog("> *** LEVEL UP! Level "+std::to_string(lv)+" ***",sf::Color(255,255,50));
+            refreshStats();
+            recalcAP();
+            addLog("  *** LEVEL UP! Level "+std::to_string(lv)+" ***",sf::Color(255,255,50));
         }
         onEnemyKilled(enemy);
     }
@@ -1266,27 +1362,25 @@ void Game::enemyAttack(Enemy* enemy)
     int dodge=s.maxDodge+m_equipment.getTotalDodgeBonus();
     float dodgeChance=std::min(0.45f,0.06f+dodge*0.05f);
     if ((std::rand()%100)<(int)(dodgeChance*100))
-    {addLog("> You dodged "+enemy->getName()+"!",sf::Color(150,220,150));return;}
+    {addLog("  You dodged "+enemy->getName()+"!",sf::Color(150,220,150));return;}
     int dmg=std::max(1,enemy->getAttack()-def+std::rand()%3);
     s.hp-=dmg;
-    addLog("> "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(220,80,80));
+    addLog("  "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(220,80,80));
     if (s.hp<=0)
     {
         s.hp=0;
         if (!s.hpDepleted)
         {
             s.hpDepleted=true;
-            addLog("> WARNING: HP depleted - Mentality drain starts!",sf::Color(255,120,50));
-            addLog("> Mentality -3/turn until recovered",sf::Color(220,100,200));
+            addLog("  WARNING: HP depleted - Mentality drain starts!",sf::Color(255,120,50));
+            addLog("  Mentality -3/turn until recovered",sf::Color(220,100,200));
         }
     }
 }
 
-// ================================================================
-//  PATCH — Game.cpp  processTurn()
-//  แทนที่ฟังก์ชัน processTurn() เดิมทั้งหมดด้วยอันนี้
-// ================================================================
-
+// ============================================================
+//  processTurn – จัดการเทิร์นของศัตรู
+// ============================================================
 void Game::processTurn()
 {
     if (!m_player) return;
@@ -1307,15 +1401,12 @@ void Game::processTurn()
 
         if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
         {
-            // ติดกัน → โจมตีโดยตรง
             enemyAttack(e);
         }
         else
         {
-            // ให้ AI เดิน (อาจ queue pending skill)
             e->updateAI(pc, pr, m_tileMap, m_enemies);
 
-            // ── จัดการ pending skill ที่ enemy queue ไว้ ──
             if (e->hasPendingSkill())
             {
                 auto ps = e->consumePendingSkill();
@@ -1324,7 +1415,6 @@ void Game::processTurn()
 
                 if (sk->data.type == SkillType::ActiveRanged)
                 {
-                    // ยิง projectile ตรงไปที่ player (ถ้าไม่มีกำแพงขวาง)
                     int dmg = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
                     auto line = getLine(e->getCol(), e->getRow(), ps.targetCol, ps.targetRow);
                     bool blocked = false;
@@ -1334,12 +1424,11 @@ void Game::processTurn()
                         { blocked = true; break; }
                         if (line[i].x == pc && line[i].y == pr)
                         {
-                            // โดน player
                             Stats& s = m_player->getStats();
                             int def = getBuffedDef();
                             int actualDmg = std::max(1, dmg - def);
                             s.hp -= actualDmg;
-                            addLog("> " + e->getName() + " uses " + sk->data.name +
+                            addLog("  " + e->getName() + " uses " + sk->data.name +
                                    " → " + std::to_string(actualDmg) + " dmg!",
                                    sf::Color(220, 100, 80));
                             if (s.hp <= 0) { s.hp = 0; s.hpDepleted = true; }
@@ -1347,12 +1436,11 @@ void Game::processTurn()
                         }
                     }
                     if (blocked)
-                        addLog("> " + e->getName() + "'s " + sk->data.name + " was blocked.",
+                        addLog("  " + e->getName() + "'s " + sk->data.name + " was blocked.",
                                sf::Color(120, 120, 120));
                 }
                 else if (sk->data.type == SkillType::ActiveAoe)
                 {
-                    // AoE รอบตัว enemy
                     int radius = sk->data.effect.aoeRadius;
                     int dmg    = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
                     int dxP = pc - e->getCol(), dyP = pr - e->getRow();
@@ -1362,57 +1450,25 @@ void Game::processTurn()
                         int def = getBuffedDef();
                         int actualDmg = std::max(1, dmg - def);
                         s.hp -= actualDmg;
-                        addLog("> " + e->getName() + " uses " + sk->data.name +
+                        addLog("  " + e->getName() + " uses " + sk->data.name +
                                " → " + std::to_string(actualDmg) + " dmg!",
                                sf::Color(220, 100, 80));
                         if (s.hp <= 0) { s.hp = 0; s.hpDepleted = true; }
                     }
                 }
-                // ActiveBuff — ถูกจัดการใน updateAI() แล้ว (ไม่ต้อง queue)
             }
         }
-
-        // tick cooldowns ของ enemy ทุก turn
         e->tickSkills();
     }
 
-    // ลบ enemy ที่ตาย
     m_enemies.erase(
         std::remove_if(m_enemies.begin(), m_enemies.end(),
             [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
         m_enemies.end());
 }
 
-void Game::refreshStats()
-{
-    if (!m_player) return;
-    Stats& s = m_player->getStats();
-
-    int newBody      = computeBody();
-    int newMentality = computeMentality();
-    int newBattle    = computeBattleIndex();
-
-    int db = newBody      - s.body;
-    int dm = newMentality - s.maxMentality;
-    int di = newBattle    - s.battleIndex;
-
-    s.body         = newBody;
-    s.maxMentality = newMentality;
-    s.mentality    = std::min(s.mentality, s.maxMentality);
-    s.itemLevel    = getItemLevelTotal();
-    s.battleIndex  = newBattle;
-
-    if (db!=0 || dm!=0 || di!=0)
-    {
-        m_deltaBody        += db;
-        m_deltaMentality   += dm;
-        m_deltaBattleIndex += di;
-        m_deltaTimer       = 180;
-    }
-}
-
 // ============================================================
-//  Render
+//  Render – ฟังก์ชันวาดทั้งหมด
 // ============================================================
 void Game::render()
 {
@@ -1425,14 +1481,15 @@ void Game::render()
     if (m_player) m_player->render(m_window);
     m_fog.render(m_window,TILE_SIZE);
 
-    if (m_targetingMode) renderTargeting();
+    if (m_ui.targeting.active) renderTargeting();
 
     m_window.setView(m_uiView);
     renderStatusPanel();
     renderRightPanel();
     renderLogPanel();
+    if (m_ui.activePanel == UIState::Panel::Stats) renderStatsOverlay();
     renderHotbar();
-    if (m_levelUpFlash) renderLevelUpEffect();
+    if (m_ui.levelUpFlash) renderLevelUpEffect();
     m_window.display();
 }
 
@@ -1443,12 +1500,12 @@ void Game::renderHotbar()
 {
     if (!m_player || !m_fontLoaded) return;
 
-    const float SZ  = 32.f;
+    const float SZ  = 22.f;
     const float GAP = 4.f;
     const int   N   = 9;
     float totalW = N * (SZ + GAP) - GAP;
-    float startX = ((float)GAME_VIEW_W - totalW) / 2.f;
-    float startY = (float)GAME_VIEW_H - SZ - 8.f;
+    float startX = 8.f;
+    float startY = 568.f;
 
     for (int i = 0; i < N; ++i)
     {
@@ -1457,9 +1514,9 @@ void Game::renderHotbar()
         const SkillInstance* sk = id.empty() ? nullptr : m_player->findSkill(id);
 
         sf::RectangleShape slot({SZ, SZ});
-        slot.setFillColor(sf::Color(10, 10, 10, 200));
-        slot.setOutlineColor(sf::Color(80, 70, 50));
-        slot.setOutlineThickness(1.5f);
+        slot.setFillColor(sf::Color(8, 8, 8, 200));
+        slot.setOutlineColor(sf::Color(120, 120, 120));
+        slot.setOutlineThickness(1.f);
         slot.setPosition({sx, startY});
         m_window.draw(slot);
 
@@ -1508,16 +1565,15 @@ void Game::renderHotbar()
 // ============================================================
 void Game::renderTargeting()
 {
-    if (!m_player) return;
-
+    if (!m_ui.targeting.active) return;
     int pc = m_player->getCol();
     int pr = m_player->getRow();
     float ts = (float)TILE_SIZE;
 
-    SkillInstance* sk = m_player->findSkill(m_targetSkillId);
+    SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     int maxRange = sk ? sk->data.effect.range : 6;
 
-    auto line = getLine(pc, pr, m_targetCol, m_targetRow);
+    auto line = getLine(pc, pr, m_ui.targeting.targetCol, m_ui.targeting.targetRow);
 
     bool blocked = false;
     for (int i = 1; i < (int)line.size(); ++i)
@@ -1563,10 +1619,10 @@ void Game::renderTargeting()
     }
 
     {
-        float cpx = m_targetCol * ts;
-        float cpy = m_targetRow * ts;
+        float cpx = m_ui.targeting.targetCol * ts;
+        float cpy = m_ui.targeting.targetRow * ts;
 
-        int ddx = m_targetCol-pc, ddy = m_targetRow-pr;
+        int ddx = m_ui.targeting.targetCol - pc, ddy = m_ui.targeting.targetRow - pr;
         float dist = std::sqrt((float)(ddx*ddx+ddy*ddy));
         bool cursorBlocked = blocked || dist > maxRange;
 
@@ -1595,7 +1651,7 @@ void Game::renderTargeting()
         {
             for (auto* e : m_enemies)
             {
-                if (!e->isDead() && e->getCol()==m_targetCol && e->getRow()==m_targetRow)
+                if (!e->isDead() && e->getCol()==m_ui.targeting.targetCol && e->getRow()==m_ui.targeting.targetRow)
                 {
                     sf::Text nameTag(m_font, e->getName(), 9);
                     nameTag.setFillColor(sf::Color(255,180,180));
@@ -1644,7 +1700,7 @@ void Game::renderItems()
 
 void Game::renderLevelUpEffect()
 {
-    float alpha=std::min(180.f,(float)m_levelUpTimer*1.5f);
+    float alpha=std::min(180.f,(float)m_ui.levelUpTimer*1.5f);
     sf::RectangleShape flash({(float)GAME_VIEW_W,(float)GAME_VIEW_H});
     flash.setFillColor(sf::Color(255,220,0,(uint8_t)alpha));
     flash.setPosition({0.f,0.f}); m_window.draw(flash);
@@ -1694,57 +1750,101 @@ void Game::renderSkillPanel()
 // ============================================================
 void Game::renderStatusPanel()
 {
-    float px=(float)(WINDOW_W-RIGHT_PANEL_W);
-    sf::RectangleShape panel({(float)RIGHT_PANEL_W,(float)STATUS_PANEL_H});
+    float px = (float)(WINDOW_W - RIGHT_PANEL_W);
+    sf::RectangleShape panel({(float)RIGHT_PANEL_W, (float)STATUS_PANEL_H});
     panel.setFillColor(sf::Color(8,8,8));
-    panel.setPosition({px,0.f});
-    panel.setOutlineColor(sf::Color(80,60,40));
+    panel.setPosition({px, 0.f});
+    panel.setOutlineColor(sf::Color(120, 120, 120));
     panel.setOutlineThickness(1.f);
     m_window.draw(panel);
 
-    if (!m_fontLoaded||!m_player) return;
-    const Stats& s=m_player->getStats();
-    float x=px+15.f, y=(float)STATUS_PANEL_TOP_PADDING;
+    if (!m_fontLoaded || !m_player) return;
+    const Stats& s = m_player->getStats();
+    float x = px + 15.f, y = (float)STATUS_PANEL_TOP_PADDING;
 
-    auto drawLine=[&](const std::string& label,const std::string& value,
-                      sf::Color color=sf::Color::White,int size=STATUS_LINE_SIZE)
-    {
-        sf::Text t(m_font,label+" "+value,(unsigned int)size);
-        t.setFillColor(color); t.setPosition({x,y}); m_window.draw(t);
-        y+=size+STATUS_LINE_SPACING;
+    auto drawLine = [&](const std::string& label, const std::string& value,
+                        sf::Color color = sf::Color::White, int size = STATUS_LINE_SIZE) {
+        sf::Text t(m_font, label + " " + value, (unsigned int)size);
+        t.setFillColor(color);
+        t.setPosition({x, y});
+        m_window.draw(t);
+        y += size + STATUS_LINE_SPACING;
     };
 
-    {sf::Text h(m_font,"player 1",STATUS_HEADER_SIZE);
-     h.setPosition({x,y});m_window.draw(h);
-     y+=STATUS_HEADER_SIZE+STATUS_HEADER_SPACING;}
+    {
+        sf::Text h(m_font, "player 1", STATUS_HEADER_SIZE);
+        h.setPosition({x, y});
+        m_window.draw(h);
+        y += STATUS_HEADER_SIZE + STATUS_HEADER_SPACING;
+    }
 
-    // เพิ่ม lambda ก่อน drawLine ของ body
     auto deltaStr = [](int d) -> std::string {
         if (d == 0) return "";
-        return d > 0 ? " (NEW+"+std::to_string(d)+")" : " (NEW"+std::to_string(d)+")";
+        return d > 0 ? " (NEW+" + std::to_string(d) + ")" : " (NEW" + std::to_string(d) + ")";
     };
     bool showDelta = m_deltaTimer > 0;
     sf::Color deltaColor = sf::Color(100,255,150);
 
-    drawLine("level:",     std::to_string(s.level));
-    drawLine("body:",      std::to_string(s.body) +
-        (showDelta && m_deltaBody!=0 ? deltaStr(m_deltaBody) : ""),
-        showDelta && m_deltaBody!=0 ? deltaColor : sf::Color::White);
-    drawLine("mentality:", std::to_string(s.maxMentality) +
-        (showDelta && m_deltaMentality!=0 ? deltaStr(m_deltaMentality) : ""),
-        showDelta && m_deltaMentality!=0 ? deltaColor : sf::Color::White);
-    drawLine("ability:",   std::to_string(s.ability));
-    drawLine("item level:",std::to_string(s.itemLevel));
-    drawLine("Comprehensive Battle", "");
-    drawLine("Index:",     std::to_string(s.battleIndex) +
-        (showDelta && m_deltaBattleIndex!=0 ? deltaStr(m_deltaBattleIndex) : ""),
-        showDelta && m_deltaBattleIndex!=0 ? deltaColor : sf::Color::White);
-        
-    std::string apStr = "AP: "+std::to_string(s.currentAP)+"/"+std::to_string(s.maxAP);
-    sf::Color apColor = s.currentAP > 0 ? sf::Color(100,200,255) : sf::Color(100,100,100);
-    drawLine("", apStr, apColor);
+    drawLine("level:", std::to_string(s.level));
+    char biStr[16];
+    std::snprintf(biStr, sizeof(biStr), "%.1f", m_finalStats.body);
+    drawLine("body:", std::string(biStr) + (showDelta && m_deltaBody != 0 ? deltaStr(m_deltaBody) : ""));
+    std::snprintf(biStr, sizeof(biStr), "%.1f", m_finalStats.mentality);
+    drawLine("mentality:", std::string(biStr) + (showDelta && m_deltaMentality != 0 ? deltaStr(m_deltaMentality) : ""));
+    drawLine("ability:", std::to_string(s.ability));
+    drawLine("item level:", std::to_string(m_finalStats.itemLevel));
+    drawLine("Comprehensive Battle Index", "");
+    // หา drawLine("Index:", ...) แล้วเปลี่ยนเป็น
+    std::snprintf(biStr, sizeof(biStr), "%.1f", m_finalStats.battleIndex);
+    drawLine(":", std::string(biStr) + (showDelta && m_deltaBattleIndex != 0 ? deltaStr(m_deltaBattleIndex) : ""));
 
     renderSkillPanel();
+}
+//showDelta && m_deltaBattleIndex != 0 ? deltaStr(m_deltaBattleIndex) : ""));
+void Game::renderStatsOverlay()
+{
+    if (!m_player || !m_fontLoaded) return;
+    const Stats& s = m_player->getStats();
+
+    sf::RectangleShape dim({(float)WINDOW_W, (float)WINDOW_H});
+    dim.setFillColor(sf::Color(0,0,0,180));
+    m_window.draw(dim);
+
+    float pw = 300.f, ph = 350.f;
+    float px = (WINDOW_W - pw) / 2.f;
+    float py = (WINDOW_H - ph) / 2.f;
+    sf::RectangleShape panel({pw, ph});
+    panel.setFillColor(sf::Color(12,12,18));
+    panel.setOutlineColor(sf::Color(120, 120, 120));
+    panel.setOutlineThickness(1.f);
+    panel.setPosition({px, py});
+    m_window.draw(panel);
+
+    float x = px + 20.f, y = py + 16.f;
+    int sz = 11;
+
+    auto line = [&](const std::string& label, const std::string& val, sf::Color col = sf::Color(200,200,200)) {
+        sf::Text t(m_font, label + val, sz);
+        t.setFillColor(col);
+        t.setPosition({x, y});
+        m_window.draw(t);
+        y += sz + 8.f;
+    };
+
+    line("Level:       ", std::to_string(s.level));
+    line("HP:          ", std::to_string(s.hp) + "/" + std::to_string(m_finalStats.maxHp));
+    line("ATK:         ", std::to_string(m_finalStats.atk));
+    line("DEF:         ", std::to_string(m_finalStats.def));
+    line("Dodge:       ", std::to_string(m_finalStats.dodge));
+    line("AP:          ", std::to_string(s.currentAP) + "/" + std::to_string(s.maxAP));
+    std::string spdStr = (m_finalStats.spd >= 0 ? "+" : "") + std::to_string(m_finalStats.spd);
+    line("Speed:       ", spdStr, m_finalStats.spd > 0 ? sf::Color(100,255,150) : (m_finalStats.spd < 0 ? sf::Color(255,100,100) : sf::Color(200,200,200)));
+    line("Move Cost:   ", std::to_string(s.moveSpeedCost) + "%");
+    line("Mana:        ", std::to_string(s.mana) + "/" + std::to_string(m_finalStats.maxMana));
+    line("MATK:        ", std::to_string(m_finalStats.matk));
+    line("MDEF:        ", std::to_string(m_finalStats.mdef));
+    line("Hunger:      ", std::to_string(s.hunger) + "/100");
+    line("EXP:         ", std::to_string(s.exp) + "/" + std::to_string(s.expToNext));
 }
 
 // ============================================================
@@ -1752,117 +1852,172 @@ void Game::renderStatusPanel()
 // ============================================================
 void Game::renderRightPanel()
 {
-    float panelX=(float)(WINDOW_W-RIGHT_PANEL_W);
-    float panelY=(float)STATUS_PANEL_H;
+    float panelX = (float)(WINDOW_W - RIGHT_PANEL_W);
+    float panelY = (float)STATUS_PANEL_H;
 
-    sf::RectangleShape panel({(float)RIGHT_PANEL_W,(float)INV_GRID_H});
-    panel.setFillColor(sf::Color(8,8,8));
-    panel.setPosition({panelX,panelY});
-    panel.setOutlineColor(sf::Color(80,60,40));
+    sf::RectangleShape panel({(float)RIGHT_PANEL_W, (float)INV_GRID_H});
+    panel.setFillColor(sf::Color(8, 8, 8));
+    panel.setPosition({panelX, panelY});
+    panel.setOutlineColor(sf::Color(120, 120, 120));
     panel.setOutlineThickness(0.f);
     m_window.draw(panel);
+
     sf::Vertex leftLine[2];
     leftLine[0].position = sf::Vector2f(panelX, panelY);
-    leftLine[0].color = sf::Color(80,60,40);
+    leftLine[0].color = sf::Color(120, 120, 120);
     leftLine[1].position = sf::Vector2f(panelX, panelY + 250.f);
-    leftLine[1].color = sf::Color(80,60,40);
+    leftLine[1].color = sf::Color(120, 120, 120);
     m_window.draw(leftLine, 2, sf::PrimitiveType::Lines);
+
     if (!m_fontLoaded) return;
 
-    if (!m_viewEquipment&&!m_viewCores)
+    switch (m_ui.activePanel)
     {
-        const int COLS=5,ROWS=4;
-        const float SZ=35.f,GAP=4.f;
-        float sx0=panelX+(RIGHT_PANEL_W-(COLS*(SZ+GAP)-GAP))/2.f;
-        float sy0=panelY+10.f;
-
-        for (int row=0;row<ROWS;++row)
-        for (int col=0;col<COLS;++col)
+        case UIState::Panel::Inventory:
         {
-            int idx=row*COLS+col;
-            float sx=sx0+col*(SZ+GAP),sy=sy0+row*(SZ+GAP);
-            bool sel=(idx==m_selectedSlot);
-            sf::RectangleShape slot({SZ,SZ});
-            slot.setFillColor(sel?sf::Color(60,50,30):sf::Color(8,8,8));
-            slot.setOutlineColor(sel?sf::Color(200,160,60):sf::Color(120,120,120));
-            slot.setOutlineThickness(1.5f);
-            slot.setPosition({sx,sy}); m_window.draw(slot);
-            Item* item=m_inventory.getItem(idx);
-            if (item)
-            {
-                auto& tm=TextureManager::instance();
-                std::string path=item->spritePath();
-                std::string name=path.substr(path.rfind('/')+1);
-                name=name.substr(0,name.rfind('.'));
-                const sf::Texture* tex=tm.get(name);
-                if (tex)
+            const int COLS = 5, ROWS = 4;
+            const float SZ = 35.f, GAP = 4.f;
+            float sx0 = panelX + (RIGHT_PANEL_W - (COLS * (SZ + GAP) - GAP)) / 2.f;
+            float sy0 = panelY + 10.f;
+
+            for (int row = 0; row < ROWS; ++row)
+                for (int col = 0; col < COLS; ++col)
                 {
-                    sf::Sprite spr(*tex);
-                    auto sz=tex->getSize();
-                    float sc=SZ*0.8f/std::max((float)sz.x,(float)sz.y);
-                    spr.setScale({sc,sc});
-                    spr.setPosition({sx+SZ*0.1f,sy+SZ*0.1f}); m_window.draw(spr);
+                    int idx = row * COLS + col;
+                    float sx = sx0 + col * (SZ + GAP);
+                    float sy = sy0 + row * (SZ + GAP);
+                    bool sel = (idx == m_ui.selectedInvSlot);
+
+                    sf::RectangleShape slot({SZ, SZ});
+                    slot.setFillColor(sel ? sf::Color(60, 50, 30) : sf::Color(8, 8, 8));
+                    slot.setOutlineColor(sel ? sf::Color(200, 160, 60) : sf::Color(120, 120, 120));
+                    slot.setOutlineThickness(1.5f);
+                    slot.setPosition({sx, sy});
+                    m_window.draw(slot);
+
+                    Item* item = m_inventory.getItem(idx);
+                    if (item) {
+                        auto& tm = TextureManager::instance();
+                        std::string path = item->spritePath();
+                        std::string name = path.substr(path.rfind('/')+1);
+                        name = name.substr(0, name.rfind('.'));
+                        const sf::Texture* tex = tm.get(name);
+                        if (tex) {
+                            sf::Sprite spr(*tex);
+                            auto sz = tex->getSize();
+                            float sc = SZ * 0.8f / std::max((float)sz.x, (float)sz.y);
+                            spr.setScale({sc, sc});
+                            spr.setPosition({sx + SZ*0.1f, sy + SZ*0.1f});
+                            m_window.draw(spr);
+                        } else {
+                            sf::CircleShape dot(SZ * 0.28f);
+                            dot.setFillColor(item->color());
+                            dot.setPosition({sx + SZ*0.22f, sy + SZ*0.22f});
+                            m_window.draw(dot);
+                        }
+                        int cnt = m_inventory.getCount(idx);
+                        if (cnt > 1) {
+                            sf::Text ct(m_font, "x"+std::to_string(cnt), 7);
+                            ct.setFillColor(sf::Color(255,220,100));
+                            ct.setPosition({sx+SZ-14.f, sy+SZ-10.f});
+                            m_window.draw(ct);
+                        }
+                    }
                 }
-                else
-                {sf::CircleShape dot(SZ*0.28f);dot.setFillColor(item->color());dot.setPosition({sx+SZ*0.22f,sy+SZ*0.22f});m_window.draw(dot);}
-                int cnt=m_inventory.getCount(idx);
-                if (cnt>1){sf::Text ct(m_font,"x"+std::to_string(cnt),7);ct.setFillColor(sf::Color(255,220,100));ct.setPosition({sx+SZ-14.f,sy+SZ-10.f});m_window.draw(ct);}
+
+            Item* selItem = m_inventory.getItem(m_ui.selectedInvSlot);
+            std::string info = "(empty)";
+            if (selItem) {
+                int cnt = m_inventory.getCount(m_ui.selectedInvSlot);
+                info = selItem->name + " (" + std::to_string(selItem->value) + ")";
+                if (cnt > 1) info += " x" + std::to_string(cnt);
             }
+            sf::Text infoTxt(m_font, info, 9);
+            infoTxt.setFillColor(sf::Color(180,160,100));
+            infoTxt.setPosition({panelX+8.f, panelY + 10.f + ROWS*(SZ+GAP) + 4.f});
+            m_window.draw(infoTxt);
+            break;
         }
-        Item* sel=m_inventory.getItem(m_selectedSlot);
-        std::string info="(empty)";
-        if (sel){int cnt=m_inventory.getCount(m_selectedSlot);info=sel->name+" ("+std::to_string(sel->value)+")";if(cnt>1)info+=" x"+std::to_string(cnt);}
-        sf::Text infoTxt(m_font,info,9);
-        infoTxt.setFillColor(sf::Color(180,160,100));
-        infoTxt.setPosition({panelX+8.f,sy0+ROWS*(SZ+GAP)+4.f}); m_window.draw(infoTxt);
-    }
-    else if (m_viewCores)
-    {
-        m_coreSlots.render(m_window,m_font,panelX+8.f,panelY+20.f,(float)RIGHT_PANEL_W,m_selectedCoreSlot,true);
-        CoreStats cb=m_coreSlots.getTotalBonus();
-        float hy=panelY+INV_GRID_H-55.f;
-        auto dh=[&](const std::string& t,sf::Color c=sf::Color(70,70,70))
-        {sf::Text tx(m_font,t,8);tx.setFillColor(c);tx.setPosition({panelX+8.f,hy});m_window.draw(tx);hy+=12.f;};
-        dh("Bonus: HP+"+std::to_string(cb.hp)+" ATK+"+std::to_string(cb.atk)+" DEF+"+std::to_string(cb.def)+" DOD+"+std::to_string(cb.dodge),sf::Color(100,200,255));
-        dh("[C] Close  [1-9] Equip core");
-        dh("[X] Remove core");
-    }
-    else if (m_viewEquipment)
-    {
-        sf::Text title(m_font,"EQUIPMENT  []/[] select  [X]=Unequip",9);
-        title.setFillColor(sf::Color(120,160,120));
-        title.setPosition({panelX+8.f,panelY+6.f}); m_window.draw(title);
-        const EquipSlot slots[]={EquipSlot::Head,EquipSlot::Body,EquipSlot::Arms,
-                                  EquipSlot::Legs,EquipSlot::Feet,EquipSlot::MainHand,EquipSlot::OffHand};
-        const float SZH=18.f,GAP=3.f;
-        float sx=panelX+8.f,sy=panelY+20.f;
-        for (int i=0;i<7;++i)
+
+        case UIState::Panel::Cores:
         {
-            bool sel=(i==m_selectedEquipSlot);
-            const Item* item=m_equipment.getItem(slots[i]);
+            m_coreSlots.render(m_window, m_font, panelX+8.f, panelY+20.f,
+                               (float)RIGHT_PANEL_W, m_ui.selectedCoreSlot, true);
 
-            // highlight แถวที่เลือก
-            if (sel)
-            {
-                sf::RectangleShape hl({(float)RIGHT_PANEL_W-16.f, SZH});
-                hl.setFillColor(sf::Color(40,60,40));
-                hl.setOutlineColor(sf::Color(100,200,100));
-                hl.setOutlineThickness(1.f);
-                hl.setPosition({panelX+8.f, sy});
-                m_window.draw(hl);
-            }
-
-            sf::Text label(m_font,Equipment::slotName(slots[i])+":",9);
-            label.setFillColor(sel?sf::Color(180,255,180):sf::Color(140,120,80));
-            label.setPosition({sx,sy});m_window.draw(label);
-            sf::Text itemTxt(m_font,item?item->name:"--",9);
-            itemTxt.setFillColor(item?item->color():sf::Color(60,60,60));
-            itemTxt.setPosition({sx+44.f,sy});m_window.draw(itemTxt);
-            if (item){sf::Text val(m_font,"+"+std::to_string(item->value),9);val.setFillColor(sf::Color(180,200,100));val.setPosition({sx+160.f,sy});m_window.draw(val);}
-            sy+=SZH+GAP;
+            StatBonus cb = m_coreSlots.getTotalBonus();
+            float hy = panelY + INV_GRID_H - 55.f;
+            auto dh = [&](const std::string& t, sf::Color c = sf::Color(70,70,70)) {
+                sf::Text tx(m_font, t, 8);
+                tx.setFillColor(c);
+                tx.setPosition({panelX+8.f, hy});
+                m_window.draw(tx);
+                hy += 12.f;
+            };
+            dh("Bonus: HP+" + std::to_string(cb.hp) + " ATK+" + std::to_string(cb.atk) +
+               " DEF+" + std::to_string(cb.def) + " DOD+" + std::to_string(cb.dodge) +
+               " MANA+" + std::to_string(cb.mana) + " MATK+" + std::to_string(cb.matk) +
+               " MRES+" + std::to_string(cb.magicRes) + " SPD+" + std::to_string(cb.spd),
+               sf::Color(100,200,255));
+            dh("[C] Close  [1-9] Equip core");
+            dh("[X] Remove core");
+            break;
         }
+
+        case UIState::Panel::Equipment:
+        {
+            sf::Text title(m_font, "EQUIPMENT  []/[] select  [X]=Unequip", 9);
+            title.setFillColor(sf::Color(120,160,120));
+            title.setPosition({panelX+8.f, panelY+6.f});
+            m_window.draw(title);
+
+            const EquipSlot slots[] = { EquipSlot::Head, EquipSlot::Body, EquipSlot::Arms,
+                                        EquipSlot::Legs, EquipSlot::Feet,
+                                        EquipSlot::MainHand, EquipSlot::OffHand };
+            const float SZH = 18.f, GAP = 3.f;
+            float sx = panelX + 8.f;
+            float sy = panelY + 20.f;
+
+            for (int i = 0; i < 7; ++i)
+            {
+                bool sel = (i == m_ui.selectedEquipSlot);
+                const Item* item = m_equipment.getItem(slots[i]);
+
+                if (sel) {
+                    sf::RectangleShape hl({(float)RIGHT_PANEL_W - 16.f, SZH});
+                    hl.setFillColor(sf::Color(40,60,40));
+                    hl.setOutlineColor(sf::Color(100,200,100));
+                    hl.setOutlineThickness(1.f);
+                    hl.setPosition({panelX+8.f, sy});
+                    m_window.draw(hl);
+                }
+
+                sf::Text label(m_font, Equipment::slotName(slots[i]) + ":", 9);
+                label.setFillColor(sel ? sf::Color(180,255,180) : sf::Color(140,120,80));
+                label.setPosition({sx, sy});
+                m_window.draw(label);
+
+                sf::Text itemTxt(m_font, item ? item->name : "--", 9);
+                itemTxt.setFillColor(item ? item->color() : sf::Color(60,60,60));
+                itemTxt.setPosition({sx + 44.f, sy});
+                m_window.draw(itemTxt);
+
+                if (item) {
+                    sf::Text val(m_font, "+" + std::to_string(item->value), 9);
+                    val.setFillColor(sf::Color(180,200,100));
+                    val.setPosition({sx + 160.f, sy});
+                    m_window.draw(val);
+                }
+
+                sy += SZH + GAP;
+            }
+            break;
+        }
+
+        case UIState::Panel::Stats:
+            break;
     }
 }
+
 void Game::addLog(const std::string& msg, sf::Color color)
 {
     m_log.push_back({msg, color});
@@ -1874,16 +2029,16 @@ void Game::renderLogPanel()
 {
     float panelY=(float)(WINDOW_H-LOG_PANEL_H);
     sf::RectangleShape panel({(float)WINDOW_W,(float)LOG_PANEL_H});
-    panel.setFillColor(sf::Color(5,5,5));
+    panel.setFillColor(sf::Color(8, 8, 8));
     panel.setPosition({0.f,panelY});
-    panel.setOutlineColor(sf::Color(80,60,40));
-    panel.setOutlineThickness(2.f);
+    panel.setOutlineColor(sf::Color(120, 120, 120));
+    panel.setOutlineThickness(1.f);
     m_window.draw(panel);
     if (!m_fontLoaded) return;
     float y=panelY+8.f;
     for (const auto& entry:m_log)
     {
-        sf::Text t(m_font,entry.text,10);
+        sf::Text t(m_font,entry.text,8);
         t.setFillColor(entry.color);
         t.setPosition({8.f,y}); m_window.draw(t);
         y+=17.f;

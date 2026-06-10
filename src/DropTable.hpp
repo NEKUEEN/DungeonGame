@@ -29,6 +29,7 @@ struct ItemData
     int  manaBonus  = 0;
     int  magicDmgBonus = 0;
     int  magicResBonus = 0;
+    int  spdBonus   = 0;
     bool stackable  = true;
 
     // core_stats (เฉพาะ Core items)
@@ -39,6 +40,7 @@ struct ItemData
     int coreMana  = 0;
     int coreMagicDmg = 0;
     int coreMagicRes = 0;
+    int coreSpdBonus = 0;
 
     // skills ที่ core นี้ให้เมื่อ equip
     std::vector<std::string> coreSkills;
@@ -74,7 +76,7 @@ public:
             d.manaBonus  = it.contains("mana")  ? it["mana"].get<int>()  : 0;
             d.magicDmgBonus  = it.contains("magic_dmg")  ? it["magic_dmg"].get<int>()  : 0;
             d.magicResBonus  = it.contains("magic_res")  ? it["magic_res"].get<int>()  : 0;
-
+            d.spdBonus    = it.contains("spd")   ? it["spd"].get<int>()   : 0;
             // core_stats
             if (it.contains("core_stats"))
             {
@@ -86,6 +88,7 @@ public:
                 d.coreMana  = cs.contains("mana")  ? cs["mana"].get<int>()  : 0;
                 d.coreMagicDmg  = cs.contains("magic_dmg")  ? cs["magic_dmg"].get<int>()  : 0;
                 d.coreMagicRes  = cs.contains("magic_res")  ? cs["magic_res"].get<int>()  : 0;
+                d.coreSpdBonus = cs.contains("spd")   ? cs["spd"].get<int>()   : 0;
             }
 
             // skills ที่ core ให้
