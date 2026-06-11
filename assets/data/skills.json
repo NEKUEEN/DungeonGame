@@ -5,11 +5,37 @@
       "name": "Power Strike",
       "desc": "Buff ATK +50% for 5 turns.",
       "type": "active_buff",
-      "hotbar_slot": -1,
+      "hotbar_slot": 2,
       "cooldown": 20,
       "duration": 5,
       "effect": {
         "atk_pct": 50
+      }
+    },
+    {
+      "id": "mana_erupt",
+      "name": "Mana Erupt",
+      "desc": "Buff MATK +50% for 5 turns.",
+      "type": "active_buff",
+      "hotbar_slot": 1,
+      "cooldown": 20,
+      "duration": 5,
+      "effect": {
+        "matk_pct": 50
+      }
+    },
+    {
+      "id": "giant_body",
+      "name": "Giant Body",
+      "desc": "The body enlarges Buff  +50% for 5 turns.",
+      "type": "active_buff",
+      "hotbar_slot": 5,
+      "cooldown": 20,
+      "duration": 15,
+      "effect": {
+        "hp_pct": 100,
+        "def_pct": 50,
+        "atk_pct": 100
       }
     },
     {
@@ -47,10 +73,24 @@
       "cooldown": 1,
       "duration": 0,
       "effect": {
-        "damage_pct": 50,
+        "damage_pct": 100,
         "range": 6,
         "scaling_stat": "magic_dmg",
         "mana_cost": 5
+      }
+    },
+    {
+      "id": "arrow",
+      "name": "Arrow",
+      "desc": "Arrow. Range 6, dmg ATK/2.",
+      "type": "active_ranged",
+      "hotbar_slot": -1,
+      "cooldown": 1,
+      "duration": 0,
+      "effect": {
+        "damage_pct": 100,
+        "range": 5,
+        "scaling_stat": "atk"
       }
     },
     {
@@ -58,12 +98,13 @@
       "name": "Quick Heal",
       "desc": "Instantly heal 20 HP.",
       "type": "active_heal",
-      "hotbar_slot": -1,
+      "hotbar_slot": 3,
       "cooldown": 10,
       "duration": 0,
       "effect": {
         "heal_flat": 20,
-        "heal_pct": 0
+        "heal_pct": 0,
+        "mana_cost": 10
       }
     },
     {
@@ -71,11 +112,12 @@
       "name": "Blink",
       "desc": "Teleport to a tile within range 5.",
       "type": "active_warp",
-      "hotbar_slot": -1,
+      "hotbar_slot": 4,
       "cooldown": 15,
       "duration": 0,
       "effect": {
-        "range": 5
+        "range": 5,
+        "mana_cost": 5
       }
     }
   ]

@@ -37,6 +37,8 @@ public:
         load("player",       "assets/textures/player.png");
         load("rat",          "assets/textures/rat.png");
         load("goblin",       "assets/textures/goblin.png");
+        load("goblinSwordman",       "assets/textures/goblinSwordman.png");
+        load("goblinArcher",       "assets/textures/goblinArcher.png");
         load("orc",          "assets/textures/orc.png");
         load("tile_floor",   "assets/textures/tile_floor.png");
         load("tile_wall",    "assets/textures/tile_wall.png");
@@ -63,6 +65,7 @@ public:
         load("item_orc_core",    "assets/textures/item_orc_core.png");
         load("item_rat_core",    "assets/textures/item_rat_core.png");
         load("item_goblinWizard_core", "assets/textures/item_goblinWizard_core.png");
+        load("item_dagger", "assets/textures/item_dagger.png");
     }
 
 private:

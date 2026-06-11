@@ -20,6 +20,8 @@ enum class SkillType
 struct SkillEffect
 {
     int atkPct       = 0;   // % bonus ATK (buff)
+    int matkPct      = 0;
+    int hpPct        = 0;
     int magicDmgPct  = 0;   // % bonus Magic Damage (buff/passive)
     int manaCost     = 0;   // AP cost ของสกิลเวท (buff/passive)
     int defPct       = 0;   // % bonus DEF (buff/passive)
@@ -51,11 +53,15 @@ struct SkillData
 
     // backward-compat aliases (ชี้ไปที่ effect)
     int& atkPct    () { return effect.atkPct; }
+    int& matkPct   () { return effect.matkPct;}
+    int& hpPct     () { return effect.hpPct;} 
     int& defPct    () { return effect.defPct; }
     int& dodgePct  () { return effect.dodgePct; }
     int& damage    () { return effect.damagePct; }
     int& range     () { return effect.range; }
     const int& atkPct () const { return effect.atkPct; }
+    const int& matkPct () const { return effect.matkPct; }
+    const int& hpPct () const { return effect.hpPct;}
     const int& defPct () const { return effect.defPct; }
     const int& range  () const { return effect.range; }
     const std::string& scalingStat () const { return effect.scalingStat; }

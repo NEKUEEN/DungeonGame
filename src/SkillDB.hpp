@@ -47,6 +47,8 @@ public:
             {
                 const auto& e = s["effect"];
                 if (e.contains("atk_pct"))      d.effect.atkPct      = e["atk_pct"].get<int>();
+                if (e.contains("matk_pct"))     d.effect.matkPct     = e["matk_pct"].get<int>();
+                if (e.contains("hp_pct"))       d.effect.hpPct       = e["hp_pct"].get<int>();
                 if (e.contains("def_pct"))       d.effect.defPct      = e["def_pct"].get<int>();
                 if (e.contains("dodge_pct"))     d.effect.dodgePct    = e["dodge_pct"].get<int>();
                 if (e.contains("heal_flat"))     d.effect.healFlat    = e["heal_flat"].get<int>();
@@ -64,6 +66,8 @@ public:
             {
                 // backward-compat: flat fields (skills.json เก่า)
                 if (s.contains("atk_pct"))   d.effect.atkPct    = s["atk_pct"].get<int>();
+                if (s.contains("matk_pct"))  d.effect.matkPct   = s["matk_pct"].get<int>();
+                if (s.contains("hp_pct"))    d.effect.hpPct     = s["hp_pct"].get<int>();
                 if (s.contains("def_pct"))   d.effect.defPct    = s["def_pct"].get<int>();
                 if (s.contains("dodge_pct")) d.effect.dodgePct  = s["dodge_pct"].get<int>();
                 if (s.contains("damage"))    d.effect.damagePct = s["damage"].get<int>();

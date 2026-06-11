@@ -36,12 +36,12 @@
       "name": "Goblin Archer",
       "family": "Goblin",
       "rank": "Rare",
-      "sprite": "goblin.png",
+      "sprite": "goblinArcher.png",
       "hp": 10, "attack": 6, "defense": 0, "exp": 2,
       "ai_type": "ranged",
       "preferred_range": 5,
       "alert_range": 10,
-      "skills": ["stone_throw"],
+      "skills": ["arrow"],
       "drops": [
         { "item": "magic_stone", "chance": 0.60 },
         { "item": "goblinArcher_core", "chance": 0.20 }
@@ -52,7 +52,7 @@
       "name": "Goblin Swordman",
       "family": "Goblin",
       "rank": "Rare",
-      "sprite": "goblin.png",
+      "sprite": "goblinSwordman.png",
       "hp": 16, "attack": 7, "defense": 3, "exp": 2,
       "ai_type": "melee",
       "preferred_range": 1,

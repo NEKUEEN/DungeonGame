@@ -91,19 +91,23 @@ void Game::recalcAllStats()
     
     StatBonus bonus = m_equipment.getTotalBonus() + m_coreSlots.getTotalBonus();
 
-    int atkPercentBonus = 0, defPercentBonus = 0, magicPercentBonus = 0;
+    int atkPercentBonus = 0, defPercentBonus = 0, magicPercentBonus = 0, hpPercentBonus = 0;
     for (const auto& sk : m_player->getSkills())
     {
-        if (sk.data.type == SkillType::Passive)
+        if (sk.data.type == SkillType::Passive ||
+            (sk.data.type == SkillType::ActiveBuff && sk.buffActive))
         {
             atkPercentBonus += sk.data.effect.atkPct;
             defPercentBonus += sk.data.effect.defPct;
-            magicPercentBonus += sk.data.effect.magicDmgPct;
+            magicPercentBonus += sk.data.effect.matkPct;
+            hpPercentBonus += sk.data.effect.hpPct;
+
         }
     }
 
     // ใช้ baseMaxHp และ baseMaxMana แทน maxHp/maxMana
     m_finalStats.maxHp   = base.baseMaxHp + bonus.hp;
+    m_finalStats.maxHp += m_finalStats.maxHp * hpPercentBonus / 100;
     m_finalStats.atk     = base.maxAtk + bonus.atk;
     m_finalStats.atk    += m_finalStats.atk * atkPercentBonus / 100;
 
@@ -281,6 +285,7 @@ void Game::executeSkill(int hotbarIdx)
         sk->durationLeft = sk->data.duration;
         sk->cooldownLeft = sk->data.cooldown;
         addLog("  "+sk->data.name+" activated!", sf::Color(255,200,50));
+        recalcAllStats();
         recalcAP();
         break;
 
@@ -918,10 +923,10 @@ void Game::processEvents()
             {
                 switch(key->code)
                 {
-                    case sf::Keyboard::Key::Up:    case sf::Keyboard::Key::K: moveTargetCursor(0,-1);  break;
-                    case sf::Keyboard::Key::Down:  case sf::Keyboard::Key::J: moveTargetCursor(0, 1);  break;
-                    case sf::Keyboard::Key::Left:  case sf::Keyboard::Key::H: moveTargetCursor(-1, 0); break;
-                    case sf::Keyboard::Key::Right: case sf::Keyboard::Key::L: moveTargetCursor(1, 0);  break;
+                    case sf::Keyboard::Key::K: moveTargetCursor(0,-1);  break;
+                    case sf::Keyboard::Key::J: moveTargetCursor(0, 1);  break;
+                    case sf::Keyboard::Key::H: moveTargetCursor(-1, 0); break;
+                    case sf::Keyboard::Key::L: moveTargetCursor(1, 0);  break;
                     case sf::Keyboard::Key::Y: moveTargetCursor(-1,-1); break;
                     case sf::Keyboard::Key::U: moveTargetCursor(1,-1);  break;
                     case sf::Keyboard::Key::B: moveTargetCursor(-1, 1); break;
@@ -946,13 +951,13 @@ void Game::processEvents()
             switch(key->code)
             {
                 case sf::Keyboard::Key::Escape: m_window.close();    break;
-                case sf::Keyboard::Key::Up:
+                
                 case sf::Keyboard::Key::K:  handlePlayerMove(0,-1);  break;
-                case sf::Keyboard::Key::Down:
+                
                 case sf::Keyboard::Key::J:  handlePlayerMove(0, 1);  break;
-                case sf::Keyboard::Key::Left:
+                
                 case sf::Keyboard::Key::H:  handlePlayerMove(-1, 0); break;
-                case sf::Keyboard::Key::Right:
+                
                 case sf::Keyboard::Key::L:  handlePlayerMove(1,  0); break;
                 case sf::Keyboard::Key::Y:  handlePlayerMove(-1,-1); break;
                 case sf::Keyboard::Key::U:  handlePlayerMove(1,-1);  break;
@@ -971,7 +976,13 @@ void Game::processEvents()
 
                 case sf::Keyboard::Key::R:  newDungeon(false);        break;
                 case sf::Keyboard::Key::G:  tryPickupItem();          break;
-                case sf::Keyboard::Key::D:  dropSelectedItem();       break;
+                case sf::Keyboard::Key::D:
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift))
+                        //(sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift))
+                    dropSelectedItem();
+                    else if(m_ui.isPanelOpen(UIState::Panel::Inventory) && m_ui.selectedInvSlot < MAX_INVENTORY-1)
+                        m_ui.selectedInvSlot++;
+                    break;
                 case sf::Keyboard::Key::E:
                     m_ui.togglePanel(UIState::Panel::Equipment);
                     break;
@@ -984,18 +995,18 @@ void Game::processEvents()
                 case sf::Keyboard::Key::C:
                     m_ui.togglePanel(UIState::Panel::Cores);
                     break;
-                case sf::Keyboard::Key::LBracket:
-                    if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot > 0)
-                        m_ui.selectedCoreSlot--;
-                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot > 0)
-                        m_ui.selectedEquipSlot--;
-                    break;
-                case sf::Keyboard::Key::RBracket:
-                    if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot < m_coreSlots.getSlotCount()-1)
-                        m_ui.selectedCoreSlot++;
-                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot < 6)
-                        m_ui.selectedEquipSlot++;
-                    break;
+                //case sf::Keyboard::Key::LBracket:
+                    //if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot > 0)
+                        //m_ui.selectedCoreSlot--;
+                    //else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot > 0)
+                        //m_ui.selectedEquipSlot--;
+                    //break;
+                //case sf::Keyboard::Key::RBracket:
+                    //if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot < m_coreSlots.getSlotCount()-1)
+                        //m_ui.selectedCoreSlot++;
+                    //else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot < 6)
+                        //m_ui.selectedEquipSlot++;
+                    //break;
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
                 case sf::Keyboard::Key::Space:  waitTurn();         break;
@@ -1013,9 +1024,33 @@ void Game::processEvents()
                     else
                         useOrEquipSelected();
                     break;
-                case sf::Keyboard::Key::Tab:
-                    m_ui.selectedInvSlot = (m_ui.selectedInvSlot + 1) % MAX_INVENTORY;
+                case sf::Keyboard::Key::W:
+                    if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot > 0)
+                        m_ui.selectedCoreSlot--;
+                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot > 0)
+                        m_ui.selectedEquipSlot--;
+                    else if (m_ui.isPanelOpen(UIState::Panel::Inventory) && m_ui.selectedInvSlot >= 5)
+                        m_ui.selectedInvSlot -= 5;
                     break;
+
+                case sf::Keyboard::Key::S:
+                    if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot < m_coreSlots.getSlotCount()-1)
+                        m_ui.selectedCoreSlot++;
+                    else if (m_ui.isPanelOpen(UIState::Panel::Equipment) && m_ui.selectedEquipSlot < 6)
+                        m_ui.selectedEquipSlot++;
+                    else if (m_ui.isPanelOpen(UIState::Panel::Inventory) && m_ui.selectedInvSlot < MAX_INVENTORY-5)
+                        m_ui.selectedInvSlot += 5;
+                    break;
+
+                case sf::Keyboard::Key::A:
+                    if (m_ui.isPanelOpen(UIState::Panel::Inventory) && m_ui.selectedInvSlot > 0)
+                        m_ui.selectedInvSlot--;
+                    break;
+
+                
+                //case sf::Keyboard::Key::Tab:
+                    //m_ui.selectedInvSlot = (m_ui.selectedInvSlot + 1) % MAX_INVENTORY;
+                    //break;
             }
         }
     }
@@ -1465,6 +1500,7 @@ void Game::processTurn()
         std::remove_if(m_enemies.begin(), m_enemies.end(),
             [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
         m_enemies.end());
+        recalcAllStats();
 }
 
 // ============================================================
@@ -1748,6 +1784,17 @@ void Game::renderSkillPanel()
 // ============================================================
 //  Status Panel
 // ============================================================
+static std::string fmtStat(float val)
+{
+    float frac = val - (int)val;
+    if (frac >= 0.1f)
+    {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%.1f", val);
+        return buf;
+    }
+    return std::to_string((int)val);
+}
 void Game::renderStatusPanel()
 {
     float px = (float)(WINDOW_W - RIGHT_PANEL_W);
@@ -1786,17 +1833,12 @@ void Game::renderStatusPanel()
     sf::Color deltaColor = sf::Color(100,255,150);
 
     drawLine("level:", std::to_string(s.level));
-    char biStr[16];
-    std::snprintf(biStr, sizeof(biStr), "%.1f", m_finalStats.body);
-    drawLine("body:", std::string(biStr) + (showDelta && m_deltaBody != 0 ? deltaStr(m_deltaBody) : ""));
-    std::snprintf(biStr, sizeof(biStr), "%.1f", m_finalStats.mentality);
-    drawLine("mentality:", std::string(biStr) + (showDelta && m_deltaMentality != 0 ? deltaStr(m_deltaMentality) : ""));
+    drawLine("body:", fmtStat(m_finalStats.body) + (showDelta && m_deltaBody != 0 ? deltaStr(m_deltaBody) : ""));
+    drawLine("mentality:", fmtStat(m_finalStats.mentality) + (showDelta && m_deltaMentality != 0 ? deltaStr(m_deltaMentality) : ""));
     drawLine("ability:", std::to_string(s.ability));
     drawLine("item level:", std::to_string(m_finalStats.itemLevel));
     drawLine("Comprehensive Battle Index", "");
-    // หา drawLine("Index:", ...) แล้วเปลี่ยนเป็น
-    std::snprintf(biStr, sizeof(biStr), "%.1f", m_finalStats.battleIndex);
-    drawLine(":", std::string(biStr) + (showDelta && m_deltaBattleIndex != 0 ? deltaStr(m_deltaBattleIndex) : ""));
+    drawLine(":", fmtStat(m_finalStats.battleIndex) + (showDelta && m_deltaBattleIndex != 0 ? deltaStr(m_deltaBattleIndex) : ""));
 
     renderSkillPanel();
 }
