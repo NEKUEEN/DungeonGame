@@ -60,6 +60,7 @@ public:
                 if (e.contains("aoe_radius"))    d.effect.aoeRadius   = e["aoe_radius"].get<int>();
                 if (e.contains("scaling_stat")) d.effect.scalingStat = e["scaling_stat"].get<std::string>();
                 if (e.contains("mana_cost"))      d.effect.manaCost    = e["mana_cost"].get<int>();
+                if (e.contains("stamina_cost"))   d.effect.staminaCost = e["stamina_cost"].get<int>();
 
             }
             else

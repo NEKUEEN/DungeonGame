@@ -52,6 +52,8 @@ struct FinalStats {
     int matk = 0;      // magic attack
     int mdef = 0;      // magic resist
     int spd = 0;       // speed bonus (อาจติดลบ)
+    int maxStamina = 0;
+    int staminaRegen = 0;
     float body = 0.f;
     float mentality = 0.f;
     float battleIndex = 0.f;  // เปลี่ยนจาก int
@@ -116,6 +118,8 @@ private:
     void onEnemyKilled(Enemy* enemy);
     void spawnBoss(const std::string& family);
 
+    void recalcSpeed();
+
     // ตัวช่วยคำนวณ FinalStats
     void recalcAllStats();      // เรียกทุกครั้งที่ equipment / core / skill เปลี่ยน
 
@@ -126,6 +130,8 @@ private:
     // skill helpers (จะใช้ค่าจาก m_finalStats)
     void useSkillBuff(const std::string& skillId);
     void fireRangedAt(int targetCol, int targetRow);
+    
+    void regenStamina();
     int  getScaledDamage(const SkillEffect& effect) const;
     int  getBuffedAtk() const { return m_finalStats.atk; }
     int  getBuffedDef() const { return m_finalStats.def; }

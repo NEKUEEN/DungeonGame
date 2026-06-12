@@ -33,6 +33,7 @@ Enemy::Enemy(const std::string& monsterId, int col, int row,
 
         m_preferredRange = data->preferredRange;
         m_alertRange     = data->alertRange;
+        m_spd            = data->spd;
 
         float scale = 1.f + (floor - 1) * 0.1f;
         m_maxHp   = (int)(data->hp      * scale);

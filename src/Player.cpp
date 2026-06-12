@@ -105,15 +105,7 @@ void Player::drawHPBar(sf::RenderWindow& window)
     bar.setPosition({bx, by});
     window.draw(bar);
 
-    // mentality drain indicator
-    if (m_stats.hpDepleted)
-    {
-        float mRatio = std::clamp((float)m_stats.mentality / (float)m_stats.maxMentality, 0.f, 1.f);
-        sf::RectangleShape mBar({bw * mRatio, 2.f});
-        mBar.setFillColor(sf::Color(180, 80, 220, 200));
-        mBar.setPosition({bx, by - 3.f});
-        window.draw(mBar);
-    }
+
 }
 
 void Player::onTurnPassed()
@@ -139,7 +131,7 @@ void Player::onTurnPassed()
     if (m_stats.regenTimer >= 7)
     {
         m_stats.regenTimer = 0;
-        if (m_stats.hunger >= 20 && m_stats.hp < m_stats.maxHp && !m_stats.hpDepleted)
+        if (m_stats.hunger >= 20 && m_stats.hp < m_stats.maxHp)
             m_stats.hp++;
     }
 
@@ -147,12 +139,5 @@ void Player::onTurnPassed()
     if (m_stats.hunger < 20 && m_stats.hp > 0)
         m_stats.hp--;
 
-    // ── ตรวจ hp ลงถึง 0 ──
-    if (m_stats.hp <= 0)
-    {
-        m_stats.hp = 0;
-        m_stats.hpDepleted = true;
-    }
-
-    // AP reset ทำใน Game::recalcAP() แล้ว
+    // AP reset ทำใน Game::recalcSpeed() แล้ว
 }

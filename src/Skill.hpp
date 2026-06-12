@@ -24,6 +24,7 @@ struct SkillEffect
     int hpPct        = 0;
     int magicDmgPct  = 0;   // % bonus Magic Damage (buff/passive)
     int manaCost     = 0;   // AP cost ของสกิลเวท (buff/passive)
+    int staminaCost  = 0;
     int defPct       = 0;   // % bonus DEF (buff/passive)
     int dodgePct     = 0;   // % bonus Dodge
     int healFlat     = 0;   // heal คงที่

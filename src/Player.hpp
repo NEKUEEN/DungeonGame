@@ -29,7 +29,6 @@ struct Stats
     // ── Mentality ──
     int  maxMentality = 0;
     int  mentality    = 0;
-    bool hpDepleted   = false;
 
     // ── Mentality sub-stats ──
     int maxMagicDmg  = 10;
@@ -74,6 +73,15 @@ struct Stats
     // ปรับได้จาก item/equipment/status
     int moveSpeedCost = 100;
     int moveAPAccum   = 0;
+
+
+    int maxStamina = 100;
+    int stamina = 0;
+    int staminaRegen = 0;
+
+    // ── Speed system ──
+    int speedPerTurn = 100;  // threshold (100 = ปกติ)
+    int spdCounter   = 100;    // accumulator — เมื่อถึง speedPerTurn = ได้เทิร์น
 };
 
 class Player

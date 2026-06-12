@@ -17,7 +17,7 @@
       "name": "Mana Erupt",
       "desc": "Buff MATK +50% for 5 turns.",
       "type": "active_buff",
-      "hotbar_slot": 1,
+      "hotbar_slot": -1,
       "cooldown": 20,
       "duration": 5,
       "effect": {
@@ -69,13 +69,13 @@
       "name": "Magic Missile",
       "desc": "Fire a magic missile. Range 6, dmg MAG/2.",
       "type": "active_ranged",
-      "hotbar_slot": 0,
-      "cooldown": 1,
+      "hotbar_slot": -1,
+      "cooldown": -1,
       "duration": 0,
       "effect": {
         "damage_pct": 100,
         "range": 6,
-        "scaling_stat": "magic_dmg",
+        "scaling_stat": "matk",
         "mana_cost": 5
       }
     },
@@ -84,13 +84,14 @@
       "name": "Arrow",
       "desc": "Arrow. Range 6, dmg ATK/2.",
       "type": "active_ranged",
-      "hotbar_slot": -1,
+      "hotbar_slot": 0,
       "cooldown": 1,
       "duration": 0,
       "effect": {
         "damage_pct": 100,
         "range": 5,
-        "scaling_stat": "atk"
+        "scaling_stat": "atk",
+        "stamina_cost": 50
       }
     },
     {
@@ -112,7 +113,7 @@
       "name": "Blink",
       "desc": "Teleport to a tile within range 5.",
       "type": "active_warp",
-      "hotbar_slot": 4,
+      "hotbar_slot": -1,
       "cooldown": 15,
       "duration": 0,
       "effect": {

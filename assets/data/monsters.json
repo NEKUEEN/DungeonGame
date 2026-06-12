@@ -6,29 +6,23 @@
       "family": "Rat",
       "rank": "Normal",
       "sprite": "rat.png",
-      "hp": 6, "attack": 3, "defense": 0, "exp": 1,
+      "hp": 6,
+      "attack": 3,
+      "defense": 0,
+      "exp": 1,
       "ai_type": "coward",
       "preferred_range": 1,
       "alert_range": 6,
+      "spd": 1,
       "drops": [
-        { "item": "magic_stone", "chance": 0.55 },
-        { "item": "rat_core",    "chance": 0.12 }
-      ]
-    },
-    {
-      "id": "goblin_warrior",
-      "name": "Goblin Warrior",
-      "family": "Goblin",
-      "rank": "Normal",
-      "sprite": "goblin.png",
-      "hp": 12, "attack": 5, "defense": 1, "exp": 1,
-      "ai_type": "melee",
-      "preferred_range": 1,
-      "alert_range": 8,
-      "skills": ["power_strike"],
-      "drops": [
-        { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblinWarrior_core", "chance": 0.15 }
+        {
+          "item": "magic_stone",
+          "chance": 0.55
+        },
+        {
+          "item": "rat_core",
+          "chance": 0.12
+        }
       ]
     },
     {
@@ -37,14 +31,26 @@
       "family": "Goblin",
       "rank": "Rare",
       "sprite": "goblinArcher.png",
-      "hp": 10, "attack": 6, "defense": 0, "exp": 2,
+      "hp": 10,
+      "attack": 6,
+      "defense": 0,
+      "exp": 2,
       "ai_type": "ranged",
       "preferred_range": 5,
       "alert_range": 10,
-      "skills": ["arrow"],
+      "spd": 0,
+      "skills": [
+        "arrow"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblinArcher_core", "chance": 0.20 }
+        {
+          "item": "magic_stone",
+          "chance": 0.6
+        },
+        {
+          "item": "goblinArcher_core",
+          "chance": 0.1
+        }
       ]
     },
     {
@@ -53,14 +59,26 @@
       "family": "Goblin",
       "rank": "Rare",
       "sprite": "goblinSwordman.png",
-      "hp": 16, "attack": 7, "defense": 3, "exp": 2,
+      "hp": 16,
+      "attack": 7,
+      "defense": 3,
+      "exp": 2,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 8,
-      "skills": ["power_strike"],
+      "spd": 0,
+      "skills": [
+        "power_strike"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.60 },
-        { "item": "goblinWarrior_core", "chance": 0.20 }
+        {
+          "item": "magic_stone",
+          "chance": 0.6
+        },
+        {
+          "item": "goblinWarrior_core",
+          "chance": 0.1
+        }
       ]
     },
     {
@@ -69,15 +87,28 @@
       "family": "Goblin",
       "rank": "Elite",
       "sprite": "goblin.png",
-      "hp": 20, "attack": 9, "defense": 2, "exp": 3,
+      "hp": 20,
+      "attack": 9,
+      "defense": 2,
+      "exp": 3,
       "ai_type": "caster",
       "preferred_range": 4,
       "alert_range": 10,
       "attack_interval": 3,
-      "skills": ["magic_missile", "quick_heal"],
+      "spd": 0,
+      "skills": [
+        "magic_missile",
+        "quick_heal"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.80 },
-        { "item": "goblinWizard_core", "chance": 0.99 }
+        {
+          "item": "magic_stone",
+          "chance": 0.8
+        },
+        {
+          "item": "goblinWizard_core",
+          "chance": 0.33
+        }
       ]
     },
     {
@@ -86,14 +117,27 @@
       "family": "Goblin",
       "rank": "Elite",
       "sprite": "goblin.png",
-      "hp": 25, "attack": 10, "defense": 4, "exp": 3,
+      "hp": 25,
+      "attack": 10,
+      "defense": 4,
+      "exp": 3,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 9,
-      "skills": ["power_strike", "iron_skin"],
+      "spd": 0,
+      "skills": [
+        "power_strike",
+        "iron_skin"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.80 },
-        { "item": "goblinHero_core", "chance": 0.35 }
+        {
+          "item": "magic_stone",
+          "chance": 0.8
+        },
+        {
+          "item": "goblinHero_core",
+          "chance": 0.33
+        }
       ]
     },
     {
@@ -102,14 +146,28 @@
       "family": "Goblin",
       "rank": "Boss",
       "sprite": "goblin.png",
-      "hp": 60, "attack": 18, "defense": 8, "exp": 5,
+      "hp": 60,
+      "attack": 18,
+      "defense": 8,
+      "exp": 5,
       "ai_type": "caster",
       "preferred_range": 3,
       "alert_range": 12,
-      "skills": ["magic_missile", "power_strike", "quick_heal"],
+      "spd": -2,
+      "skills": [
+        "magic_missile",
+        "power_strike",
+        "quick_heal"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 1.00 },
-        { "item": "goblinElder_core", "chance": 0.75 }
+        {
+          "item": "magic_stone",
+          "chance": 1.0
+        },
+        {
+          "item": "goblinElder_core",
+          "chance": 0.33
+        }
       ]
     },
     {
@@ -118,14 +176,26 @@
       "family": "Orc",
       "rank": "Normal",
       "sprite": "orc.png",
-      "hp": 22, "attack": 8, "defense": 3, "exp": 1,
+      "hp": 22,
+      "attack": 8,
+      "defense": 3,
+      "exp": 1,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 7,
-      "skills": ["iron_skin"],
+      "spd": 0,
+      "skills": [
+        "iron_skin"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.60 },
-        { "item": "orc_core",    "chance": 0.12 }
+        {
+          "item": "magic_stone",
+          "chance": 0.6
+        },
+        {
+          "item": "orc_core",
+          "chance": 0.12
+        }
       ]
     },
     {
@@ -134,15 +204,27 @@
       "family": "Orc",
       "rank": "Rare",
       "sprite": "orc.png",
-      "hp": 18, "attack": 10, "defense": 1, "exp": 2,
+      "hp": 18,
+      "attack": 10,
+      "defense": 1,
+      "exp": 2,
       "ai_type": "caster",
       "preferred_range": 4,
       "alert_range": 9,
+      "spd": 0,
       "attack_interval": 2,
-      "skills": ["magic_missile"],
+      "skills": [
+        "magic_missile"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.65 },
-        { "item": "orc_core",    "chance": 0.20 }
+        {
+          "item": "magic_stone",
+          "chance": 0.65
+        },
+        {
+          "item": "orc_core",
+          "chance": 0.2
+        }
       ]
     },
     {
@@ -151,14 +233,27 @@
       "family": "Orc",
       "rank": "Elite",
       "sprite": "orc.png",
-      "hp": 40, "attack": 14, "defense": 4, "exp": 3,
+      "hp": 40,
+      "attack": 14,
+      "defense": 4,
+      "exp": 3,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 9,
-      "skills": ["power_strike", "iron_skin"],
+      "spd": 0,
+      "skills": [
+        "power_strike",
+        "iron_skin"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 0.80 },
-        { "item": "orc_core",    "chance": 0.35 }
+        {
+          "item": "magic_stone",
+          "chance": 0.8
+        },
+        {
+          "item": "orc_core",
+          "chance": 0.35
+        }
       ]
     },
     {
@@ -167,14 +262,27 @@
       "family": "Orc",
       "rank": "Boss",
       "sprite": "orc.png",
-      "hp": 80, "attack": 20, "defense": 10, "exp": 5,
+      "hp": 80,
+      "attack": 20,
+      "defense": 10,
+      "exp": 5,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 14,
-      "skills": ["power_strike", "iron_skin"],
+      "spd": -2,
+      "skills": [
+        "power_strike",
+        "iron_skin"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 1.00 },
-        { "item": "orc_core",    "chance": 0.80 }
+        {
+          "item": "magic_stone",
+          "chance": 1.0
+        },
+        {
+          "item": "orc_core",
+          "chance": 0.8
+        }
       ]
     },
     {
@@ -183,14 +291,26 @@
       "family": "Rat",
       "rank": "Boss",
       "sprite": "rat.png",
-      "hp": 35, "attack": 12, "defense": 3, "exp": 5,
+      "hp": 35,
+      "attack": 12,
+      "defense": 3,
+      "exp": 5,
       "ai_type": "coward",
       "preferred_range": 2,
       "alert_range": 12,
-      "skills": ["stone_throw"],
+      "spd": -2,
+      "skills": [
+        "stone_throw"
+      ],
       "drops": [
-        { "item": "magic_stone", "chance": 1.00 },
-        { "item": "rat_core",    "chance": 0.75 }
+        {
+          "item": "magic_stone",
+          "chance": 1.0
+        },
+        {
+          "item": "rat_core",
+          "chance": 0.75
+        }
       ]
     }
   ]

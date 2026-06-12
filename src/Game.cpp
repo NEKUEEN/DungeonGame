@@ -58,24 +58,7 @@ int Game::getItemLevelTotal() const
 
 void Game::drainMentality()
 {
-    if (!m_player) return;
-    Stats& s = m_player->getStats();
-    if (!s.hpDepleted || m_playerDead) return;   // ← คืนเงื่อนไขเดิม
-
-    if (s.maxMentality <= 0) return;  // ป้องกันค่า 0
-
-    s.mentality -= 3;
-    if (s.mentality < 0) s.mentality = 0;
-
-    // บรรทัดนี้ควรแสดงทุกครั้งที่ลด
-    addLog("  Mentality -3 per turn ("+std::to_string(s.mentality)+"/"+std::to_string(s.maxMentality)+")",
-           sf::Color(180,80,220));
-
-    if (s.mentality <= 0)
-    {
-        m_playerDead = true;
-        addLog(" *** Mind shattered - DEAD *** [R] restart", sf::Color(255,50,50));
-    }
+    // ระบบ drain mentality ถูกปิดไว้
 }
 
 // ============================================================
@@ -120,6 +103,8 @@ void Game::recalcAllStats()
     m_finalStats.matk   += m_finalStats.matk * magicPercentBonus / 100;
     m_finalStats.mdef    = base.maxMagicRes + bonus.magicRes;
     m_finalStats.spd     = base.maxSpd + bonus.spd;
+    m_finalStats.maxStamina  = 100;   // base stamina — ขยายได้จาก equipment/core ทีหลัง
+    m_finalStats.staminaRegen = 10;   // ฟื้น 10/เทิร์น by default
     m_finalStats.itemLevel = getItemLevelTotal();
 
     m_finalStats.body = (m_finalStats.maxHp * 0.4f + m_finalStats.atk * 0.3f +
@@ -143,7 +128,8 @@ void Game::recalcAllStats()
     base.maxMana      = m_finalStats.maxMana;
     base.body         = m_finalStats.body;
     base.maxMentality = m_finalStats.mentality;
-    base.mentality    = m_finalStats.mentality;
+    // reset mentality เฉพาะตอนที่ยังไม่ถูก drain (ไม่ทับค่าที่กำลัง drain อยู่)
+    if (base.mentality > m_finalStats.mentality) base.mentality = m_finalStats.mentality;
     base.itemLevel    = m_finalStats.itemLevel;
     base.battleIndex  = m_finalStats.battleIndex;
 }
@@ -175,39 +161,50 @@ void Game::refreshStats()
 // ============================================================
 //  AP Helpers
 // ============================================================
-void Game::recalcAP()
+// ============================================================
+//  recalcSpeed – คำนวณ spd สุทธิของผู้เล่น (ใหม่)
+//
+//  ระบบใหม่: spdCounter สะสมทุกเทิร์น ถ้า >= 100 → ขยับได้
+//  spd=0  → +100/turn (ขยับทุกเทิร์น, ปกติ)
+//  spd=+1 → +200/turn (เร็ว 2x — ขยับได้ 2 ครั้งต่อเทิร์นศัตรู)
+//  spd=+2 → +300/turn (เร็ว 3x)
+//  spd=-1 → +50/turn  (ช้า 2x — ขยับได้ทุก 2 เทิร์น)
+//  spd=-2 → +33/turn  (ช้า 3x)
+//  spd=-3 → +25/turn  (ช้า 4x)
+// ============================================================
+void Game::recalcSpeed()
 {
     if (!m_player) return;
     Stats& s = m_player->getStats();
-    int ap = 1;
 
-    for (const auto& sk : m_player->getSkills())
-    {
-        if (!sk.buffActive && !sk.isPassive()) continue;
-        ap += sk.data.effect.speedBonus;
-    }
-    s.maxAP     = ap;
-    s.currentAP = ap;
-
-    int atkCost = 100;
-    for (const auto& sk : m_player->getSkills())
-    {
-        if (!sk.buffActive && !sk.isPassive()) continue;
-        if (sk.data.effect.atkSpeedPct < atkCost)
-            atkCost = sk.data.effect.atkSpeedPct;
-    }
-    s.atkSpeedCost = atkCost;
-    s.atkAPAccum   = 0;
-
+    // รวม spd จาก equipment + passive/active buff skills
     int spd = m_finalStats.spd;
-    s.spd = std::clamp(spd, -s.maxSpd, s.maxSpd);
+    for (const auto& sk : m_player->getSkills())
+    {
+        if (!sk.buffActive && !sk.isPassive()) continue;
+        spd += sk.data.effect.speedBonus;
+    }
+    s.spd = std::clamp(spd, -4, 4);  // cap ที่ -4 ถึง +4
 
-    int moveCost = 100;
-    if (s.spd > 0) moveCost = 100 / (s.spd + 1);
-    else if (s.spd < 0) moveCost = 100 * (-s.spd + 1);
-    s.moveSpeedCost = std::clamp(moveCost, 25, 400);
-    s.moveAPAccum   = 0;
+    // คำนวณ baseSpeed ต่อเทิร์น (เหมือนสูตรในมอน)
+    int baseSpeed = 100;
+    if (s.spd >= 0) baseSpeed = 100 + s.spd * 100;
+    else            baseSpeed = std::max(10, 100 / (1 - s.spd));
+    s.speedPerTurn = baseSpeed;
+
+    // Stamina regen จาก base + equipment bonus (ขยายได้ทีหลัง)
+    s.staminaRegen = m_finalStats.staminaRegen;
+    if (s.maxStamina == 0) s.maxStamina = m_finalStats.maxStamina;
+    if (s.stamina > s.maxStamina) s.stamina = s.maxStamina;
 }
+
+void Game::regenStamina()
+{
+    if (!m_player) return;
+    Stats& s = m_player->getStats();
+    s.stamina = std::min(s.maxStamina, s.stamina + s.staminaRegen);
+}
+
 
 // ============================================================
 //  Skill Helpers
@@ -248,7 +245,7 @@ void Game::useSkillBuff(const std::string& skillId)
     sk->cooldownLeft = sk->data.cooldown;
     addLog("  "+sk->data.name+" activated! ATK +"+std::to_string(sk->data.effect.atkPct)+
            "% for "+std::to_string(sk->data.duration)+" turns", sf::Color(255,200,50));
-    recalcAP();
+    recalcSpeed();
 }
 
 // ============================================================
@@ -271,6 +268,13 @@ void Game::executeSkill(int hotbarIdx)
         return;
     }
 
+    if (s.stamina < sk->data.effect.staminaCost)
+    {
+        addLog("  Not enough stamina! Need " + std::to_string(sk->data.effect.staminaCost) +
+               " (have " + std::to_string(s.stamina) + ")", sf::Color(220,160,50));
+        return;
+    }
+
     if (!sk->isReady())
     {
         addLog("  "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns", sf::Color(160,160,160));
@@ -280,25 +284,22 @@ void Game::executeSkill(int hotbarIdx)
     switch (sk->data.type)
     {
     case SkillType::ActiveBuff:
-        s.mana -= sk->data.effect.manaCost;
+        s.mana    -= sk->data.effect.manaCost;
+        s.stamina -= sk->data.effect.staminaCost;
         sk->buffActive = true;
         sk->durationLeft = sk->data.duration;
         sk->cooldownLeft = sk->data.cooldown;
         addLog("  "+sk->data.name+" activated!", sf::Color(255,200,50));
         recalcAllStats();
-        recalcAP();
+        recalcSpeed();
         break;
 
     case SkillType::ActiveHeal:
-        s.mana -= sk->data.effect.manaCost;
+        s.mana    -= sk->data.effect.manaCost;
+        s.stamina -= sk->data.effect.staminaCost;
         {
             int heal = sk->data.effect.healFlat + s.maxHp * sk->data.effect.healPct / 100;
             s.hp = std::min(s.maxHp, s.hp + heal);
-            if (s.hp > 0 && s.hpDepleted)
-            {
-                s.hpDepleted = false;
-                addLog("  HP recovered", sf::Color(100,220,180));
-            }
             sk->cooldownLeft = sk->data.cooldown;
             addLog("  "+sk->data.name+" +"+std::to_string(heal)+" HP", sf::Color(80,220,120));
         }
@@ -307,6 +308,7 @@ void Game::executeSkill(int hotbarIdx)
     case SkillType::ActiveRanged:
     case SkillType::ActiveWarp:
         s.mana -= sk->data.effect.manaCost;
+        // stamina หักตอน confirm ยิงจริง (fireRangedAt / executeWarp) ไม่หักตอนเข้า targeting
         m_ui.targeting.active = true;
         m_ui.targeting.skillId = id;
         m_ui.targeting.targetCol = m_player->getCol();
@@ -318,7 +320,8 @@ void Game::executeSkill(int hotbarIdx)
         break;
 
     case SkillType::ActiveAoe:
-        s.mana -= sk->data.effect.manaCost;
+        s.mana    -= sk->data.effect.manaCost;
+        s.stamina -= sk->data.effect.staminaCost;
         executeAoe(sk);
         sk->cooldownLeft = sk->data.cooldown;
         break;
@@ -354,6 +357,13 @@ void Game::executeAoe(SkillInstance* sk)
     if (hits == 0)
         addLog("  "+sk->data.name+"  no targets in range.", sf::Color(140,140,140));
 
+    {
+        Stats& ps = m_player->getStats();
+        ps.spdCounter -= 100;
+        ps.spdCounter += ps.speedPerTurn;
+        if (ps.spdCounter > 300) ps.spdCounter = 300;
+    }
+
     processTurn(); tryRespawnEnemies();
     m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
 }
@@ -367,10 +377,23 @@ void Game::executeWarp(int col, int row)
     }
     m_player->setPos(col, row);
     SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
-    if (sk) sk->cooldownLeft = sk->data.cooldown;
+    if (sk)
+    {
+        sk->cooldownLeft = sk->data.cooldown;
+        // หัก stamina ตอน confirm warp จริง
+        m_player->getStats().stamina -= sk->data.effect.staminaCost;
+    }
     addLog("  Warped!", sf::Color(100,200,255));
     m_fog.compute(col, row, VIEW_RADIUS, m_tileMap);
     updateCamera();
+
+    {
+        Stats& ps = m_player->getStats();
+        ps.spdCounter -= 100;
+        ps.spdCounter += ps.speedPerTurn;
+        if (ps.spdCounter > 300) ps.spdCounter = 300;
+    }
+
     processTurn();
     tryRespawnEnemies();
 }
@@ -470,6 +493,10 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     if (!sk) return;
 
+    // หัก stamina ตอน confirm ยิงจริง
+    Stats& ps = m_player->getStats();
+    ps.stamina -= sk->data.effect.staminaCost;
+
     sk->cooldownLeft = sk->data.cooldown;
 
     int pc = m_player->getCol();
@@ -535,7 +562,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         int lv = m_player->getStats().level;
                         m_coreSlots.setSlotCount(lv);
                         refreshStats();
-                        recalcAP();
+                        recalcSpeed();
                         addLog("  *** LEVEL UP! Level "+std::to_string(lv)+" ***", sf::Color(255,255,50));
                     }
                     onEnemyKilled(e);
@@ -549,6 +576,14 @@ void Game::fireRangedAt(int targetCol, int targetRow)
 
     if (!hit)
         addLog("  " + sk->data.name + " hits nothing.", sf::Color(140,140,140));
+
+    // หัก spdCounter เหมือนขยับ
+    {
+        Stats& ps = m_player->getStats();
+        ps.spdCounter -= 100;
+        ps.spdCounter += ps.speedPerTurn;
+        if (ps.spdCounter > 300) ps.spdCounter = 300;
+    }
 
     m_turnCount++;
     m_player->onTurnPassed();
@@ -612,7 +647,7 @@ void Game::newDungeon(bool keepPlayer)
     if (m_player)
     {
         recalcAllStats();
-        recalcAP();
+        recalcSpeed();
         m_coreSlots.setSlotCount(m_player->getStats().level);
         m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
     }
@@ -1116,7 +1151,6 @@ void Game::waitTurn()
 {
     if (!m_player) return;
 
-    int pc = m_player->getCol(), pr = m_player->getRow();
     for (auto* e : m_enemies)
     {
         if (m_fog.isVisible(e->getCol(), e->getRow()))
@@ -1125,10 +1159,14 @@ void Game::waitTurn()
             return;
         }
     }
+    // เติม spdCounter เต็ม (100) เหมือนขยับ 1 เทิร์น
+    Stats& ps = m_player->getStats();
+    ps.spdCounter = std::max(ps.spdCounter, 100);
+
     m_turnCount++; m_player->onTurnPassed();
     processTurn(); tryRespawnEnemies();
-    m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
-    addLog("  You wait.",sf::Color(140,140,140));
+    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+    addLog("  You wait.", sf::Color(140,140,140));
 }
 
 // ============================================================
@@ -1163,7 +1201,6 @@ void Game::useOrEquipSelected()
          addLog("  Ate "+item->name+". Hunger +"+std::to_string(item->value),sf::Color(200,180,80));}
         else
         {s.hp=std::min(s.maxHp,s.hp+item->value);
-         if(s.hp>0&&s.hpDepleted){s.hpDepleted=false;addLog("  HP recovered",sf::Color(100,220,180));}
          addLog("  Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(80,180,220));}
         m_inventory.removeItem(m_ui.selectedInvSlot);
     }
@@ -1185,7 +1222,7 @@ void Game::useOrEquipSelected()
                std::to_string(toEquip.value),sf::Color(180,220,180));
         
         refreshStats();
-        recalcAP();
+        recalcSpeed();
     }
 }
 
@@ -1205,7 +1242,7 @@ void Game::unequipSelected()
     m_inventory.addItem(item);
     addLog("  Unequipped "+item.name, sf::Color(180,180,180));
     refreshStats();
-    recalcAP();
+    recalcSpeed();
 }
 
 void Game::equipCore()
@@ -1235,7 +1272,7 @@ void Game::equipCore()
         if (sk.fromCore) abilityCount++;
     m_player->getStats().ability = abilityCount;
     refreshStats();
-    recalcAP();
+    recalcSpeed();
 }
 
 void Game::unequipCore()
@@ -1259,7 +1296,7 @@ void Game::unequipCore()
         if (sk.fromCore) abilityCount++;
     m_player->getStats().ability = abilityCount;
     refreshStats();
-    recalcAP();
+    recalcSpeed();
 }
 
 void Game::dropSelectedItem()
@@ -1279,7 +1316,13 @@ void Game::handlePlayerMove(int dc, int dr)
 {
     if (!m_player) return;
 
-    if (m_player->getStats().currentAP <= 0) return;
+    // เช็ค spdCounter: ต้องมี >= 100 จึงขยับได้
+    Stats& ms = m_player->getStats();
+    if (ms.spdCounter < 100)
+    {
+        addLog("  Too slow to act! ("+std::to_string(ms.spdCounter)+"/100)", sf::Color(160,120,80));
+        return;
+    }
 
     int tc=m_player->getCol()+dc, tr=m_player->getRow()+dr;
 
@@ -1287,10 +1330,10 @@ void Game::handlePlayerMove(int dc, int dr)
         if (!e->isDead()&&e->getCol()==tc&&e->getRow()==tr)
         {
             playerAttack(e);
-            if (m_player->getStats().currentAP <= 0)
-            {
-                processTurn(); tryRespawnEnemies(); recalcAP();
-            }
+            ms.spdCounter -= 100;
+            ms.spdCounter += ms.speedPerTurn;
+            if (ms.spdCounter > 300) ms.spdCounter = 300;
+            processTurn(); tryRespawnEnemies(); recalcSpeed();
             m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
             updateCamera(); return;
         }
@@ -1298,21 +1341,15 @@ void Game::handlePlayerMove(int dc, int dr)
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
     if (!moved) return;
 
-    Stats& ms = m_player->getStats();
-    ms.moveAPAccum += ms.moveSpeedCost;
-    while (ms.moveAPAccum >= 100)
-    {
-        ms.moveAPAccum -= 100;
-        ms.currentAP--;
-    }
+    ms.spdCounter -= 100;
+    // สะสม counter สำหรับ action ถัดไป (spd=0 → +100, spd=-1 → +50 ฯลฯ)
+    ms.spdCounter += ms.speedPerTurn;
+    if (ms.spdCounter > 300) ms.spdCounter = 300;
 
     m_turnCount++; m_player->onTurnPassed();
     m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
 
-    if (m_player->getStats().currentAP <= 0)
-    {
-        processTurn(); tryRespawnEnemies(); recalcAP();
-    }
+    processTurn(); tryRespawnEnemies(); recalcSpeed();
     updateCamera();
 
     int pc=m_player->getCol(),pr=m_player->getRow();
@@ -1346,14 +1383,6 @@ void Game::playerAttack(Enemy* enemy)
     if (powered) msg+=" [POWERED]";
     addLog(msg,sf::Color(255,200,50));
 
-    Stats& s = m_player->getStats();
-    s.atkAPAccum += s.atkSpeedCost;
-    while (s.atkAPAccum >= 100)
-    {
-        s.atkAPAccum -= 100;
-        s.currentAP--;
-    }
-
     if (enemy->isDead())
     {
         addLog("  "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
@@ -1382,7 +1411,7 @@ void Game::playerAttack(Enemy* enemy)
             int lv=m_player->getStats().level;
             m_coreSlots.setSlotCount(lv);
             refreshStats();
-            recalcAP();
+            recalcSpeed();
             addLog("  *** LEVEL UP! Level "+std::to_string(lv)+" ***",sf::Color(255,255,50));
         }
         onEnemyKilled(enemy);
@@ -1404,12 +1433,8 @@ void Game::enemyAttack(Enemy* enemy)
     if (s.hp<=0)
     {
         s.hp=0;
-        if (!s.hpDepleted)
-        {
-            s.hpDepleted=true;
-            addLog("  WARNING: HP depleted - Mentality drain starts!",sf::Color(255,120,50));
-            addLog("  Mentality -3/turn until recovered",sf::Color(220,100,200));
-        }
+        m_playerDead=true;
+        addLog("  *** YOU DIED *** [R] restart",sf::Color(255,50,50));
     }
 }
 
@@ -1420,8 +1445,11 @@ void Game::processTurn()
 {
     if (!m_player) return;
 
-    drainMentality();
-    if (m_playerDead) return;
+    regenStamina();
+
+    // tick cooldown + buff duration ของ player skills
+    for (auto& sk : m_player->getSkills())
+        sk.tick();
 
     int pc = m_player->getCol();
     int pr = m_player->getRow();
@@ -1429,6 +1457,10 @@ void Game::processTurn()
     for (auto* e : m_enemies)
     {
         if (e->isDead()) continue;
+
+        // ── มอน spd check: ช้า = skip turn ──
+        if (!e->tickSpeed()) continue;
+
         if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted()) continue;
 
         int dx = std::abs(e->getCol() - pc);
@@ -1464,9 +1496,9 @@ void Game::processTurn()
                             int actualDmg = std::max(1, dmg - def);
                             s.hp -= actualDmg;
                             addLog("  " + e->getName() + " uses " + sk->data.name +
-                                   " → " + std::to_string(actualDmg) + " dmg!",
+                                   " -> " + std::to_string(actualDmg) + " dmg!",
                                    sf::Color(220, 100, 80));
-                            if (s.hp <= 0) { s.hp = 0; s.hpDepleted = true; }
+                            if (s.hp <= 0) { s.hp = 0; m_playerDead = true; addLog("  *** YOU DIED *** [R] restart", sf::Color(255,50,50)); }
                             break;
                         }
                     }
@@ -1486,9 +1518,9 @@ void Game::processTurn()
                         int actualDmg = std::max(1, dmg - def);
                         s.hp -= actualDmg;
                         addLog("  " + e->getName() + " uses " + sk->data.name +
-                               " → " + std::to_string(actualDmg) + " dmg!",
+                               " -> " + std::to_string(actualDmg) + " dmg!",
                                sf::Color(220, 100, 80));
-                        if (s.hp <= 0) { s.hp = 0; s.hpDepleted = true; }
+                        if (s.hp <= 0) { s.hp = 0; m_playerDead = true; addLog("  *** YOU DIED *** [R] restart", sf::Color(255,50,50)); }
                     }
                 }
             }
@@ -1878,10 +1910,27 @@ void Game::renderStatsOverlay()
     line("ATK:         ", std::to_string(m_finalStats.atk));
     line("DEF:         ", std::to_string(m_finalStats.def));
     line("Dodge:       ", std::to_string(m_finalStats.dodge));
-    line("AP:          ", std::to_string(s.currentAP) + "/" + std::to_string(s.maxAP));
-    std::string spdStr = (m_finalStats.spd >= 0 ? "+" : "") + std::to_string(m_finalStats.spd);
-    line("Speed:       ", spdStr, m_finalStats.spd > 0 ? sf::Color(100,255,150) : (m_finalStats.spd < 0 ? sf::Color(255,100,100) : sf::Color(200,200,200)));
-    line("Move Cost:   ", std::to_string(s.moveSpeedCost) + "%");
+
+    // Stamina bar
+    {
+        std::string stam = std::to_string(s.stamina) + "/" + std::to_string(s.maxStamina)
+                         + "  (+" + std::to_string(s.staminaRegen) + "/turn)";
+        sf::Color stCol = s.stamina < s.maxStamina / 3 ? sf::Color(255,120,50)
+                        : s.stamina < s.maxStamina * 2 / 3 ? sf::Color(255,200,80)
+                        : sf::Color(80,220,140);
+        line("Stamina:     ", stam, stCol);
+    }
+
+    // Speed — แสดง modifier + counter
+    {
+        std::string spdStr = (m_finalStats.spd >= 0 ? "+" : "") + std::to_string(m_finalStats.spd);
+        spdStr += "  [" + std::to_string(s.spdCounter) + "/100]";
+        sf::Color spdCol = m_finalStats.spd > 0 ? sf::Color(100,255,150)
+                         : m_finalStats.spd < 0 ? sf::Color(255,100,100)
+                         : sf::Color(200,200,200);
+        line("Speed:       ", spdStr, spdCol);
+    }
+
     line("Mana:        ", std::to_string(s.mana) + "/" + std::to_string(m_finalStats.maxMana));
     line("MATK:        ", std::to_string(m_finalStats.matk));
     line("MDEF:        ", std::to_string(m_finalStats.mdef));

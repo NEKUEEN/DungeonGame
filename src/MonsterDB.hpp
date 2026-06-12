@@ -21,6 +21,7 @@ struct MonsterData
     int attack   = 3;
     int defense  = 0;
     int exp      = 1;
+    int spd      = 0;   // ความเร็ว: บวก=เร็ว, ลบ=ช้า (boss/ตัวใหญ่)
 
     // ── AI ──
     // "melee" (default) | "ranged" | "caster" | "coward"
@@ -65,6 +66,7 @@ public:
                 d.exp     = m["exp"].get<int>();
 
                 // ── AI fields (optional — backward-compat) ──
+                d.spd            = m.contains("spd")             ? m["spd"].get<int>()              : 0;
                 d.aiType         = m.contains("ai_type")         ? m["ai_type"].get<std::string>()  : "melee";
                 d.preferredRange = m.contains("preferred_range") ? m["preferred_range"].get<int>()  : 1;
                 d.alertRange     = m.contains("alert_range")     ? m["alert_range"].get<int>()      : 8;
