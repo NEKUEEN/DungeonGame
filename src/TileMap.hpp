@@ -20,7 +20,7 @@ class TileMap
 public:
     TileMap(int cols, int rows, int tileSize);
     void generate();
-    void render(sf::RenderWindow& window);
+    void render(sf::RenderWindow& window, const sf::View& gameView);
     TileType getTile(int col,int row) const;
     void     setTile(int col,int row,TileType type);
     bool     isWalkable(int col,int row) const;

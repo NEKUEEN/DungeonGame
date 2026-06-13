@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 #include <cmath>
+#include <chrono>
 
 // ============================================================
 //  Constructor / Destructor
@@ -1334,7 +1335,11 @@ void Game::handlePlayerMove(int dc, int dr)
             ms.spdCounter += ms.speedPerTurn;
             if (ms.spdCounter > 300) ms.spdCounter = 300;
             processTurn(); tryRespawnEnemies(); recalcSpeed();
-            m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+            auto t1 = std::chrono::high_resolution_clock::now();
+m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+auto t2 = std::chrono::high_resolution_clock::now();
+auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
+//addLog("fog: " + std::to_string(ms2) + "ms", sf::Color(100,255,100));
             updateCamera(); return;
         }
 
@@ -1542,7 +1547,7 @@ void Game::render()
 {
     m_window.clear(sf::Color(0,0,0));
     m_window.setView(m_gameView);
-    m_tileMap.render(m_window);
+    m_tileMap.render(m_window, m_gameView);
     renderItems();
     for (auto*e:m_enemies)
         if (m_fog.isVisible(e->getCol(),e->getRow())) e->render(m_window);
@@ -1559,6 +1564,25 @@ void Game::render()
     renderHotbar();
     if (m_ui.levelUpFlash) renderLevelUpEffect();
     if (m_playerDead) renderDeathScreen();
+
+    // ใน render() ก่อน m_window.display()
+    if (m_fontLoaded)
+    {
+        static sf::Clock fpsClock;
+        static int fpsCount = 0;
+        static int fpsDisplay = 0;
+        fpsCount++;
+        if (fpsClock.getElapsedTime().asSeconds() >= 1.f)
+        {
+            fpsDisplay = fpsCount;
+            fpsCount = 0;
+            fpsClock.restart();
+        }
+        sf::Text fpsTxt(m_font, "FPS: " + std::to_string(fpsDisplay), 10);
+        fpsTxt.setFillColor(sf::Color(100, 255, 100));
+        fpsTxt.setPosition({4.f, 4.f});
+        m_window.draw(fpsTxt);
+    }
     m_window.display();
 }
 

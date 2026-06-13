@@ -171,72 +171,77 @@ void TileMap::carveCorridor(int x1,int y1,int x2,int y2)
 // ============================================================
 //  Render  –  ใช้ texture ถ้ามี
 // ============================================================
-void TileMap::render(sf::RenderWindow& window)
+void TileMap::render(sf::RenderWindow& window, const sf::View& gameView)
 {
     auto& tm = TextureManager::instance();
     float ts = (float)m_tileSize;
 
-    // rebuild cache เฉพาะตอน map เปลี่ยน
-    if (m_cacheDirty)
-    {
-        m_renderCache.clear();
+    // คำนวณ tile ที่อยู่ใน view
+    sf::Vector2f center = gameView.getCenter();
+    sf::Vector2f size   = gameView.getSize();
 
-        auto getTexKey = [&](TileType type, ZoneType zone) -> const char* {
-            switch(type)
-            {
-                case TileType::Floor:
-                    if (zone == ZoneType::Darkness)      return "darkness_floor";
-                    if (zone == ZoneType::CrystalBright) return "crystalBright_floor";
-                    if (zone == ZoneType::DeadMan)       return "deadMan_floor";
-                    if (zone == ZoneType::BlackRock)     return "blackRock_floor";
-                    return "tile_floor";
-                case TileType::Wall:
-                    if (zone == ZoneType::CrystalBright) return "crystalBright_wall";
-                    return "tile_wall";
-                case TileType::GateDown: return "gate_down";
-                case TileType::GateUp:   return "gate_up";
-            }
-            return nullptr;
-        };
+    int minCol = std::max(0, (int)((center.x - size.x/2) / ts) - 1);
+    int maxCol = std::min(m_cols-1, (int)((center.x + size.x/2) / ts) + 1);
+    int minRow = std::max(0, (int)((center.y - size.y/2) / ts) - 1);
+    int maxRow = std::min(m_rows-1, (int)((center.y + size.y/2) / ts) + 1);
 
-        for (int row = 0; row < m_rows; ++row)
-        for (int col = 0; col < m_cols; ++col)
-        {
-            const char* key = getTexKey(m_grid[row][col], m_zoneGrid[row][col]);
-            if (!key) continue;
-            const sf::Texture* tex = tm.get(key);
-            if (!tex) continue;
+    // build vertex array เฉพาะ tile ที่เห็น
+    std::map<const sf::Texture*, sf::VertexArray> frameCache;
 
-            float x = (float)(col * m_tileSize);
-            float y = (float)(row * m_tileSize);
-            auto sz = tex->getSize();
-            float tw = (float)sz.x, th = (float)sz.y;
-
-            auto& va = m_renderCache[tex];
-            if (va.getPrimitiveType() != sf::PrimitiveType::Triangles)
-                va.setPrimitiveType(sf::PrimitiveType::Triangles);
-
-            size_t base = va.getVertexCount();
-            va.resize(base + 6);
-
-            va[base+0].position = {x,    y};    va[base+0].texCoords = {0,  0};
-            va[base+1].position = {x+ts, y};    va[base+1].texCoords = {tw, 0};
-            va[base+2].position = {x,    y+ts}; va[base+2].texCoords = {0,  th};
-            va[base+3].position = {x+ts, y};    va[base+3].texCoords = {tw, 0};
-            va[base+4].position = {x+ts, y+ts}; va[base+4].texCoords = {tw, th};
-            va[base+5].position = {x,    y+ts}; va[base+5].texCoords = {0,  th};
+    auto getTexKey = [&](TileType type, ZoneType zone) -> const char* {
+        switch(type) {
+            case TileType::Floor:
+                if (zone == ZoneType::Darkness)      return "darkness_floor";
+                if (zone == ZoneType::CrystalBright) return "crystalBright_floor";
+                if (zone == ZoneType::DeadMan)       return "deadMan_floor";
+                if (zone == ZoneType::BlackRock)     return "blackRock_floor";
+                return "tile_floor";
+            case TileType::Wall:
+                if (zone == ZoneType::CrystalBright) return "crystalBright_wall";
+                return "tile_wall";
+            case TileType::GateDown: return "gate_down";
+            case TileType::GateUp:   return "gate_up";
         }
+        return nullptr;
+    };
 
-        m_cacheDirty = false;
+    for (int row = minRow; row <= maxRow; ++row)
+    for (int col = minCol; col <= maxCol; ++col)
+    {
+        const char* key = getTexKey(m_grid[row][col], m_zoneGrid[row][col]);
+        if (!key) continue;
+        const sf::Texture* tex = tm.get(key);
+        if (!tex) continue;
+
+        float x = (float)(col * m_tileSize);
+        float y = (float)(row * m_tileSize);
+        auto sz = tex->getSize();
+        float tw = (float)sz.x, th = (float)sz.y;
+
+        auto& va = frameCache[tex];
+        if (va.getPrimitiveType() != sf::PrimitiveType::Triangles)
+            va.setPrimitiveType(sf::PrimitiveType::Triangles);
+
+        size_t base = va.getVertexCount();
+        va.resize(base + 6);
+
+        va[base+0].position = {x,    y};    va[base+0].texCoords = {0,  0};
+        va[base+1].position = {x+ts, y};    va[base+1].texCoords = {tw, 0};
+        va[base+2].position = {x,    y+ts}; va[base+2].texCoords = {0,  th};
+        va[base+3].position = {x+ts, y};    va[base+3].texCoords = {tw, 0};
+        va[base+4].position = {x+ts, y+ts}; va[base+4].texCoords = {tw, th};
+        va[base+5].position = {x,    y+ts}; va[base+5].texCoords = {0,  th};
     }
 
-    // draw — แค่นี้ทุก frame
     sf::RenderStates states;
-    for (auto& [tex, va] : m_renderCache)
+    for (auto& [tex, va] : frameCache)
     {
         states.texture = tex;
         window.draw(va, states);
     }
+    
+    // ลบ cache เก่าออก ไม่ต้องการแล้ว
+    m_cacheDirty = false;
 }
 
 
