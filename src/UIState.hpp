@@ -8,6 +8,7 @@ struct UIState {
     int selectedInvSlot = 0;
     int selectedEquipSlot = 0;
     int selectedCoreSlot = 0;
+    int selectedRace = 0;
 
     bool levelUpFlash = false;
     int levelUpTimer = 0;

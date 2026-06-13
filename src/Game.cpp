@@ -27,6 +27,8 @@ Game::Game()
     MonsterDB::instance().load("assets/data/monsters.json");
     DropTable::instance().loadItems("assets/data/items.json");
     SkillDB::instance().load("assets/data/skills.json");
+    RaceDB::instance().load("assets/data/races.json");
+    std::cerr << "[RaceDB] loaded: " << RaceDB::instance().getAll().size() << " races\n";
 
     m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
     m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
@@ -527,7 +529,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
 
                 if (e->isDead())
                 {
-                    addLog("  "+e->getName()+" dead! +"+std::to_string(e->getExp())+" EXP", sf::Color(220,80,80));
+                    //addLog("  "+e->getName()+" dead! +"+std::to_string(e->getExp())+" EXP", sf::Color(220,80,80));
                     
                     auto dropped = DropTable::instance().roll(e->getId());
                     for (const auto& itemId : dropped)
@@ -556,7 +558,17 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         addLog("  Dropped: "+idata->name, sf::Color(180,220,255));
                     }
 
-                    if (m_player->addExp(e->getExp()))
+                    const std::string& eid = e->getId();
+                        bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
+                        int expGain = isFirstKill ? e->getExp() : 0;
+
+                    if (isFirstKill) {
+                        m_firstKillDone.insert(eid);
+                        addLog("  [FIRST KILL] " + e->getName() + "! +" + std::to_string(expGain) + " EXP",
+                        sf::Color(255, 220, 50));
+}
+
+                    if (expGain > 0 && m_player->addExp(expGain))
                     {
                         m_ui.levelUpFlash = true;
                         m_ui.levelUpTimer = 120;
@@ -624,6 +636,7 @@ void Game::newDungeon(bool keepPlayer)
         m_coreSlots=CoreSlots();
         m_familyKillCount.clear();
         m_bossActive.clear();
+        m_firstKillDone.clear();
     }
 
     std::vector<std::pair<int,int>> floorTiles;
@@ -639,6 +652,26 @@ void Game::newDungeon(bool keepPlayer)
         ];
         delete m_player;
         m_player = new Player(col, row, TILE_SIZE);
+        if (!m_selectedRace.empty()) {
+        const RaceData* race = RaceDB::instance().get(m_selectedRace);
+        if (race) {
+            Stats& s = m_player->getStats();
+            s.baseMaxHp   += race->statBonus.hp;
+            s.hp           = s.baseMaxHp;
+            s.baseMaxMana += race->statBonus.mana;
+            s.mana         = s.baseMaxMana;
+            s.maxAtk      += race->statBonus.atk;
+            s.maxDef      += race->statBonus.def;
+            s.maxDodge    += race->statBonus.dodge;
+            s.maxMagicDmg += race->statBonus.matk;
+            s.maxMagicRes += race->statBonus.mdef;
+            s.maxSpd      += race->statBonus.spd;
+        // ใส่ start skill
+        m_player->addCoreSkill(race->startSkill);
+    if (!race->sprite.empty())
+        m_player->setSprite(race->sprite);
+        }
+}
     }
 
     clearEnemies(); spawnEnemies(8+m_dungeonFloor);
@@ -934,6 +967,29 @@ void Game::processEvents()
     while (const std::optional event = m_window.pollEvent())
     {
         if (event->is<sf::Event::Closed>()) m_window.close();
+        if (m_inRaceSelect)
+    {
+        if (const auto* key = event->getIf<sf::Event::KeyPressed>())
+        {
+            int& sel = m_ui.selectedRace;
+            int total = (int)RaceDB::instance().getAll().size(); // ไม่นับ ???
+            if (key->code == sf::Keyboard::Key::A && sel % 3 > 0)       sel--;
+            if (key->code == sf::Keyboard::Key::D && sel % 3 < 2 && sel+1 < total) sel++;
+            if (key->code == sf::Keyboard::Key::W && sel - 3 >= 0)       sel -= 3;
+            if (key->code == sf::Keyboard::Key::S && sel + 3 < total)    sel += 3;
+            if (key->code == sf::Keyboard::Key::Enter)
+            {
+                auto& races = RaceDB::instance().getAll();
+                if (sel < (int)races.size())
+                {
+                    m_selectedRace = races[sel].id;
+                    m_inRaceSelect = false;
+                    newDungeon(false);
+                }
+            }
+        }
+        return;
+    }
         if (const auto* key = event->getIf<sf::Event::KeyPressed>())
         {
             // F11 toggle fullscreen
@@ -950,7 +1006,10 @@ void Game::processEvents()
             }
             if (m_playerDead)
             {
-                if (key->code==sf::Keyboard::Key::R)      newDungeon(false);
+                if (key->code==sf::Keyboard::Key::R)
+                m_inRaceSelect = true;
+                m_ui.selectedRace = 0;
+                break;
                 if (key->code==sf::Keyboard::Key::Q) m_window.close();
                 return;
             }
@@ -1010,7 +1069,10 @@ void Game::processEvents()
                 case sf::Keyboard::Key::Num8: executeSkill(7); break;
                 case sf::Keyboard::Key::Num9: executeSkill(8); break;
 
-                case sf::Keyboard::Key::R:  newDungeon(false);        break;
+                case sf::Keyboard::Key::R:
+                    m_inRaceSelect = true;
+                    m_ui.selectedRace = 0;
+                    break;
                 case sf::Keyboard::Key::G:  tryPickupItem();          break;
                 case sf::Keyboard::Key::D:
                     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift))
@@ -1390,7 +1452,7 @@ void Game::playerAttack(Enemy* enemy)
 
     if (enemy->isDead())
     {
-        addLog("  "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
+        //addLog("  "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
         auto dropped=DropTable::instance().roll(enemy->getId());
         for (const auto& itemId:dropped)
         {
@@ -1409,7 +1471,17 @@ void Game::playerAttack(Enemy* enemy)
             m_mapItems.push_back(drop);
             addLog("  Dropped: "+idata->name,sf::Color(180,220,255));
         }
-        if (m_player->addExp(enemy->getExp()))
+        const std::string& eid = enemy->getId();
+            bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
+            int expGain = isFirstKill ? enemy->getExp() : 0;
+
+        if (isFirstKill) {
+            m_firstKillDone.insert(eid);
+        addLog("  [FIRST KILL] " + enemy->getName() + "! +" + std::to_string(expGain) + " EXP",
+           sf::Color(255, 220, 50));
+        }
+
+            if (expGain > 0 && m_player->addExp(expGain))
         {
             m_ui.levelUpFlash = true;
             m_ui.levelUpTimer = 120;
@@ -1545,6 +1617,9 @@ void Game::processTurn()
 // ============================================================
 void Game::render()
 {
+    m_window.clear(sf::Color(8,8,8));
+    if (m_inRaceSelect) { renderRaceSelect(); m_window.display(); return; }
+
     m_window.clear(sf::Color(0,0,0));
     m_window.setView(m_gameView);
     m_tileMap.render(m_window, m_gameView);
@@ -2250,4 +2325,110 @@ void Game::renderDeathScreen()
         t.setPosition({px + 125.f, btnY2 + -16.5f});
         m_window.draw(t);
     }
+}
+void Game::renderRaceSelect()
+{
+    if (!m_fontLoaded) return;
+    auto& races = RaceDB::instance().getAll();
+
+    // background
+    sf::RectangleShape bg({(float)WINDOW_W, (float)WINDOW_H});
+    bg.setFillColor(sf::Color(26, 26, 26));
+    m_window.draw(bg);
+
+    // title box
+    sf::RectangleShape titleBox({320.f, 36.f});
+    titleBox.setFillColor(sf::Color(30, 30, 30));
+    titleBox.setOutlineColor(sf::Color(180, 180, 180));
+    titleBox.setOutlineThickness(2.f);
+    titleBox.setPosition({(float)WINDOW_W/2.f - 160.f, 24.f});
+    m_window.draw(titleBox);
+
+    sf::Text title(m_font, "SELECT YOUR CHARACTER", 14);
+    title.setFillColor(sf::Color(220, 220, 220));
+    auto tb = title.getLocalBounds();
+    title.setPosition({(float)WINDOW_W/2.f - tb.size.x/2.f, 32.f});
+    m_window.draw(title);
+
+    // grid: 3 cols x 2 rows
+    const float CARD_W = 160.f;
+    const float CARD_H = 200.f;
+    const float GAP    = 12.f;
+    const int   COLS   = 3;
+    const int   TOTAL  = 6; // 5 races + 1 ???
+
+    float gridW = COLS * CARD_W + (COLS - 1) * GAP;
+    float startX = (float)WINDOW_W/2.f - gridW/2.f;
+    float startY = 80.f;
+
+    auto& tm = TextureManager::instance();
+
+    for (int i = 0; i < TOTAL; ++i)
+    {
+        int col = i % COLS;
+        int row = i / COLS;
+        float cx = startX + col * (CARD_W + GAP);
+        float cy = startY + row * (CARD_H + GAP);
+
+        bool sel     = (i == m_ui.selectedRace);
+        bool isEmpty = (i >= (int)races.size()); // slot ???
+
+        // card bg
+        sf::RectangleShape card({CARD_W, CARD_H});
+        card.setFillColor(sf::Color(155, 155, 155));
+        card.setOutlineColor(sel ? sf::Color(255, 220, 50) : sf::Color(90, 90, 90));
+        card.setOutlineThickness(sel ? 3.f : 1.5f);
+        card.setPosition({cx, cy});
+        m_window.draw(card);
+
+        if (isEmpty)
+        {
+            // ??? slot
+            sf::Text q(m_font, "???", 18);
+            q.setFillColor(sf::Color(60, 60, 60));
+            auto qb = q.getLocalBounds();
+            q.setPosition({cx + CARD_W/2.f - qb.size.x/2.f, cy + CARD_H/2.f - 16.f});
+            m_window.draw(q);
+            continue;
+        }
+
+        const auto& r = races[i];
+
+        // sprite
+        const sf::Texture* tex = tm.get(r.sprite);
+        if (tex)
+        {
+            sf::Sprite spr(*tex);
+            sf::Vector2u sz = tex->getSize();
+            float scale = std::min((CARD_W - 20.f) / sz.x, (CARD_H - 40.f) / sz.y);
+            spr.setScale({scale, scale});
+            spr.setPosition({
+                cx + CARD_W/2.f - (sz.x * scale)/2.f,
+                cy + 8.f
+            });
+            m_window.draw(spr);
+        }
+        else
+        {
+            // fallback สี่เหลี่ยมแทน sprite
+            sf::RectangleShape placeholder({CARD_W - 20.f, CARD_H - 50.f});
+            placeholder.setFillColor(sf::Color(70, 70, 80));
+            placeholder.setPosition({cx + 10.f, cy + 8.f});
+            m_window.draw(placeholder);
+        }
+
+        // ชื่อเผ่า
+        sf::Text name(m_font, r.name, 10);
+        name.setFillColor(sel ? sf::Color(255, 220, 50) : sf::Color(200, 200, 200));
+        auto nb = name.getLocalBounds();
+        name.setPosition({cx + CARD_W/2.f - nb.size.x/2.f, cy + CARD_H - 22.f});
+        m_window.draw(name);
+    }
+
+    // hint
+    sf::Text hint(m_font, "[WASD] Move   [Enter] Confirm", 9);
+    hint.setFillColor(sf::Color(100, 100, 100));
+    auto hb = hint.getLocalBounds();
+    hint.setPosition({(float)WINDOW_W/2.f - hb.size.x/2.f, (float)WINDOW_H - 24.f});
+    m_window.draw(hint);
 }

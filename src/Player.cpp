@@ -2,6 +2,7 @@
 #include "SkillDB.hpp"
 #include <algorithm>
 #include <iostream>
+#include "TextureManager.hpp"
 
 Player::Player(int startCol, int startRow, int tileSize)
     : m_col(startCol), m_row(startRow), m_tileSize(tileSize)
@@ -140,4 +141,20 @@ void Player::onTurnPassed()
         m_stats.hp--;
 
     // AP reset ทำใน Game::recalcSpeed() แล้ว
+}
+void Player::setSprite(const std::string& textureKey)
+{
+    const sf::Texture* tex = TextureManager::instance().get(textureKey);
+    if (!tex) { std::cerr << "[Player] setSprite: key not found: " << textureKey << "\n"; return; }
+
+    m_texture = *tex;
+
+    if (!m_sprite)
+        m_sprite = new sf::Sprite(m_texture);
+    else
+        m_sprite->setTexture(m_texture, true);
+
+    sf::Vector2u sz = m_texture.getSize();
+    m_sprite->setScale({(float)m_tileSize / sz.x, (float)m_tileSize / sz.y});
+    m_hasSprite = true;
 }

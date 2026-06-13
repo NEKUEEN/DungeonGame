@@ -42,6 +42,11 @@ public:
         load("orc",          "assets/textures/orc.png");
         load("tile_floor",   "assets/textures/tile_floor.png");
         load("tile_wall",    "assets/textures/tile_wall.png");
+        load("barbarian",       "assets/textures/barbarian.png");
+        load("furry",       "assets/textures/furry.png");
+        load("dwarf",       "assets/textures/dwarf.png");
+        load("fairy",       "assets/textures/fairy.png");
+        load("human",       "assets/textures/human.png");
         // zone floor textures
         load("darkness_floor",      "assets/textures/darkness_floor_tile.png");
         load("crystalBright_floor", "assets/textures/crystalBright_floor_tile.png");
@@ -66,6 +71,7 @@ public:
         load("item_rat_core",    "assets/textures/item_rat_core.png");
         load("item_goblinWizard_core", "assets/textures/item_goblinWizard_core.png");
         load("item_dagger", "assets/textures/item_dagger.png");
+
     }
 
 private:

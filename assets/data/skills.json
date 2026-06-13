@@ -5,7 +5,7 @@
       "name": "Power Strike",
       "desc": "Buff ATK +50% for 5 turns.",
       "type": "active_buff",
-      "hotbar_slot": 2,
+      "hotbar_slot": -1,
       "cooldown": 20,
       "duration": 5,
       "effect": {
@@ -29,7 +29,7 @@
       "name": "Giant Body",
       "desc": "The body enlarges Buff  +50% for 5 turns.",
       "type": "active_buff",
-      "hotbar_slot": 5,
+      "hotbar_slot": -1,
       "cooldown": 20,
       "duration": 15,
       "effect": {
@@ -84,14 +84,14 @@
       "name": "Arrow",
       "desc": "Arrow. Range 6, dmg ATK/2.",
       "type": "active_ranged",
-      "hotbar_slot": 0,
+      "hotbar_slot": -1,
       "cooldown": 1,
       "duration": 0,
       "effect": {
         "damage_pct": 100,
         "range": 5,
         "scaling_stat": "atk",
-        "stamina_cost": 50
+        "stamina_cost": 10
       }
     },
     {
@@ -99,7 +99,7 @@
       "name": "Quick Heal",
       "desc": "Instantly heal 20 HP.",
       "type": "active_heal",
-      "hotbar_slot": 3,
+      "hotbar_slot": -1,
       "cooldown": 10,
       "duration": 0,
       "effect": {

@@ -12,11 +12,11 @@ struct Stats
     int level = 1;
 
     // ── Base stats (ก่อน equipment/core) ──
-    int maxHp    = 25;   // จะถูก sync โดย recalcAllStats (รวม bonus แล้ว)
-    int baseMaxHp = 25;  // ค่าดิบก่อน bonus — ใช้ใน recalcAllStats เท่านั้น
-    int maxAtk   = 5;
-    int maxDef   = 2;
-    int maxDodge = 2;
+    int maxHp    = 0;   // จะถูก sync โดย recalcAllStats (รวม bonus แล้ว)
+    int baseMaxHp = 0;  // ค่าดิบก่อน bonus — ใช้ใน recalcAllStats เท่านั้น
+    int maxAtk   = 0;
+    int maxDef   = 0;
+    int maxDodge = 0;
     int maxSpd = 0;
     int spd    = 0;
 
@@ -24,17 +24,17 @@ struct Stats
     int body = 0;
 
     // ── HP bar ──
-    int hp = 25;
+    int hp = 0;
 
     // ── Mentality ──
     int  maxMentality = 0;
     int  mentality    = 0;
 
     // ── Mentality sub-stats ──
-    int maxMagicDmg  = 10;
-    int maxMana      = 20;
-    int baseMaxMana  = 20;  // ค่าดิบก่อน bonus
-    int mana = 20;
+    int maxMagicDmg  = 0;
+    int maxMana      = 0;
+    int baseMaxMana  = 0;  // ค่าดิบก่อน bonus
+    int mana = 0;
     int manaRegen = 1;   // เตรียมไว้ก่อน
     int maxMagicRes  = 0;
     // อนาคต: int maxPoisonRes = 0; int maxMagicSpd = 0;
@@ -76,7 +76,7 @@ struct Stats
 
 
     int maxStamina = 100;
-    int stamina = 0;
+    int stamina = 100;
     int staminaRegen = 0;
 
     // ── Speed system ──
@@ -99,6 +99,7 @@ public:
     int getCol() const { return m_col; }
     int getRow() const { return m_row; }
     void setPos(int col, int row) { m_col = col; m_row = row; }
+    void setSprite(const std::string& textureKey); // ← เพิ่ม
 
     Stats&       getStats()       { return m_stats; }
     const Stats& getStats() const { return m_stats; }

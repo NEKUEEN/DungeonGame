@@ -1,0 +1,79 @@
+{
+  "races": [
+    {
+      "id": "human",
+      "name": "Human",
+      "sprite": "human",
+      "statBonus": {
+        "hp": 0, "atk": 0, "def": 0,
+        "mana": 0, "matk": 0, "mdef": 0,
+        "dodge": 0, "spd": 0
+      },
+      "passive": {
+        "id": "exp_bonus",
+        "desc": "First kill EXP +50%"
+      },
+      "startSkill": "rally"
+    },
+    {
+      "id": "dwarf",
+      "name": "Dwarf",
+      "sprite": "dwarf",
+      "statBonus": {
+        "hp": 10, "atk": 3, "def": 20,
+        "mana": 0, "matk": 0, "mdef": 5,
+        "dodge": -1, "spd": 1
+      },
+      "passive": {
+        "id": "armor_mastery",
+        "desc": "Equipment DEF bonus +30%"
+      },
+      "startSkill": "stone_skin"
+    },
+    {
+      "id": "fairy",
+      "name": "Fairy",
+      "sprite": "fairy",
+      "statBonus": {
+        "hp": 10, "atk": 2, "def": -3,
+        "mana": 25, "matk": 5, "mdef": 5,
+        "dodge": 10, "spd": 2
+      },
+      "passive": {
+        "id": "mana_regen",
+        "desc": "Regen 3 mana per turn"
+      },
+      "startSkill": "pixie_dust"
+    },
+    {
+      "id": "barbarian",
+      "name": "Barbarian",
+      "sprite": "barbarian",
+      "statBonus": {
+        "hp": 40, "atk": 8, "def": 3,
+        "mana": -20, "matk": 0, "mdef": 0,
+        "dodge": 0, "spd": 0
+      },
+      "passive": {
+        "id": "soul_imprine",
+        "desc": ""
+      },
+      "startSkill": "berserker_slash"
+    },
+    {
+      "id": "furry",
+      "name": "Furry",
+      "sprite": "furry",
+      "statBonus": {
+        "hp": 12, "atk": 4, "def": -3,
+        "mana": 10, "matk": 0, "mdef": 0,
+        "dodge": 6, "spd": 2
+      },
+      "passive": {
+        "id": "keen_senses",
+        "desc": "Auto-reveal enemy stats on sight"
+      },
+      "startSkill": "shadow_step"
+    }
+  ]
+}

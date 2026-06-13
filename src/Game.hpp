@@ -2,6 +2,7 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <vector>
+#include <set>
 #include <string>
 #include <map>
 #include <random>
@@ -17,6 +18,7 @@
 #include "SkillDB.hpp"
 #include "UIState.hpp"
 #include "StatBonus.hpp"
+#include "RaceDB.hpp"
 
 constexpr int WINDOW_W        = 800;
 constexpr int WINDOW_H        = 600;
@@ -83,6 +85,10 @@ private:
     void renderStatsOverlay();
     void renderDeathScreen();
 
+    //Race
+    std::string m_selectedRace = "";
+    bool m_inRaceSelect = true;  // เริ่มที่หน้าเลือกเผ่า
+
     // player actions
     void handlePlayerMove(int dc, int dr);
     void handleInventoryInput(sf::Keyboard::Key key);
@@ -95,6 +101,7 @@ private:
     void tryAscendStairs();
     void waitTurn();
     void unequipSelected();
+    void renderRaceSelect();
 
     void executeSkill(int hotbarIdx);
     void executeAoe(SkillInstance* sk);
@@ -117,6 +124,7 @@ private:
     void regenStamina();        // ฟื้น stamina ต่อเทิร์น
 
     std::string pickRandomMonster(int floor);
+    std::set<std::string> m_firstKillDone;  // id ที่เคย first kill แล้ว
     void onEnemyKilled(Enemy* enemy);
     void spawnBoss(const std::string& family);
 
