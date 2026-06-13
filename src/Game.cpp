@@ -103,8 +103,8 @@ void Game::recalcAllStats()
     m_finalStats.matk   += m_finalStats.matk * magicPercentBonus / 100;
     m_finalStats.mdef    = base.maxMagicRes + bonus.magicRes;
     m_finalStats.spd     = base.maxSpd + bonus.spd;
-    m_finalStats.maxStamina  = 100;   // base stamina — ขยายได้จาก equipment/core ทีหลัง
-    m_finalStats.staminaRegen = 10;   // ฟื้น 10/เทิร์น by default
+    m_finalStats.maxStamina  = 100;
+    m_finalStats.staminaRegen = 1;
     m_finalStats.itemLevel = getItemLevelTotal();
 
     m_finalStats.body = (m_finalStats.maxHp * 0.4f + m_finalStats.atk * 0.3f +
@@ -950,7 +950,7 @@ void Game::processEvents()
             if (m_playerDead)
             {
                 if (key->code==sf::Keyboard::Key::R)      newDungeon(false);
-                if (key->code==sf::Keyboard::Key::Escape) m_window.close();
+                if (key->code==sf::Keyboard::Key::Q) m_window.close();
                 return;
             }
 
@@ -1467,8 +1467,8 @@ void Game::processTurn()
         int dy = std::abs(e->getRow() - pr);
 
         if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
-        {
-            enemyAttack(e);
+            {
+                enemyAttack(e);
         }
         else
         {
@@ -1558,6 +1558,7 @@ void Game::render()
     if (m_ui.activePanel == UIState::Panel::Stats) renderStatsOverlay();
     renderHotbar();
     if (m_ui.levelUpFlash) renderLevelUpEffect();
+    if (m_playerDead) renderDeathScreen();
     m_window.display();
 }
 
@@ -2133,5 +2134,96 @@ void Game::renderLogPanel()
         t.setFillColor(entry.color);
         t.setPosition({8.f,y}); m_window.draw(t);
         y+=17.f;
+    }
+}
+void Game::renderDeathScreen()
+{
+    if (!m_fontLoaded) return;
+
+    // dim overlay
+    sf::RectangleShape dim({(float)WINDOW_W, (float)WINDOW_H});
+    dim.setFillColor(sf::Color(8, 8, 8, 200));
+    m_window.draw(dim);
+
+    // panel
+    float pw = 320.f, ph = 220.f;
+    float px = (WINDOW_W - pw) / 2.f;
+    float py = (WINDOW_H - ph) / 2.f;
+    sf::RectangleShape panel({pw, ph});
+    panel.setFillColor(sf::Color(18, 5, 5));
+    panel.setOutlineColor(sf::Color(180, 40, 40));
+    panel.setOutlineThickness(2.f);
+    panel.setPosition({px, py});
+    m_window.draw(panel);
+
+    // YOU DIED
+    sf::Text died(m_font, "YOU DIED", 32);
+    died.setFillColor(sf::Color(220, 40, 40));
+    died.setOutlineColor(sf::Color(80, 0, 0));
+    died.setOutlineThickness(2.f);
+    auto db = died.getLocalBounds();
+    died.setPosition({px + (pw - db.size.x) / 2.f, py + 24.f});
+    m_window.draw(died);
+
+    // divider
+    sf::RectangleShape divider({pw - 40.f, 1.f});
+    divider.setFillColor(sf::Color(120, 30, 30));
+    divider.setPosition({px + 20.f, py + 80.f});
+    m_window.draw(divider);
+
+    // stats summary
+    if (m_player)
+    {
+        const Stats& s = m_player->getStats();
+        float sy = py + 94.f;
+        auto stat = [&](const std::string& txt, sf::Color c = sf::Color(180,140,140))
+        {
+            sf::Text t(m_font, txt, 11);
+            t.setFillColor(c);
+            auto b = t.getLocalBounds();
+            t.setPosition({px + (pw - b.size.x) / 2.f, sy});
+            m_window.draw(t);
+            sy += 18.f;
+        };
+        stat("Floor " + std::to_string(m_dungeonFloor) +
+             "   Level " + std::to_string(s.level) +
+             "   Turns " + std::to_string(m_turnCount),
+             sf::Color(160, 120, 120));
+        stat("Body " + fmtStat(m_finalStats.body) +
+             "   Battle Index " + fmtStat(m_finalStats.battleIndex),
+             sf::Color(140, 100, 100));
+    }
+
+    // buttons
+    float btnY = py + ph - 44.f;
+
+    // [R] Restart
+    {
+        sf::RectangleShape btn({pw - 40.f, 26.f});
+        btn.setFillColor(sf::Color(60, 10, 10));
+        btn.setOutlineColor(sf::Color(180, 60, 60));
+        btn.setOutlineThickness(1.5f);
+        btn.setPosition({px + 20.f, btnY + -30.f});
+        m_window.draw(btn);
+        sf::Text t(m_font, "[R]estart", 11);
+        t.setFillColor(sf::Color(220, 120, 120));
+        t.setPosition({px + 110.f, btnY + -21.5f});
+        m_window.draw(t);
+    }
+
+    // [Esc] Quit
+    float btnY2 = btnY + 32.f;
+
+    {
+        sf::RectangleShape btn({pw - 40.f, 26.f});
+        btn.setFillColor(sf::Color(20, 10, 10));
+        btn.setOutlineColor(sf::Color(100, 60, 60));
+        btn.setOutlineThickness(1.5f);
+        btn.setPosition({px + 20.f, btnY2 + -25.f});
+        m_window.draw(btn);
+        sf::Text t(m_font, "[Q]uit", 11);
+        t.setFillColor(sf::Color(140, 100, 100));
+        t.setPosition({px + 125.f, btnY2 + -16.5f});
+        m_window.draw(t);
     }
 }

@@ -52,7 +52,7 @@ struct FinalStats {
     int matk = 0;      // magic attack
     int mdef = 0;      // magic resist
     int spd = 0;       // speed bonus (อาจติดลบ)
-    int maxStamina = 0;
+    int maxStamina = 100;
     int staminaRegen = 0;
     float body = 0.f;
     float mentality = 0.f;
@@ -81,6 +81,7 @@ private:
     void renderHotbar();
     void renderTargeting();
     void renderStatsOverlay();
+    void renderDeathScreen();
 
     // player actions
     void handlePlayerMove(int dc, int dr);
@@ -112,13 +113,14 @@ private:
     void clearEnemies();
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
-    void recalcAP();            // จะใช้ m_finalStats.spd
+    void recalcSpeed();         // คำนวณ spd + stamina regen
+    void regenStamina();        // ฟื้น stamina ต่อเทิร์น
 
     std::string pickRandomMonster(int floor);
     void onEnemyKilled(Enemy* enemy);
     void spawnBoss(const std::string& family);
 
-    void recalcSpeed();
+
 
     // ตัวช่วยคำนวณ FinalStats
     void recalcAllStats();      // เรียกทุกครั้งที่ equipment / core / skill เปลี่ยน
@@ -131,7 +133,6 @@ private:
     void useSkillBuff(const std::string& skillId);
     void fireRangedAt(int targetCol, int targetRow);
     
-    void regenStamina();
     int  getScaledDamage(const SkillEffect& effect) const;
     int  getBuffedAtk() const { return m_finalStats.atk; }
     int  getBuffedDef() const { return m_finalStats.def; }

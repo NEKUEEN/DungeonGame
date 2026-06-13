@@ -102,25 +102,46 @@ void FogOfWar::compute(int playerCol, int playerRow, int radius,
             if (cell == FogState::Visible)
                 cell = FogState::Explored;
 
-    markVisible(playerCol, playerRow);
+// offset → octant indices ที่อนุญาต
+// T[8] = 8 octant ตามลำดับใน array เดิม
+// {1,0} = ขวา → octant 0,1,6,7 (ฝั่งขวา)
+// {-1,0} = ซ้าย → octant 2,3,4,5 (ฝั่งซ้าย)
+// {0,1} = ล่าง → octant 1,2,3,4 (ฝั่งล่าง)
+// {0,-1} = บน → octant 0,5,6,7 (ฝั่งบน)
 
-    // 8 octants: transform {cx, cy, rx, ry}
-    const int T[8][4] = {
-        { 1,  0,  0,  1},  // E-SE
-        { 0,  1,  1,  0},  // SE-S
-        { 0, -1,  1,  0},  // SW-S
-        {-1,  0,  0,  1},  // W-SW
-        {-1,  0,  0, -1},  // W-NW
-        { 0, -1, -1,  0},  // NW-N
-        { 0,  1, -1,  0},  // NE-N
-        { 1,  0,  0, -1},  // E-NE
-    };
+struct VirtualPlayer {
+    int dc, dr;
+    std::vector<int> octants; // index ของ T ที่ยิงได้
+};
 
-    // ทางโล่ง → radius ใหญ่ขึ้น shadowcasting จัดการกำแพงเอง
-    int r = radius * 3;
+VirtualPlayer vplayers[] = {
+    {0,  0, {0,1,2,3,4,5,6,7}}, // ตัวกลาง ยิงทุก octant
+    {1,  0, {0,1,6,7}},          // ขวา
+    {-1, 0, {2,3,4,5}},          // ซ้าย
+    {0,  1, {1,2,3,4}},          // ล่าง
+    {0, -1, {0,5,6,7}},          // บน
+    {1,  1, {0,1}},   // ขวา-ล่าง
+    {-1, 1, {2,3}},   // ซ้าย-ล่าง
+    {1, -1, {6,7}},   // ขวา-บน
+    {-1,-1, {4,5}},   // ซ้าย-บน
+};
 
-    for (auto& t : T)
-        castOctant(playerCol, playerRow, t[0], t[1], t[2], t[3], r, map);
+const int T[8][4] = {
+    { 1, 0, 0, 1}, { 0, 1, 1, 0},
+    { 0,-1, 1, 0}, {-1, 0, 0, 1},
+    {-1, 0, 0,-1}, { 0,-1,-1, 0},
+    { 0, 1,-1, 0}, { 1, 0, 0,-1},
+};
+
+for (auto& vp : vplayers)
+{
+    int vc = playerCol + vp.dc;
+    int vr = playerRow + vp.dr;
+    if (map.getTile(vc, vr) == TileType::Wall) continue;
+    markVisible(vc, vr);
+    for (int idx : vp.octants)
+        castOctant(vc, vr, T[idx][0], T[idx][1], T[idx][2], T[idx][3], radius, map);
+}
 }
 
 FogState FogOfWar::getState(int col, int row) const
