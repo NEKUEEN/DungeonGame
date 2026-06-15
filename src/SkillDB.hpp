@@ -32,6 +32,7 @@ public:
             d.cooldown = s["cooldown"].get<int>();
             d.duration = s["duration"].get<int>();
             d.hotbarSlot = s.contains("hotbar_slot") ? s["hotbar_slot"].get<int>() : -1;
+            d.icon = s.contains("icon") ? s["icon"].get<std::string>() : "";
 
             // type
             std::string t = s["type"].get<std::string>();
@@ -61,6 +62,9 @@ public:
                 if (e.contains("scaling_stat")) d.effect.scalingStat = e["scaling_stat"].get<std::string>();
                 if (e.contains("mana_cost"))      d.effect.manaCost    = e["mana_cost"].get<int>();
                 if (e.contains("stamina_cost"))   d.effect.staminaCost = e["stamina_cost"].get<int>();
+                if (e.contains("apply_status"))     d.effect.applyStatus    = e["apply_status"].get<std::string>();
+                if (e.contains("status_power"))     d.effect.statusPower    = e["status_power"].get<int>();
+                if (e.contains("status_duration"))  d.effect.statusDuration = e["status_duration"].get<int>();
 
             }
             else

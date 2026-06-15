@@ -11,6 +11,15 @@ struct StatBonus {
     int matk  = 0;      // เปลี่ยนจาก magicDmg
     int magicRes = 0;
     int spd   = 0;
+    // ── Status bonus ──
+    int bleedBonus  = 0;
+    int poisonBonus = 0;
+    int burnBonus   = 0;
+    int resistBleed  = 0;
+    int resistPoison = 0;
+    int resistBurn   = 0;
+    int resistStun   = 0;
+    int resistSlow   = 0;
 
     StatBonus& operator+=(const StatBonus& other) {
         hp    += other.hp;
@@ -21,6 +30,14 @@ struct StatBonus {
         matk  += other.matk;
         magicRes += other.magicRes;
         spd   += other.spd;
+        bleedBonus  += other.bleedBonus;
+        poisonBonus += other.poisonBonus;
+        burnBonus   += other.burnBonus;
+        resistBleed  += other.resistBleed;
+        resistPoison += other.resistPoison;
+        resistBurn   += other.resistBurn;
+        resistStun   += other.resistStun;
+        resistSlow   += other.resistSlow;
         return *this;
     }
 
@@ -31,7 +48,7 @@ struct StatBonus {
     }
 
     void clear() {
-        hp = atk = def = dodge = mana = matk = magicRes = spd = 0;
+        hp = atk = def = dodge = mana = matk = magicRes = spd = bleedBonus = poisonBonus = burnBonus = 0;
     }
 
     std::string toString() const {

@@ -6,6 +6,7 @@
 #include "Skill.hpp"
 #include <algorithm>
 #include <SkillDB.hpp>
+#include "StatusEffect.hpp"
 
 struct Stats
 {
@@ -82,6 +83,16 @@ struct Stats
     // ── Speed system ──
     int speedPerTurn = 100;  // threshold (100 = ปกติ)
     int spdCounter   = 100;    // accumulator — เมื่อถึง speedPerTurn = ได้เทิร์น
+
+    // ── Status Resist (0-100, หน่วยเป็น %) ──
+    int resistBleed  = 0;
+    int resistPoison = 0;
+    int resistBurn   = 0;
+    int resistStun   = 0;
+    int resistSlow   = 0;
+
+    // ── Active status effects ──
+    std::vector<StatusEffect> statusEffects;
 };
 
 class Player
@@ -107,6 +118,8 @@ public:
     // ── Skills ──
     std::vector<SkillInstance>&       getSkills()       { return m_skills; }
     const std::vector<SkillInstance>& getSkills() const { return m_skills; }
+
+
 
     SkillInstance* findSkill(const std::string& id)
     {
@@ -147,6 +160,11 @@ public:
         inst.data     = *sd;
         inst.fromCore = true;  // ← set ตรงนี้
         m_skills.push_back(inst);
+
+        // passive ไม่ใส่ hotbar
+        if (sd->type == SkillType::Passive)
+            return true;
+
 
         for (int i = 0; i < 9; ++i)
             if (m_hotbar[i].empty())

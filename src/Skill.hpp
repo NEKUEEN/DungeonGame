@@ -35,6 +35,10 @@ struct SkillEffect
     int atkSpeedPct  = 100; // AP cost ของการโจมตี x100 (100=ปกติ, 50=ถูกกว่า)
     int aoeRadius    = 0;   // radius ของ AOE
     std::string scalingStat = "atk"; // "atk", "def", "dodge", "magic_dmg" - stat ที่ใช้ในการคำนวณ damage ของ ranged/aoe
+    // ── Status Effect on hit ──
+    std::string applyStatus  = "";   // "bleed", "poison", "burn", "stun", "slow"
+    int         statusPower  = 0;    // damage per tick / magnitude
+    int         statusDuration = 0;  // จำนวนเทิร์น
 };
 
 // ============================================================
@@ -49,7 +53,7 @@ struct SkillData
     int         cooldown  = 0;   // turns
     int         duration  = 0;   // turns (สำหรับ buff)
     int         hotbarSlot = -1; // slot 0-8, -1 = ไม่ได้ assign
-
+    std::string icon = "";
     SkillEffect effect;
 
     // backward-compat aliases (ชี้ไปที่ effect)

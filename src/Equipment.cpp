@@ -37,6 +37,14 @@ StatBonus Equipment::getTotalBonus() const {
         total.matk  += item.magicDmgBonus;    // เปลี่ยน
         total.magicRes += item.magicResBonus;
         total.spd   += item.spdBonus;
+        total.bleedBonus  += item.bleedBonus;
+        total.poisonBonus += item.poisonBonus;
+        total.burnBonus   += item.burnBonus;
+        total.resistBleed += item.resistBleed;
+        total.resistBurn += item.resistBurn;
+        total.resistPoison += item.resistPoison;
+        total.resistSlow += item.resistSlow;
+        total.resistStun += item.resistStun;
     }
     return total;
 }

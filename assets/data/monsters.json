@@ -14,6 +14,9 @@
       "preferred_range": 1,
       "alert_range": 6,
       "spd": 1,
+      "apply_status": "bleed",
+      "status_power": 2,
+      "status_duration": 3,
       "drops": [
         {
           "item": "magic_stone",
@@ -21,7 +24,7 @@
         },
         {
           "item": "rat_core",
-          "chance": 0.12
+          "chance": 0.99
         }
       ]
     },

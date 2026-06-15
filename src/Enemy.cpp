@@ -9,6 +9,7 @@
 #include <queue>
 #include <unordered_map>
 #include <functional>
+#include "StatusEffect.hpp"
 
 // ============================================================
 //  Constructor
@@ -359,6 +360,44 @@ void Enemy::drawHPBar(sf::RenderWindow& window)
         dot.setPosition({bx+bw-4.f, by-4.f});
         window.draw(dot);
     }
+}
+
+void Enemy::applyStatus(const StatusEffect& se)
+{
+    // ถ้ามีอยู่แล้ว → refresh duration (ไม่ stack)
+    for (auto& existing : m_statusEffects)
+        if (existing.type == se.type)
+        { existing.duration = std::max(existing.duration, se.duration);
+          existing.power    = se.power; return; }
+    m_statusEffects.push_back(se);
+}
+
+void Enemy::tickStatusEffects(int& hpDelta)
+{
+    hpDelta = 0;
+    for (auto& se : m_statusEffects) {
+        switch(se.type) {
+            case StatusType::Bleed:
+            case StatusType::Poison:
+            case StatusType::Burn:   hpDelta -= se.power; break;
+            case StatusType::Regen:  hpDelta += se.power; break;
+            default: break;
+        }
+    }
+    m_hp += hpDelta;
+    m_hp  = std::clamp(m_hp, 0, m_maxHp);
+
+    // tick และลบ effect ที่หมดอายุ
+    m_statusEffects.erase(
+        std::remove_if(m_statusEffects.begin(), m_statusEffects.end(),
+            [](StatusEffect& se){ return !se.tick(); }),
+        m_statusEffects.end());
+}
+
+bool Enemy::hasStatus(StatusType type) const {
+    for (const auto& se : m_statusEffects)
+        if (se.type == type && se.isActive()) return true;
+    return false;
 }
 
 sf::Color Enemy::rankColor() const

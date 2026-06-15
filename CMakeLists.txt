@@ -21,7 +21,8 @@ set(SOURCES
     src/Skill.cpp
 )
 
-add_executable(DungeonGame ${SOURCES})
+add_executable(DungeonGame ${SOURCES}
+    src/StatusEffect.hpp)
 target_include_directories(DungeonGame PRIVATE src src/lib)
 target_link_libraries(DungeonGame PRIVATE SFML::Graphics SFML::Window SFML::System)
 

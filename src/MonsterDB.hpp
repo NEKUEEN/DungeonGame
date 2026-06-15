@@ -32,6 +32,10 @@ struct MonsterData
 
     // ── Skills ──
     std::vector<std::string> skills;  // skill ids จาก skills.json
+    // ── Status on hit ──
+    std::string applyStatus    = "";
+    int         statusPower    = 0;
+    int         statusDuration = 0;
 };
 
 // ============================================================
@@ -71,6 +75,9 @@ public:
                 d.preferredRange = m.contains("preferred_range") ? m["preferred_range"].get<int>()  : 1;
                 d.alertRange     = m.contains("alert_range")     ? m["alert_range"].get<int>()      : 8;
                 d.attackInterval = m.contains("attack_interval") ? m["attack_interval"].get<int>() : 1;
+                d.applyStatus    = m.contains("apply_status")    ? m["apply_status"].get<std::string>() : "";
+                d.statusPower    = m.contains("status_power")    ? m["status_power"].get<int>()         : 0;
+                d.statusDuration = m.contains("status_duration") ? m["status_duration"].get<int>()      : 0;
 
                 // ── Skills (optional) ──
                 if (m.contains("skills"))

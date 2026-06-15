@@ -1,6 +1,7 @@
 #include "Game.hpp"
 #include "TextureManager.hpp"
 #include "MonsterDB.hpp"
+#include "StatusEffect.hpp"
 #include "DropTable.hpp"
 #include <iostream>
 #include <cstdlib>
@@ -76,11 +77,18 @@ void Game::recalcAllStats()
     int oldMaxMana = base.maxMana;
     
     StatBonus bonus = m_equipment.getTotalBonus() + m_coreSlots.getTotalBonus();
+    m_finalStats.bleedBonus  = bonus.bleedBonus;
+    m_finalStats.poisonBonus = bonus.poisonBonus;
+    m_finalStats.resistBleed  = bonus.resistBleed;
+    m_finalStats.resistPoison = bonus.resistPoison;
+    m_finalStats.resistBurn   = bonus.resistBurn;
+    m_finalStats.resistStun   = bonus.resistStun;
+    m_finalStats.resistSlow   = bonus.resistSlow;
 
     int atkPercentBonus = 0, defPercentBonus = 0, magicPercentBonus = 0, hpPercentBonus = 0;
     for (const auto& sk : m_player->getSkills())
     {
-        if (sk.data.type == SkillType::Passive ||
+        if (sk.data.type == SkillType::Passive  ||
             (sk.data.type == SkillType::ActiveBuff && sk.buffActive))
         {
             atkPercentBonus += sk.data.effect.atkPct;
@@ -524,8 +532,38 @@ void Game::fireRangedAt(int targetCol, int targetRow)
             if (!e->isDead() && e->getCol() == tx && e->getRow() == ty)
             {
                 e->takeDamage(projDmg);
-                addLog("  " + sk->data.name + " hits " + e->getName() + " for " + std::to_string(projDmg) + "!",
-                       sf::Color(180,220,255));
+
+                std::string hitLog = "  " + sk->data.name + " hits " + e->getName() + " for " + std::to_string(projDmg) + "!";
+                // ── Apply status effect on hit ──
+                if (!sk->data.effect.applyStatus.empty() && sk->data.effect.statusDuration > 0)
+                {
+                const std::string& st = sk->data.effect.applyStatus;
+                StatusType stype;
+                bool valid = true;
+
+                if      (st == "bleed")  stype = StatusType::Bleed;
+                else if (st == "poison") stype = StatusType::Poison;
+                else if (st == "burn")   stype = StatusType::Burn;
+                else if (st == "stun")   stype = StatusType::Stun;
+                else if (st == "slow")   stype = StatusType::Slow;
+                else valid = false;
+
+                if (valid)
+                {
+                    StatusEffect se;
+                    se.type     = stype;
+                    int bonus = 0;
+                    if (st == "bleed")  bonus = m_finalStats.bleedBonus;  // ← เพิ่มใน FinalStats ด้วย
+                    if (st == "poison") bonus = m_finalStats.poisonBonus;
+                    if (st == "burn")   bonus = m_finalStats.burnBonus;
+                    se.power = sk->data.effect.statusPower + bonus;
+                    se.duration = sk->data.effect.statusDuration;
+                    se.sourceId = sk->data.id;
+                    e->applyStatus(se);
+                        addLog("  " + e->getName() + " is " + st + "!", sf::Color(200, 100, 220));
+                }
+            }
+                        addLog(hitLog, sf::Color(180, 220, 255));  // ← log เดียว
 
                 if (e->isDead())
                 {
@@ -550,6 +588,14 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         drop.magicDmgBonus = idata->magicDmgBonus;
                         drop.magicResBonus = idata->magicResBonus;
                         drop.spdBonus = idata->spdBonus;
+                        drop.bleedBonus  = idata->bleedBonus;
+                        drop.poisonBonus = idata->poisonBonus;
+                        drop.burnBonus   = idata->burnBonus;
+                        drop.resistBurn = idata->resistBurn;
+                        drop.resistBleed = idata->resistBleed;
+                        drop.resistPoison = idata->resistPoison;
+                        drop.resistSlow = idata->resistSlow;
+                        drop.resistStun = idata->resistStun;
                         drop.spriteName = idata->sprite;
                         drop.stackable = idata->stackable;
                         drop.col = e->getCol();
@@ -672,6 +718,13 @@ void Game::newDungeon(bool keepPlayer)
         m_player->setSprite(race->sprite);
         }
 }
+        // ใน newDungeon() หลัง new Player
+        //StatusEffect test;
+        //test.type     = StatusType::Bleed;
+        //test.power    = 3;
+        //test.duration = 10;
+        //test.sourceId = "test";
+        //m_player->getStats().statusEffects.push_back(test);
     }
 
     clearEnemies(); spawnEnemies(8+m_dungeonFloor);
@@ -922,6 +975,14 @@ void Game::spawnItems()
                 item.magicDmgBonus = idata->magicDmgBonus;
                 item.magicResBonus = idata->magicResBonus;
                 item.spdBonus      = idata->spdBonus;
+                item.bleedBonus  = idata->bleedBonus;
+                item.poisonBonus = idata->poisonBonus;
+                item.burnBonus   = idata->burnBonus;
+                item.resistBleed = idata->resistBleed;
+                item.resistBurn = idata->resistBurn;
+                item.resistPoison = idata->resistPoison;
+                item.resistSlow = idata->resistSlow;
+                item.resistStun = idata->resistStun;
                 item.spriteName    = idata->sprite;
                 item.stackable     = idata->stackable;
             }
@@ -973,11 +1034,12 @@ void Game::processEvents()
         {
             int& sel = m_ui.selectedRace;
             int total = (int)RaceDB::instance().getAll().size(); // ไม่นับ ???
-            if (key->code == sf::Keyboard::Key::A && sel % 3 > 0)       sel--;
-            if (key->code == sf::Keyboard::Key::D && sel % 3 < 2 && sel+1 < total) sel++;
-            if (key->code == sf::Keyboard::Key::W && sel - 3 >= 0)       sel -= 3;
-            if (key->code == sf::Keyboard::Key::S && sel + 3 < total)    sel += 3;
+            if (key->code == sf::Keyboard::Key::H && sel % 3 > 0)       sel--;
+            if (key->code == sf::Keyboard::Key::L && sel % 3 < 2 && sel+1 < total) sel++;
+            if (key->code == sf::Keyboard::Key::K && sel - 3 >= 0)       sel -= 3;
+            if (key->code == sf::Keyboard::Key::J && sel + 3 < total)    sel += 3;
             if (key->code == sf::Keyboard::Key::Enter)
+            
             {
                 auto& races = RaceDB::instance().getAll();
                 if (sel < (int)races.size())
@@ -987,6 +1049,9 @@ void Game::processEvents()
                     newDungeon(false);
                 }
             }
+            if (key->code == sf::Keyboard::Key::Escape)
+            m_window.close();
+                return;
         }
         return;
     }
@@ -1009,9 +1074,8 @@ void Game::processEvents()
                 if (key->code==sf::Keyboard::Key::R)
                 m_inRaceSelect = true;
                 m_ui.selectedRace = 0;
-                break;
                 if (key->code==sf::Keyboard::Key::Q) m_window.close();
-                return;
+                break;
             }
 
             if (m_ui.targeting.active)
@@ -1466,6 +1530,14 @@ void Game::playerAttack(Enemy* enemy)
             drop.defBonus=idata->defBonus; drop.dodgeBonus=idata->dodgeBonus;
             drop.manaBonus=idata->manaBonus; drop.magicDmgBonus=idata->magicDmgBonus;
             drop.magicResBonus=idata->magicResBonus; drop.spdBonus=idata->spdBonus;
+            drop.bleedBonus  = idata->bleedBonus;
+            drop.poisonBonus = idata->poisonBonus;
+            drop.burnBonus   = idata->burnBonus;
+            drop.resistBleed = idata->resistBleed;
+            drop.resistBurn = idata->resistBurn;
+            drop.resistPoison = idata->resistPoison;
+            drop.resistSlow = idata->resistSlow;
+            drop.resistStun = idata->resistStun;
             drop.spriteName=idata->sprite; drop.stackable=idata->stackable;
             drop.col=enemy->getCol(); drop.row=enemy->getRow();
             m_mapItems.push_back(drop);
@@ -1505,8 +1577,67 @@ void Game::enemyAttack(Enemy* enemy)
     if ((std::rand()%100)<(int)(dodgeChance*100))
     {addLog("  You dodged "+enemy->getName()+"!",sf::Color(150,220,150));return;}
     int dmg=std::max(1,enemy->getAttack()-def+std::rand()%3);
-    s.hp-=dmg;
-    addLog("  "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(220,80,80));
+    s.hp -= dmg;
+
+// ── Apply status on hit ──
+const MonsterData* mdata = MonsterDB::instance().get(enemy->getId());
+if (mdata && !mdata->applyStatus.empty() && mdata->statusDuration > 0)
+{
+    StatusType stype;
+    bool valid = true;
+    const std::string& st = mdata->applyStatus;
+
+    if      (st == "bleed")  stype = StatusType::Bleed;
+    else if (st == "poison") stype = StatusType::Poison;
+    else if (st == "burn")   stype = StatusType::Burn;
+    else if (st == "stun")   stype = StatusType::Stun;
+    else if (st == "slow")   stype = StatusType::Slow;
+    else valid = false;
+
+    StatusEffect se;
+    se.type     = stype;
+    se.power    = mdata->statusPower;
+    se.duration = mdata->statusDuration;
+    se.sourceId = enemy->getId();
+
+    if (valid)
+    {
+        int resist = 0;
+        if (stype == StatusType::Bleed)  resist = s.resistBleed;
+        if (stype == StatusType::Poison) resist = s.resistPoison;
+        if (stype == StatusType::Burn)   resist = s.resistBurn;
+        if (stype == StatusType::Stun)   resist = s.resistStun;
+        if (stype == StatusType::Slow)   resist = s.resistSlow;
+
+        std::uniform_int_distribution<int> rollDist(0, 99);
+        int roll = rollDist(m_rng);
+        if (roll < resist)
+        {
+            addLog("  You resist " + st + "!", sf::Color(100, 200, 100));
+        }
+        else
+        {
+            bool found = false;
+            for (auto& existing : s.statusEffects)
+            {
+                if (existing.type == stype)
+                {
+                    existing.duration = se.duration;
+                    existing.power    = se.power;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                s.statusEffects.push_back(se);
+                addLog("  You are " + st + "ed!", sf::Color(200, 100, 220));
+            }
+        }
+    }
+    
+}
+addLog("  "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(220,80,80));
     if (s.hp<=0)
     {
         s.hp=0;
@@ -1514,7 +1645,6 @@ void Game::enemyAttack(Enemy* enemy)
         addLog("  *** YOU DIED *** [R] restart",sf::Color(255,50,50));
     }
 }
-
 // ============================================================
 //  processTurn – จัดการเทิร์นของศัตรู
 // ============================================================
@@ -1525,30 +1655,47 @@ void Game::processTurn()
     regenStamina();
 
     // tick cooldown + buff duration ของ player skills
-    for (auto& sk : m_player->getSkills())
+        for (auto& sk : m_player->getSkills())
         sk.tick();
 
-    int pc = m_player->getCol();
-    int pr = m_player->getRow();
+        int pc = m_player->getCol();
+        int pr = m_player->getRow();
 
-    for (auto* e : m_enemies)
-    {
+        for (auto* e : m_enemies)
+        {
+        // 1. ตายแล้วข้ามเลย
         if (e->isDead()) continue;
 
-        // ── มอน spd check: ช้า = skip turn ──
+        // 2. Tick status effects (bleed/poison/burn ฯลฯ)
+        int hpDelta = 0;
+        e->tickStatusEffects(hpDelta);
+        if (hpDelta < 0)
+            addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
+                " dot dmg", sf::Color(180, 80, 180));
+
+        // 3. ตายจาก status ไหม?
+        if (e->isDead()) { onEnemyKilled(e); continue; }
+
+        // 4. Stun → ข้ามเทิร์น
+        if (e->hasStatus(StatusType::Stun)) continue;
+
+        // 5. Speed check → ถ้า counter ยังไม่ถึง 100 ข้ามเทิร์น
         if (!e->tickSpeed()) continue;
 
+        // 6. อยู่นอก fog และยังไม่ alerted → ข้ามเทิร์น
         if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted()) continue;
 
+        // 7. ติดกับ player → โจมตี
         int dx = std::abs(e->getCol() - pc);
         int dy = std::abs(e->getRow() - pr);
 
         if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
-            {
-                enemyAttack(e);
-        }
-        else
         {
+            enemyAttack(e);
+        }
+            else
+        {
+            // 8. AI เดิน + skill
             e->updateAI(pc, pr, m_tileMap, m_enemies);
 
             if (e->hasPendingSkill())
@@ -1637,6 +1784,7 @@ void Game::render()
     renderLogPanel();
     if (m_ui.activePanel == UIState::Panel::Stats) renderStatsOverlay();
     renderHotbar();
+    renderStatusEffects();  // ← เพิ่ม
     if (m_ui.levelUpFlash) renderLevelUpEffect();
     if (m_playerDead) renderDeathScreen();
 
@@ -1668,12 +1816,12 @@ void Game::renderHotbar()
 {
     if (!m_player || !m_fontLoaded) return;
 
-    const float SZ  = 22.f;
+    const float SZ  = 32.f;
     const float GAP = 4.f;
     const int   N   = 9;
     float totalW = N * (SZ + GAP) - GAP;
     float startX = 8.f;
-    float startY = 568.f;
+    float startY = 558.f;
 
     for (int i = 0; i < N; ++i)
     {
@@ -2010,6 +2158,8 @@ void Game::renderStatsOverlay()
     line("ATK:         ", std::to_string(m_finalStats.atk));
     line("DEF:         ", std::to_string(m_finalStats.def));
     line("Dodge:       ", std::to_string(m_finalStats.dodge));
+    line("Bleed:       ", std::to_string(m_finalStats.bleedBonus));
+    line("BldRes%:     ", std::to_string(m_finalStats.resistBleed));
 
     // Stamina bar
     {
@@ -2338,7 +2488,7 @@ void Game::renderRaceSelect()
 
     // title box
     sf::RectangleShape titleBox({320.f, 36.f});
-    titleBox.setFillColor(sf::Color(30, 30, 30));
+    titleBox.setFillColor(sf::Color(155, 155, 155));
     titleBox.setOutlineColor(sf::Color(180, 180, 180));
     titleBox.setOutlineThickness(2.f);
     titleBox.setPosition({(float)WINDOW_W/2.f - 160.f, 24.f});
@@ -2347,17 +2497,19 @@ void Game::renderRaceSelect()
     sf::Text title(m_font, "SELECT YOUR CHARACTER", 14);
     title.setFillColor(sf::Color(220, 220, 220));
     auto tb = title.getLocalBounds();
-    title.setPosition({(float)WINDOW_W/2.f - tb.size.x/2.f, 32.f});
+    //title.setPosition({(float)WINDOW_W/2.f - tb.size.x/2.f, 32.f});
+    title.setPosition({252.5f, 36.f});
     m_window.draw(title);
 
     // grid: 3 cols x 2 rows
-    const float CARD_W = 160.f;
-    const float CARD_H = 200.f;
+    const float CARD_W = 180.f;
+    const float CARD_H = 205.f;
     const float GAP    = 12.f;
     const int   COLS   = 3;
     const int   TOTAL  = 6; // 5 races + 1 ???
 
     float gridW = COLS * CARD_W + (COLS - 1) * GAP;
+    //float startX = 1.f;
     float startX = (float)WINDOW_W/2.f - gridW/2.f;
     float startY = 80.f;
 
@@ -2376,11 +2528,11 @@ void Game::renderRaceSelect()
         // card bg
         sf::RectangleShape card({CARD_W, CARD_H});
         card.setFillColor(sf::Color(155, 155, 155));
-        card.setOutlineColor(sel ? sf::Color(255, 220, 50) : sf::Color(90, 90, 90));
+        card.setOutlineColor(sel ? sf::Color(255, 255, 255) : sf::Color(90, 90, 90));
         card.setOutlineThickness(sel ? 3.f : 1.5f);
         card.setPosition({cx, cy});
         m_window.draw(card);
-
+//sf::Color(255, 220, 50)
         if (isEmpty)
         {
             // ??? slot
@@ -2404,7 +2556,7 @@ void Game::renderRaceSelect()
             spr.setScale({scale, scale});
             spr.setPosition({
                 cx + CARD_W/2.f - (sz.x * scale)/2.f,
-                cy + 8.f
+                cy + 10.f
             });
             m_window.draw(spr);
         }
@@ -2418,8 +2570,8 @@ void Game::renderRaceSelect()
         }
 
         // ชื่อเผ่า
-        sf::Text name(m_font, r.name, 10);
-        name.setFillColor(sel ? sf::Color(255, 220, 50) : sf::Color(200, 200, 200));
+        sf::Text name(m_font, r.name, 16);
+        name.setFillColor(sel ? sf::Color(255, 255, 255) : sf::Color(200, 200, 200));
         auto nb = name.getLocalBounds();
         name.setPosition({cx + CARD_W/2.f - nb.size.x/2.f, cy + CARD_H - 22.f});
         m_window.draw(name);
@@ -2431,4 +2583,87 @@ void Game::renderRaceSelect()
     auto hb = hint.getLocalBounds();
     hint.setPosition({(float)WINDOW_W/2.f - hb.size.x/2.f, (float)WINDOW_H - 24.f});
     m_window.draw(hint);
+}
+void Game::renderStatusEffects()
+{
+    if (!m_player || !m_fontLoaded) return;
+
+    const float SZ   = 22.f;
+    const float GAP  = 4.f;
+    const float Y    = 568.f;
+    const float RIGHT = 550.f;  // ขอบขวาก่อน right panel
+
+    // ── Passive skills — ชิดขวาสุด ──
+    auto& skills = m_player->getSkills();
+    std::vector<const SkillInstance*> passives;
+    for (const auto& sk : skills)
+        if (sk.data.type == SkillType::Passive && sk.fromCore)
+            passives.push_back(&sk);
+
+    float passiveStartX = RIGHT - passives.size() * (SZ + GAP);
+    for (int i = 0; i < (int)passives.size(); ++i)
+    {
+        const auto& sk = *passives[i];
+        float sx = passiveStartX + i * (SZ + GAP);
+
+        sf::RectangleShape slot({SZ, SZ});
+        slot.setFillColor(sf::Color(20, 20, 20, 220));
+        slot.setOutlineColor(sf::Color(100, 200, 255));
+        slot.setOutlineThickness(2.f);
+        slot.setPosition({sx, Y});
+        m_window.draw(slot);
+
+        if (!sk.data.icon.empty())
+        {
+            const sf::Texture* tex = TextureManager::instance().get(sk.data.icon);
+            if (tex)
+            {
+                sf::Sprite spr(*tex);
+                auto tsz = tex->getSize();
+                float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+                spr.setScale({sc, sc});
+                spr.setPosition({sx, Y});
+                m_window.draw(spr);
+            }
+        }
+        else
+        {
+            sf::Text txt(m_font, sk.data.name.substr(0, 3), 7);
+            txt.setFillColor(sf::Color(100, 200, 255));
+            txt.setPosition({sx + 2.f, Y + 2.f});
+            m_window.draw(txt);
+
+            sf::Text nameTxt(m_font, sk.data.name, 6);
+            nameTxt.setFillColor(sf::Color(100, 200, 255, 180));
+            nameTxt.setPosition({sx + 2.f, Y + 12.f});
+            m_window.draw(nameTxt);
+        }
+    }
+
+    // ── Status effects — อยู่ซ้ายของ passive ──
+    const auto& effects = m_player->getStats().statusEffects;
+    float statusStartX = passiveStartX - effects.size() * (SZ + GAP) - GAP;
+
+    for (int i = 0; i < (int)effects.size(); ++i)
+    {
+        const auto& se = effects[i];
+        float sx = statusStartX + i * (SZ + GAP);
+
+        sf::RectangleShape slot({SZ, SZ});
+        slot.setFillColor(sf::Color(20, 20, 20, 220));
+        slot.setOutlineColor(se.color());
+        slot.setOutlineThickness(2.f);
+        slot.setPosition({sx, Y});
+        m_window.draw(slot);
+
+        sf::Text nameTxt(m_font, se.icon(), 7);
+        nameTxt.setFillColor(se.color());
+        nameTxt.setPosition({sx + 2.f, Y + 2.f});
+        m_window.draw(nameTxt);
+
+        sf::Text durTxt(m_font, std::to_string(se.duration), 9);
+        durTxt.setFillColor(sf::Color::White);
+        durTxt.setPosition({sx + 2.f, Y + SZ - 11.f});
+        m_window.draw(durTxt);
+    }
 }

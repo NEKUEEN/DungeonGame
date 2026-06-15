@@ -30,6 +30,14 @@ struct ItemData
     int  magicDmgBonus = 0;
     int  magicResBonus = 0;
     int  spdBonus   = 0;
+    int bleedBonus = 0;
+    int poisonBonus = 0;
+    int burnBonus = 0;
+    int resistBleed  = 0;
+    int resistPoison = 0;
+    int resistBurn   = 0;
+    int resistStun   = 0;
+    int resistSlow   = 0;
     bool stackable  = true;
 
     // core_stats (เฉพาะ Core items)
@@ -77,6 +85,14 @@ public:
             d.magicDmgBonus  = it.contains("magic_dmg")  ? it["magic_dmg"].get<int>()  : 0;
             d.magicResBonus  = it.contains("magic_res")  ? it["magic_res"].get<int>()  : 0;
             d.spdBonus    = it.contains("spd")   ? it["spd"].get<int>()   : 0;
+            d.bleedBonus  = it.contains("bleed_bonus")  ? it["bleed_bonus"].get<int>()  : 0;
+            d.poisonBonus = it.contains("poison_bonus") ? it["poison_bonus"].get<int>() : 0;
+            d.burnBonus   = it.contains("burn_bonus")   ? it["burn_bonus"].get<int>()   : 0;
+            d.resistBleed  = it.contains("resist_bleed")  ? it["resist_bleed"].get<int>()  : 0;
+            d.resistPoison = it.contains("resist_poison") ? it["resist_poison"].get<int>() : 0;
+            d.resistBurn   = it.contains("resist_burn")   ? it["resist_burn"].get<int>()   : 0;
+            d.resistStun   = it.contains("resist_stun")   ? it["resist_stun"].get<int>()   : 0;
+            d.resistSlow   = it.contains("resist_slow")   ? it["resist_slow"].get<int>()   : 0;
             // core_stats
             if (it.contains("core_stats"))
             {
@@ -89,6 +105,7 @@ public:
                 d.coreMagicDmg  = cs.contains("magic_dmg")  ? cs["magic_dmg"].get<int>()  : 0;
                 d.coreMagicRes  = cs.contains("magic_res")  ? cs["magic_res"].get<int>()  : 0;
                 d.coreSpdBonus = cs.contains("spd")   ? cs["spd"].get<int>()   : 0;
+
             }
 
             // skills ที่ core ให้

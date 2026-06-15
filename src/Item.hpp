@@ -22,6 +22,14 @@ struct Item
     int         magicDmgBonus = 0; // เพิ่ม: สำหรับ Core ที่มี bonus magic damage
     int         magicResBonus = 0;
     int         spdBonus   = 0;  // +/- speed (บวก=เร็ว, ลบ=ช้า) // เพิ่ม: สำหรับ Core ที่มี bonus magic resistance
+    int bleedBonus  = 0;
+    int poisonBonus = 0;
+    int burnBonus   = 0;
+    int resistBleed  = 0;
+    int resistPoison = 0;
+    int resistBurn   = 0;
+    int resistStun   = 0;
+    int resistSlow   = 0;
     bool        stackable  = false;
     int         col        = -1;
     int         row        = -1;
@@ -35,7 +43,10 @@ struct Item
             .mana  = manaBonus,
             .matk  = magicDmgBonus,   // เปลี่ยน
             .magicRes = magicResBonus,
-            .spd   = spdBonus
+            .spd   = spdBonus,
+            .bleedBonus  = bleedBonus,
+            .poisonBonus = poisonBonus,
+            .burnBonus   = burnBonus,
         };
     }
 

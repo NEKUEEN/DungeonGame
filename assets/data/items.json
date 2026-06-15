@@ -52,6 +52,34 @@
       "skills": ["power_strike"]
     },
     {
+    "id": "hunters_bow",
+    "name": "Hunter's Bow",
+    "type": "Weapon",
+    "desc": "A bow that causes deep wounds. Bleed +3.",
+    "value": 5,
+    "atk": 5,
+    "dodge": 2,
+    "bleed_bonus": 3,
+    "sprite": "item_dagger.png",
+    "stackable": false
+    },
+    {
+      "id": "mace1",
+      "name": "Mace",
+      "type": "Weapon",
+      "desc": "A mace.",
+      "value": 3,
+      "hp": 0,
+      "atk": 4,
+      "def": 0,
+      "dodge": 4,
+      "resist_bleed": 100,
+      "spd": 1,
+      "sprite": "item_dagger.png",
+      "stackable": false,
+      "skills": ["power_strike"]
+    },
+    {
       "id": "wand",
       "name": "Wand",
       "type": "Weapon",
@@ -64,6 +92,7 @@
       "magic_res": 0,
       "mana": 20,
       "dodge": 2,
+      "resist_bleed": 100,
       "sprite": "item_weapon.png",
       "stackable": false
     },
@@ -77,6 +106,7 @@
       "atk": 0,
       "def": 3,
       "dodge": 1,
+      "resist_bleed": 100,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -93,6 +123,7 @@
       "def": 3,
       "dodge": 1,
       "spd": 2,
+      "resist_bleed": 100,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -106,6 +137,7 @@
       "atk": 0,
       "def": 2,
       "dodge": 0,
+      "resist_bleed": 100,
       "sprite": "item_helmet.png",
       "stackable": false
     },
@@ -119,6 +151,7 @@
       "atk": 0,
       "def": 15,
       "dodge": 0,
+      "resist_bleed": 100,
       "sprite": "item_armor.png",
       "stackable": false
     },
@@ -132,6 +165,7 @@
       "atk": 0,
       "def": 1,
       "dodge": 2,
+      "resist_bleed": 100,
       "sprite": "item_gloves.png",
       "stackable": false
     },
@@ -145,6 +179,7 @@
       "atk": 0,
       "def": 1,
       "dodge": 0,
+      "resist_bleed": 100,
       "sprite": "item_greaves.png",
       "stackable": false
     },
@@ -159,6 +194,7 @@
       "def": 0,
       "dodge": 2,
       "spd": 2,
+      "resist_bleed": 100,
       "sprite": "item_boots.png",
       "stackable": false
     },
@@ -262,7 +298,7 @@
         "def": 0,
         "dodge": 2
       },
-      "skills": ["stone_throw"]
+      "skills": ["stone_throw, iron_skin"]
     }
   ]
 }

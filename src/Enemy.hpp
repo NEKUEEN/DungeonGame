@@ -6,6 +6,7 @@
 #include <queue>
 #include <unordered_map>
 #include "Skill.hpp"
+#include "StatusEffect.hpp"
 
 // ── เพิ่ม Rare เข้าไประหว่าง Normal และ Elite ──
 enum class EnemyRank { Normal, Rare, Elite, Boss };
@@ -38,6 +39,11 @@ public:
     std::string getId()     const { return m_id; }
     bool        isAlerted() const { return m_alerted; }
     int         getPreferredRange() const { return m_preferredRange; }
+
+    void applyStatus(const StatusEffect& se);
+    void tickStatusEffects(int& hpDelta);  // คืน hp ที่เปลี่ยน
+    const std::vector<StatusEffect>& getStatusEffects() const { return m_statusEffects; }
+    bool hasStatus(StatusType type) const;
 
     // SPD system
     int  getSpd()        const { return m_spd; }
@@ -108,6 +114,7 @@ private:
 
     std::vector<SkillInstance> m_skills;
     std::optional<PendingSkill> m_pendingSkill;
+    std::vector<StatusEffect> m_statusEffects;
 
     sf::Texture m_texture;
     sf::Sprite* m_sprite    = nullptr;

@@ -54,6 +54,14 @@ struct FinalStats {
     int matk = 0;      // magic attack
     int mdef = 0;      // magic resist
     int spd = 0;       // speed bonus (อาจติดลบ)
+    int bleedBonus  = 0;
+    int poisonBonus = 0;
+    int burnBonus   = 0;
+    int resistBleed  = 0;
+    int resistPoison = 0;
+    int resistBurn   = 0;
+    int resistStun   = 0;
+    int resistSlow   = 0;
     int maxStamina = 100;
     int staminaRegen = 0;
     float body = 0.f;
@@ -81,6 +89,7 @@ private:
     void renderLevelUpEffect();
     void renderSkillPanel();
     void renderHotbar();
+    void renderStatusEffects();
     void renderTargeting();
     void renderStatsOverlay();
     void renderDeathScreen();

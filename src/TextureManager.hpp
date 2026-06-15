@@ -71,6 +71,8 @@ public:
         load("item_rat_core",    "assets/textures/item_rat_core.png");
         load("item_goblinWizard_core", "assets/textures/item_goblinWizard_core.png");
         load("item_dagger", "assets/textures/item_dagger.png");
+        //passive
+        load("ironSkin", "assets/textures/ironSkin.png");
 
     }
 

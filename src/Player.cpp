@@ -111,6 +111,24 @@ void Player::drawHPBar(sf::RenderWindow& window)
 
 void Player::onTurnPassed()
 {
+    // ── Tick player status effects ──
+auto& effects = m_stats.statusEffects;
+for (auto& se : effects)
+{
+    switch(se.type)
+    {
+        case StatusType::Bleed:
+        case StatusType::Poison:
+        case StatusType::Burn:   m_stats.hp -= se.power; break;
+        case StatusType::Regen:  m_stats.hp  = std::min(m_stats.maxHp, m_stats.hp + se.power); break;
+        default: break;
+    }
+}
+m_stats.hp = std::max(0, m_stats.hp);
+effects.erase(
+    std::remove_if(effects.begin(), effects.end(),
+        [](StatusEffect& se){ return !se.tick(); }),
+    effects.end());
     // ── tick skills (cooldown + buff duration) ──
     for (auto& sk : m_skills)
         sk.tick();
