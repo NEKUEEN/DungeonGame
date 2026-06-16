@@ -84,6 +84,15 @@ void Game::recalcAllStats()
     m_finalStats.resistBurn   = bonus.resistBurn;
     m_finalStats.resistStun   = bonus.resistStun;
     m_finalStats.resistSlow   = bonus.resistSlow;
+    m_finalStats.bleedDmgReduce = bonus.bleedDmgReduce;
+    m_finalStats.bleedDurReduce = bonus.bleedDurReduce;
+    m_finalStats.poisonDmgReduce = bonus.poisonDmgReduce;
+    m_finalStats.poisonDurReduce = bonus.poisonDurReduce;
+    m_finalStats.burnDmgReduce = bonus.burnDmgReduce;
+    m_finalStats.burnDurReduce = bonus.burnDurReduce;
+    m_finalStats.stunDurReduce = bonus.stunDurReduce;
+    m_finalStats.slowDurReduce = bonus.slowDurReduce;
+
 
     int atkPercentBonus = 0, defPercentBonus = 0, magicPercentBonus = 0, hpPercentBonus = 0;
     for (const auto& sk : m_player->getSkills())
@@ -596,6 +605,15 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         drop.resistPoison = idata->resistPoison;
                         drop.resistSlow = idata->resistSlow;
                         drop.resistStun = idata->resistStun;
+                        //ตรงนี้
+                        drop.bleedDmgReduce = idata->bleedDmgReduce;
+                        drop.bleedDurReduce = idata->bleedDurReduce;
+                        drop.poisonDmgReduce = idata->poisonDmgReduce;
+                        drop.poisonDurReduce = idata->poisonDurReduce;
+                        drop.burnDmgReduce = idata->burnDmgReduce;
+                        drop.burnDurReduce = idata->burnDurReduce;
+                        drop.stunDurReduce = idata->stunDurReduce;
+                        drop.slowDurReduce = idata->slowDurReduce;
                         drop.spriteName = idata->sprite;
                         drop.stackable = idata->stackable;
                         drop.col = e->getCol();
@@ -983,8 +1001,17 @@ void Game::spawnItems()
                 item.resistPoison = idata->resistPoison;
                 item.resistSlow = idata->resistSlow;
                 item.resistStun = idata->resistStun;
+                item.bleedDmgReduce = idata->bleedDmgReduce;
+                item.bleedDurReduce = idata->bleedDurReduce;
+                item.poisonDmgReduce = idata->poisonDmgReduce;
+                item.poisonDurReduce = idata->poisonDurReduce;
+                item.burnDmgReduce = idata->burnDmgReduce;
+                item.burnDurReduce = idata->burnDurReduce;
+                item.stunDurReduce = idata->stunDurReduce;
+                item.slowDurReduce = idata->slowDurReduce;
                 item.spriteName    = idata->sprite;
                 item.stackable     = idata->stackable;
+                //ตรงนี้
             }
         }
 
@@ -1538,6 +1565,15 @@ void Game::playerAttack(Enemy* enemy)
             drop.resistPoison = idata->resistPoison;
             drop.resistSlow = idata->resistSlow;
             drop.resistStun = idata->resistStun;
+            //ตรงนี้
+            drop.bleedDmgReduce = idata->bleedDmgReduce;
+            drop.bleedDurReduce = idata->bleedDurReduce;
+            drop.poisonDmgReduce = idata->poisonDmgReduce;
+            drop.poisonDurReduce = idata->poisonDurReduce;
+            drop.burnDmgReduce = idata->burnDmgReduce;
+            drop.burnDurReduce = idata->burnDurReduce;
+            drop.stunDurReduce = idata->stunDurReduce;
+            drop.slowDurReduce = idata->slowDurReduce;
             drop.spriteName=idata->sprite; drop.stackable=idata->stackable;
             drop.col=enemy->getCol(); drop.row=enemy->getRow();
             m_mapItems.push_back(drop);
@@ -1603,11 +1639,11 @@ if (mdata && !mdata->applyStatus.empty() && mdata->statusDuration > 0)
     if (valid)
     {
         int resist = 0;
-        if (stype == StatusType::Bleed)  resist = s.resistBleed;
-        if (stype == StatusType::Poison) resist = s.resistPoison;
-        if (stype == StatusType::Burn)   resist = s.resistBurn;
-        if (stype == StatusType::Stun)   resist = s.resistStun;
-        if (stype == StatusType::Slow)   resist = s.resistSlow;
+        if (stype == StatusType::Bleed)  resist = m_finalStats.resistBleed;
+        if (stype == StatusType::Poison) resist = m_finalStats.resistPoison;
+        if (stype == StatusType::Burn)   resist = m_finalStats.resistBurn;
+        if (stype == StatusType::Stun)   resist = m_finalStats.resistStun;
+        if (stype == StatusType::Slow)   resist = m_finalStats.resistSlow;
 
         std::uniform_int_distribution<int> rollDist(0, 99);
         int roll = rollDist(m_rng);
@@ -1617,19 +1653,47 @@ if (mdata && !mdata->applyStatus.empty() && mdata->statusDuration > 0)
         }
         else
         {
+            // declare ก่อน for loop
+            int dmgReduce = 0;
+            if (stype == StatusType::Bleed)  dmgReduce = m_finalStats.bleedDmgReduce;
+            if (stype == StatusType::Poison) dmgReduce = m_finalStats.poisonDmgReduce;
+            if (stype == StatusType::Burn)   dmgReduce = m_finalStats.burnDmgReduce;
+
+            int durReduce = 0;
+            if (stype == StatusType::Bleed)  durReduce = m_finalStats.bleedDurReduce;
+            if (stype == StatusType::Poison) durReduce = m_finalStats.poisonDurReduce;
+            if (stype == StatusType::Burn)   durReduce = m_finalStats.burnDurReduce;
+            if (stype == StatusType::Stun)   durReduce = m_finalStats.stunDurReduce;
+            if (stype == StatusType::Slow)   durReduce = m_finalStats.slowDurReduce;
+
             bool found = false;
             for (auto& existing : s.statusEffects)
             {
                 if (existing.type == stype)
                 {
-                    existing.duration = se.duration;
-                    existing.power    = se.power;
+                    existing.duration = std::max(1, se.duration * (100 - durReduce) / 100);
+                    existing.power    = std::max(1, se.power    * (100 - dmgReduce) / 100);
                     found = true;
                     break;
                 }
             }
             if (!found)
             {
+                int dmgReduce = 0;
+                if (stype == StatusType::Bleed)  dmgReduce = m_finalStats.bleedDmgReduce;
+                if (stype == StatusType::Poison) dmgReduce = m_finalStats.poisonDmgReduce;
+                if (stype == StatusType::Burn)   dmgReduce = m_finalStats.burnDmgReduce;
+
+                int durReduce = 0;
+                if (stype == StatusType::Bleed)  durReduce = m_finalStats.bleedDurReduce;
+                if (stype == StatusType::Poison) durReduce = m_finalStats.poisonDurReduce;
+                if (stype == StatusType::Burn)   durReduce = m_finalStats.burnDurReduce;
+                if (stype == StatusType::Stun)   durReduce = m_finalStats.stunDurReduce;
+                if (stype == StatusType::Slow)   durReduce = m_finalStats.slowDurReduce;
+
+                se.power    = std::max(1, se.power    * (100 - dmgReduce) / 100);
+                se.duration = std::max(1, se.duration * (100 - durReduce) / 100);
+
                 s.statusEffects.push_back(se);
                 addLog("  You are " + st + "ed!", sf::Color(200, 100, 220));
             }
@@ -1655,8 +1719,6 @@ void Game::processTurn()
     regenStamina();
 
     // tick cooldown + buff duration ของ player skills
-        for (auto& sk : m_player->getSkills())
-        sk.tick();
 
         int pc = m_player->getCol();
         int pr = m_player->getRow();
@@ -1668,11 +1730,12 @@ void Game::processTurn()
 
         // 2. Tick status effects (bleed/poison/burn ฯลฯ)
         int hpDelta = 0;
-        e->tickStatusEffects(hpDelta);
-        if (hpDelta < 0)
-            addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
-                " dot dmg", sf::Color(180, 80, 180));
+std::string effectName;
+e->tickStatusEffects(hpDelta, effectName);
 
+if (hpDelta < 0)
+    addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
+           " " + effectName + " dmg", sf::Color(180, 80, 180));
         // 3. ตายจาก status ไหม?
         if (e->isDead()) { onEnemyKilled(e); continue; }
 
@@ -1843,7 +1906,22 @@ void Game::renderHotbar()
 
         if (sk)
         {
-            if (!sk->isReady())
+            // ── Icon sprite ──
+            if (!sk->data.icon.empty())
+            {
+                const sf::Texture* tex = TextureManager::instance().get(sk->data.icon);
+                if (tex)
+                {
+                    sf::Sprite spr(*tex);
+                    auto tsz = tex->getSize();
+                    float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+                    spr.setScale({sc, sc});
+                    spr.setPosition({sx, startY});
+                    m_window.draw(spr);
+                }
+            }
+
+            if (!sk->isReady())  // ← บรรทัด 1846 เดิม
             {
                 float ratio = sk->data.cooldown > 0
                     ? (float)sk->cooldownLeft / sk->data.cooldown : 1.f;
@@ -2160,6 +2238,8 @@ void Game::renderStatsOverlay()
     line("Dodge:       ", std::to_string(m_finalStats.dodge));
     line("Bleed:       ", std::to_string(m_finalStats.bleedBonus));
     line("BldRes%:     ", std::to_string(m_finalStats.resistBleed));
+    line("BldDmgRed:   ", std::to_string(m_finalStats.bleedDmgReduce));
+    line("BldDurRed:   ", std::to_string(m_finalStats.bleedDurReduce));
 
     // Stamina bar
     {
@@ -2588,15 +2668,14 @@ void Game::renderStatusEffects()
 {
     if (!m_player || !m_fontLoaded) return;
 
-    const float SZ   = 22.f;
-    const float GAP  = 4.f;
-    const float Y    = 568.f;
-    const float RIGHT = 550.f;  // ขอบขวาก่อน right panel
+    const float SZ    = 32.f;
+    const float GAP   = 4.f;
+    const float Y     = 558.f;
+    const float RIGHT = 550.f;
 
-    // ── Passive skills — ชิดขวาสุด ──
-    auto& skills = m_player->getSkills();
+    // ── 1. Passive skills — ชิดขวาสุด ──
     std::vector<const SkillInstance*> passives;
-    for (const auto& sk : skills)
+    for (const auto& sk : m_player->getSkills())
         if (sk.data.type == SkillType::Passive && sk.fromCore)
             passives.push_back(&sk);
 
@@ -2632,17 +2711,61 @@ void Game::renderStatusEffects()
             txt.setFillColor(sf::Color(100, 200, 255));
             txt.setPosition({sx + 2.f, Y + 2.f});
             m_window.draw(txt);
-
-            sf::Text nameTxt(m_font, sk.data.name, 6);
-            nameTxt.setFillColor(sf::Color(100, 200, 255, 180));
-            nameTxt.setPosition({sx + 2.f, Y + 12.f});
-            m_window.draw(nameTxt);
         }
     }
 
-    // ── Status effects — อยู่ซ้ายของ passive ──
+    // ── 2. Active buffs — ซ้ายของ passive ──
+    std::vector<const SkillInstance*> buffs;
+    for (const auto& sk : m_player->getSkills())
+        if (sk.data.type == SkillType::ActiveBuff && sk.buffActive)
+            buffs.push_back(&sk);
+
+    float buffStartX = passiveStartX - buffs.size() * (SZ + GAP) - GAP;
+    for (int i = 0; i < (int)buffs.size(); ++i)
+    {
+        const auto& sk = *buffs[i];
+        float sx = buffStartX + i * (SZ + GAP);
+
+        sf::RectangleShape slot({SZ, SZ});
+        slot.setFillColor(sf::Color(20, 20, 20, 220));
+        slot.setOutlineColor(sf::Color(255, 200, 50));
+        slot.setOutlineThickness(2.f);
+        slot.setPosition({sx, Y});
+        m_window.draw(slot);
+
+        if (!sk.data.icon.empty())
+        {
+            const sf::Texture* tex = TextureManager::instance().get(sk.data.icon);
+            if (tex)
+            {
+                sf::Sprite spr(*tex);
+                auto tsz = tex->getSize();
+                float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+                spr.setScale({sc, sc});
+                spr.setPosition({sx, Y});
+                m_window.draw(spr);
+            }
+        }
+        else
+        {
+            sf::Text txt(m_font, sk.data.name.substr(0, 3), 7);
+            txt.setFillColor(sf::Color(255, 200, 50));
+            txt.setPosition({sx + 2.f, Y + 2.f});
+            m_window.draw(txt);
+        }
+
+        // duration remaining
+        sf::Text durTxt(m_font, std::to_string(sk.durationLeft), 9);
+        durTxt.setFillColor(sf::Color::White);
+        durTxt.setPosition({sx + 2.f, Y + SZ - 11.f});
+        m_window.draw(durTxt);
+    }
+
+    // ── 3. Status effects (debuff) — ซ้ายของ buff ──
     const auto& effects = m_player->getStats().statusEffects;
-    float statusStartX = passiveStartX - effects.size() * (SZ + GAP) - GAP;
+    float statusStartX = buffs.empty()
+        ? passiveStartX - effects.size() * (SZ + GAP) - GAP
+        : buffStartX - effects.size() * (SZ + GAP) - GAP;
 
     for (int i = 0; i < (int)effects.size(); ++i)
     {

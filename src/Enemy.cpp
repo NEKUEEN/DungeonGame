@@ -372,18 +372,31 @@ void Enemy::applyStatus(const StatusEffect& se)
     m_statusEffects.push_back(se);
 }
 
-void Enemy::tickStatusEffects(int& hpDelta)
+void Enemy::tickStatusEffects(int& hpDelta, std::string& effectName)
 {
     hpDelta = 0;
+    effectName = "";
     for (auto& se : m_statusEffects) {
         switch(se.type) {
             case StatusType::Bleed:
+                hpDelta -= se.power;
+                effectName = "bleed";
+                break;
             case StatusType::Poison:
-            case StatusType::Burn:   hpDelta -= se.power; break;
-            case StatusType::Regen:  hpDelta += se.power; break;
+                hpDelta -= se.power;
+                effectName = "poison";
+                break;
+            case StatusType::Burn:
+                hpDelta -= se.power;
+                effectName = "burn";
+                break;
+            case StatusType::Regen:
+                hpDelta += se.power;
+                break;
             default: break;
         }
     }
+    // ส่วนที่เหลือเหมือนเดิม...
     m_hp += hpDelta;
     m_hp  = std::clamp(m_hp, 0, m_maxHp);
 

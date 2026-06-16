@@ -46,6 +46,9 @@
       "atk": 4,
       "def": 0,
       "dodge": 4,
+      "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "spd": 1,
       "sprite": "item_dagger.png",
       "stackable": false,
@@ -74,6 +77,8 @@
       "def": 0,
       "dodge": 4,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "spd": 1,
       "sprite": "item_dagger.png",
       "stackable": false,
@@ -93,6 +98,8 @@
       "mana": 20,
       "dodge": 2,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_weapon.png",
       "stackable": false
     },
@@ -107,6 +114,8 @@
       "def": 3,
       "dodge": 1,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -124,6 +133,8 @@
       "dodge": 1,
       "spd": 2,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -138,6 +149,8 @@
       "def": 2,
       "dodge": 0,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_helmet.png",
       "stackable": false
     },
@@ -152,6 +165,8 @@
       "def": 15,
       "dodge": 0,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_armor.png",
       "stackable": false
     },
@@ -166,6 +181,8 @@
       "def": 1,
       "dodge": 2,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_gloves.png",
       "stackable": false
     },
@@ -180,6 +197,8 @@
       "def": 1,
       "dodge": 0,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_greaves.png",
       "stackable": false
     },
@@ -195,6 +214,8 @@
       "dodge": 2,
       "spd": 2,
       "resist_bleed": 100,
+      "bleed_dmg_reduce": 50,
+      "bleed_dur_reduce": 50,
       "sprite": "item_boots.png",
       "stackable": false
     },

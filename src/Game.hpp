@@ -62,6 +62,14 @@ struct FinalStats {
     int resistBurn   = 0;
     int resistStun   = 0;
     int resistSlow   = 0;
+    int bleedDmgReduce  = 0;
+    int bleedDurReduce  = 0;
+    int poisonDmgReduce = 0;
+    int poisonDurReduce = 0;
+    int burnDmgReduce   = 0;
+    int burnDurReduce   = 0;
+    int stunDurReduce   = 0;
+    int slowDurReduce   = 0;
     int maxStamina = 100;
     int staminaRegen = 0;
     float body = 0.f;

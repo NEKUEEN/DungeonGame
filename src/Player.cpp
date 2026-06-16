@@ -17,17 +17,17 @@ Player::Player(int startCol, int startRow, int tileSize)
         m_hasSprite = true;
     }
 
-    // โหลด skills จาก SkillDB และ assign hotbar ตาม hotbarSlot
+    // โหลด skills จาก SkillDB เฉพาะที่มี hotbar_slot >= 0
     for (const auto& sd : SkillDB::instance().getAll())
     {
-        SkillInstance inst;
-        inst.data = sd;
-        inst.fromCore = false;  // สกิลเริ่มต้นมาจาก core
-        m_skills.push_back(inst);
-
-        // assign hotbar จาก JSON
         if (sd.hotbarSlot >= 0 && sd.hotbarSlot < 9)
+        {
+            SkillInstance inst;
+            inst.data     = sd;
+            inst.fromCore = false;
+            m_skills.push_back(inst);
             m_hotbar[sd.hotbarSlot] = sd.id;
+        }
     }
 }
 

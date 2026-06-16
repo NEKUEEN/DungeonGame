@@ -38,6 +38,14 @@ struct ItemData
     int resistBurn   = 0;
     int resistStun   = 0;
     int resistSlow   = 0;
+    int bleedDmgReduce  = 0;
+    int bleedDurReduce  = 0;
+    int poisonDmgReduce = 0;
+    int poisonDurReduce = 0;
+    int burnDmgReduce   = 0;
+    int burnDurReduce   = 0;
+    int stunDurReduce   = 0;
+    int slowDurReduce   = 0;
     bool stackable  = true;
 
     // core_stats (เฉพาะ Core items)
@@ -93,6 +101,15 @@ public:
             d.resistBurn   = it.contains("resist_burn")   ? it["resist_burn"].get<int>()   : 0;
             d.resistStun   = it.contains("resist_stun")   ? it["resist_stun"].get<int>()   : 0;
             d.resistSlow   = it.contains("resist_slow")   ? it["resist_slow"].get<int>()   : 0;
+            //resist
+            d.bleedDmgReduce  = it.contains("bleed_dmg_reduce")  ? it["bleed_dmg_reduce"].get<int>()  : 0;
+            d.bleedDurReduce = it.contains("bleed_dur_reduce") ? it["bleed_dur_reduce"].get<int>() : 0;
+            d.poisonDmgReduce   = it.contains("poison_dmg_reduce")   ? it["poison_dmg_reduce"].get<int>()   : 0;
+            d.poisonDurReduce  = it.contains("poison_dur_reduce")  ? it["poison_dur_reduce"].get<int>()  : 0;
+            d.burnDmgReduce = it.contains("burn_dmg_reduce") ? it["burn_dmg_reduce"].get<int>() : 0;
+            d.burnDurReduce   = it.contains("burn_dur_reduce")   ? it["burn_dur_reduce"].get<int>()   : 0;
+            d.stunDurReduce   = it.contains("stun_dur_reduce")   ? it["stun_dur_reduce"].get<int>()   : 0;
+            d.slowDurReduce   = it.contains("slow_dur_reduce")   ? it["slow_dur_reduce"].get<int>()   : 0;
             // core_stats
             if (it.contains("core_stats"))
             {

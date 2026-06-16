@@ -41,7 +41,7 @@ public:
     int         getPreferredRange() const { return m_preferredRange; }
 
     void applyStatus(const StatusEffect& se);
-    void tickStatusEffects(int& hpDelta);  // คืน hp ที่เปลี่ยน
+    void tickStatusEffects(int& hpDelta, std::string& effectName);  // คืน hp ที่เปลี่ยน
     const std::vector<StatusEffect>& getStatusEffects() const { return m_statusEffects; }
     bool hasStatus(StatusType type) const;
 

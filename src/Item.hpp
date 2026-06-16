@@ -30,6 +30,15 @@ struct Item
     int resistBurn   = 0;
     int resistStun   = 0;
     int resistSlow   = 0;
+    //resist
+    int bleedDmgReduce  = 0;
+    int bleedDurReduce  = 0;
+    int poisonDmgReduce = 0;
+    int poisonDurReduce = 0;
+    int burnDmgReduce   = 0;
+    int burnDurReduce   = 0;
+    int stunDurReduce   = 0;
+    int slowDurReduce   = 0;
     bool        stackable  = false;
     int         col        = -1;
     int         row        = -1;
@@ -47,6 +56,7 @@ struct Item
             .bleedBonus  = bleedBonus,
             .poisonBonus = poisonBonus,
             .burnBonus   = burnBonus,
+            .bleedDurReduce = bleedDurReduce
         };
     }
 

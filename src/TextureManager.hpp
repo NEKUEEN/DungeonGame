@@ -73,6 +73,8 @@ public:
         load("item_dagger", "assets/textures/item_dagger.png");
         //passive
         load("ironSkin", "assets/textures/ironSkin.png");
+        //skill
+        load("arrow", "assets/textures/arrow.png");
 
     }
 

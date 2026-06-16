@@ -20,6 +20,15 @@ struct StatBonus {
     int resistBurn   = 0;
     int resistStun   = 0;
     int resistSlow   = 0;
+    //resist
+    int bleedDmgReduce  = 0;
+    int bleedDurReduce  = 0;
+    int poisonDmgReduce = 0;
+    int poisonDurReduce = 0;
+    int burnDmgReduce   = 0;
+    int burnDurReduce   = 0;
+    int stunDurReduce   = 0;
+    int slowDurReduce   = 0;
 
     StatBonus& operator+=(const StatBonus& other) {
         hp    += other.hp;
@@ -38,6 +47,14 @@ struct StatBonus {
         resistBurn   += other.resistBurn;
         resistStun   += other.resistStun;
         resistSlow   += other.resistSlow;
+        bleedDmgReduce += other.bleedDmgReduce;
+        bleedDurReduce += other.bleedDurReduce;
+        poisonDmgReduce += other.poisonDmgReduce;
+        poisonDurReduce += other.poisonDurReduce;
+        burnDmgReduce += other.burnDmgReduce;
+        burnDurReduce += other.burnDurReduce;
+        stunDurReduce += other.stunDurReduce;
+        slowDurReduce += other.slowDurReduce;
         return *this;
     }
 

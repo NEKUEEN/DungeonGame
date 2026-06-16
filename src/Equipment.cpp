@@ -45,6 +45,14 @@ StatBonus Equipment::getTotalBonus() const {
         total.resistPoison += item.resistPoison;
         total.resistSlow += item.resistSlow;
         total.resistStun += item.resistStun;
+        total.bleedDmgReduce += item.bleedDmgReduce;
+        total.bleedDurReduce += item.bleedDurReduce;
+        total.poisonDmgReduce += item.poisonDmgReduce;
+        total.poisonDurReduce += item.poisonDurReduce;
+        total.burnDmgReduce += item.burnDmgReduce;
+        total.burnDurReduce += item.burnDurReduce;
+        total.stunDurReduce += item.stunDurReduce;
+        total.slowDurReduce += item.slowDurReduce;
     }
     return total;
 }
