@@ -32,6 +32,8 @@ public:
         return &it->second;
     }
 
+    
+
     void loadAll()
     {
         load("player",       "assets/textures/player.png");
@@ -47,6 +49,7 @@ public:
         load("dwarf",       "assets/textures/dwarf.png");
         load("fairy",       "assets/textures/fairy.png");
         load("human",       "assets/textures/human.png");
+        load("dummy",       "assets/textures/dummy.png");
         // zone floor textures
         load("darkness_floor",      "assets/textures/darkness_floor_tile.png");
         load("crystalBright_floor", "assets/textures/crystalBright_floor_tile.png");
@@ -75,7 +78,17 @@ public:
         load("ironSkin", "assets/textures/ironSkin.png");
         //skill
         load("arrow", "assets/textures/arrow.png");
+        //Debuff icon
+        load("debuff_bleed", "assets/textures/debuff_bleed.png");
+        load("debuff_poison",    "assets/textures/debuff_poison.png");
+        load("debuff_burn",    "assets/textures/debuff_burn.png");
+        load("debuff_stun", "assets/textures/debuff_stun.png");
+        load("debuff_slow", "assets/textures/debuff_slow.png");
+        //weapon
+        load("weapon_mace", "assets/textures/weapon_mace.png");
 
+
+        
     }
 
 private:

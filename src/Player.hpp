@@ -111,6 +111,8 @@ public:
     int getRow() const { return m_row; }
     void setPos(int col, int row) { m_col = col; m_row = row; }
     void setSprite(const std::string& textureKey); // ← เพิ่ม
+    // เพิ่มใน public section ของ Player
+    void tickStatusEffects(int& hpDelta, std::string& effectName);
 
     Stats&       getStats()       { return m_stats; }
     const Stats& getStats() const { return m_stats; }

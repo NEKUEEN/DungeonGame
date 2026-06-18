@@ -60,6 +60,12 @@ struct ItemData
 
     // skills ที่ core นี้ให้เมื่อ equip
     std::vector<std::string> coreSkills;
+
+    // on-hit status effect (สำหรับ weapon)
+    std::string onHitStatus;   // "bleed", "poison", "stun" ฯลฯ
+    int         onHitPower    = 0;
+    int         onHitDuration = 0;
+    int         onHitChance   = 0;  // 0-100 (%)
 };
 
 class DropTable
@@ -110,6 +116,10 @@ public:
             d.burnDurReduce   = it.contains("burn_dur_reduce")   ? it["burn_dur_reduce"].get<int>()   : 0;
             d.stunDurReduce   = it.contains("stun_dur_reduce")   ? it["stun_dur_reduce"].get<int>()   : 0;
             d.slowDurReduce   = it.contains("slow_dur_reduce")   ? it["slow_dur_reduce"].get<int>()   : 0;
+            d.onHitStatus   = it.contains("on_hit_status")   ? it["on_hit_status"].get<std::string>() : "";
+            d.onHitPower    = it.contains("on_hit_power")     ? it["on_hit_power"].get<int>()    : 0;
+            d.onHitDuration = it.contains("on_hit_duration")  ? it["on_hit_duration"].get<int>() : 0;
+            d.onHitChance   = it.contains("on_hit_chance")    ? it["on_hit_chance"].get<int>()   : 0;
             // core_stats
             if (it.contains("core_stats"))
             {

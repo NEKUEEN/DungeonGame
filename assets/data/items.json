@@ -1,6 +1,15 @@
 {
   "items": [
     {
+    "id": "arrow_ammo",
+    "name": "Arrow",
+    "type": "Ammo",
+    "desc": "A single arrow. Can be retrieved after firing.",
+    "value": 1,
+    "sprite": "item_offweapon.png",
+    "stackable": true
+    },
+    {
       "id": "magic_stone",
       "name": "Magic Stone",
       "type": "Material",
@@ -46,9 +55,9 @@
       "atk": 4,
       "def": 0,
       "dodge": 4,
-      "resist_bleed": 100,
-      "bleed_dmg_reduce": 50,
-      "bleed_dur_reduce": 50,
+      "resist_bleed": 0,
+      "bleed_dmg_reduce": 0,
+      "bleed_dur_reduce": 0,
       "spd": 1,
       "sprite": "item_dagger.png",
       "stackable": false,
@@ -67,22 +76,19 @@
     "stackable": false
     },
     {
-      "id": "mace1",
-      "name": "Mace",
-      "type": "Weapon",
-      "desc": "A mace.",
-      "value": 3,
-      "hp": 0,
-      "atk": 4,
-      "def": 0,
-      "dodge": 4,
-      "resist_bleed": 100,
-      "bleed_dmg_reduce": 50,
-      "bleed_dur_reduce": 50,
-      "spd": 1,
-      "sprite": "item_dagger.png",
-      "stackable": false,
-      "skills": ["power_strike"]
+    "id": "mace1",
+    "name": "Mace",
+    "type": "Weapon",
+    "desc": "A heavy mace. 25% chance to stun.",
+    "value": 3,
+    "atk": 4,
+    "def": 0,
+    "on_hit_status": "stun",
+    "on_hit_power": 1,
+    "on_hit_duration": 10,
+    "on_hit_chance": 100,
+    "sprite": "weapon_mace.png",
+    "stackable": false
     },
     {
       "id": "wand",
@@ -97,9 +103,9 @@
       "magic_res": 0,
       "mana": 20,
       "dodge": 2,
-      "resist_bleed": 100,
-      "bleed_dmg_reduce": 50,
-      "bleed_dur_reduce": 50,
+      "resist_bleed": 0,
+      "bleed_dmg_reduce": 0,
+      "bleed_dur_reduce": 0,
       "sprite": "item_weapon.png",
       "stackable": false
     },
@@ -113,7 +119,7 @@
       "atk": 0,
       "def": 3,
       "dodge": 1,
-      "resist_bleed": 100,
+      "resist_bleed": 40,
       "bleed_dmg_reduce": 50,
       "bleed_dur_reduce": 50,
       "sprite": "item_offweapon.png",
@@ -132,9 +138,9 @@
       "def": 3,
       "dodge": 1,
       "spd": 2,
-      "resist_bleed": 100,
-      "bleed_dmg_reduce": 50,
-      "bleed_dur_reduce": 50,
+      "resist_bleed": 0,
+      "bleed_dmg_reduce": 0,
+      "bleed_dur_reduce": 0,
       "sprite": "item_offweapon.png",
       "stackable": false
     },
@@ -148,7 +154,7 @@
       "atk": 0,
       "def": 2,
       "dodge": 0,
-      "resist_bleed": 100,
+      "resist_bleed": 5,
       "bleed_dmg_reduce": 50,
       "bleed_dur_reduce": 50,
       "sprite": "item_helmet.png",
@@ -164,7 +170,7 @@
       "atk": 0,
       "def": 15,
       "dodge": 0,
-      "resist_bleed": 100,
+      "resist_bleed": 50,
       "bleed_dmg_reduce": 50,
       "bleed_dur_reduce": 50,
       "sprite": "item_armor.png",
@@ -180,7 +186,7 @@
       "atk": 0,
       "def": 1,
       "dodge": 2,
-      "resist_bleed": 100,
+      "resist_bleed": 0,
       "bleed_dmg_reduce": 50,
       "bleed_dur_reduce": 50,
       "sprite": "item_gloves.png",
@@ -196,7 +202,7 @@
       "atk": 0,
       "def": 1,
       "dodge": 0,
-      "resist_bleed": 100,
+      "resist_bleed": 10,
       "bleed_dmg_reduce": 50,
       "bleed_dur_reduce": 50,
       "sprite": "item_greaves.png",
@@ -213,7 +219,7 @@
       "def": 0,
       "dodge": 2,
       "spd": 2,
-      "resist_bleed": 100,
+      "resist_bleed": 10,
       "bleed_dmg_reduce": 50,
       "bleed_dur_reduce": 50,
       "sprite": "item_boots.png",
@@ -319,7 +325,7 @@
         "def": 0,
         "dodge": 2
       },
-      "skills": ["stone_throw, iron_skin"]
+      "skills": ["stone_throw", "iron_skin"]
     }
   ]
 }

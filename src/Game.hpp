@@ -128,6 +128,9 @@ private:
     void moveTargetCursor(int dc, int dr);
     void confirmTarget();
     void cancelTargeting();
+    // ── Bow system ──
+    void enterBowTargeting();
+    void fireBow();
 
     void processTurn();
     void tryRespawnEnemies();
@@ -151,6 +154,7 @@ private:
     void recalcAllStats();      // เรียกทุกครั้งที่ equipment / core / skill เปลี่ยน
 
     int  getItemLevelTotal() const;
+    int m_statsScrollOffset = 0;
     void drainMentality();
     void refreshStats();        // เรียก recalcAllStats แล้ว update delta
 

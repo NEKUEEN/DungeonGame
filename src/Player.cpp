@@ -109,26 +109,49 @@ void Player::drawHPBar(sf::RenderWindow& window)
 
 }
 
+void Player::tickStatusEffects(int& hpDelta, std::string& effectName)
+{
+    hpDelta = 0;
+    effectName = "";
+    auto& effects = m_stats.statusEffects;
+    for (auto& se : effects)
+    {
+        switch (se.type)
+        {
+            case StatusType::Bleed:
+                hpDelta -= se.power;
+                effectName = "bleed";
+                break;
+            case StatusType::Poison:
+                hpDelta -= se.power;
+                effectName = "poison";
+                break;
+            case StatusType::Burn:
+                hpDelta -= se.power;
+                effectName = "burn";
+                break;
+            case StatusType::Regen:
+                hpDelta += se.power;
+                break;
+            default: break;
+        }
+    }
+    m_stats.hp += hpDelta;
+    m_stats.hp  = std::clamp(m_stats.hp, 0, m_stats.maxHp);
+    effects.erase(
+        std::remove_if(effects.begin(), effects.end(),
+            [](StatusEffect& se){ return !se.tick(); }),
+        effects.end());
+}
+
 void Player::onTurnPassed()
 {
     // ── Tick player status effects ──
-auto& effects = m_stats.statusEffects;
-for (auto& se : effects)
-{
-    switch(se.type)
-    {
-        case StatusType::Bleed:
-        case StatusType::Poison:
-        case StatusType::Burn:   m_stats.hp -= se.power; break;
-        case StatusType::Regen:  m_stats.hp  = std::min(m_stats.maxHp, m_stats.hp + se.power); break;
-        default: break;
-    }
-}
-m_stats.hp = std::max(0, m_stats.hp);
-effects.erase(
-    std::remove_if(effects.begin(), effects.end(),
-        [](StatusEffect& se){ return !se.tick(); }),
-    effects.end());
+    int hpDelta = 0; std::string unused;
+    tickStatusEffects(hpDelta, unused);  // Game.cpp จะเรียกเองและ log เอง
+    // ลบ block เดิมที่ทำ loop effects ออก
+
+    // ... ส่วนที่เหลือเหมือนเดิม
     // ── tick skills (cooldown + buff duration) ──
     for (auto& sk : m_skills)
         sk.tick();

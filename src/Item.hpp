@@ -4,7 +4,7 @@
 #include "StatBonus.hpp"   // เพิ่ม
 
 enum class ItemType
-{ Food, Potion, Helmet, BodyArmor, Gloves, Greaves, Boots, Weapon, OffWeapon, Core, Material, };
+{ Food, Potion, Helmet, BodyArmor, Gloves, Greaves, Boots, Weapon, OffWeapon, Core, Material, Ammo, };
 
 struct Item
 {
@@ -39,6 +39,10 @@ struct Item
     int burnDurReduce   = 0;
     int stunDurReduce   = 0;
     int slowDurReduce   = 0;
+    std::string onHitStatus;
+    int         onHitPower    = 0;
+    int         onHitDuration = 0;
+    int         onHitChance   = 0;
     bool        stackable  = false;
     int         col        = -1;
     int         row        = -1;
@@ -66,11 +70,13 @@ struct Item
     static Item makeWeapon();
     static Item makeOffWeapon();
     static Item makeArmor();
+    static Item makeAmmo();
 
     sf::Color   color()       const;
     bool        isUsable()    const { return type==ItemType::Food||type==ItemType::Potion; }
     bool        isEquipment() const { return !isUsable()&&type!=ItemType::Material&&type!=ItemType::Core; }
     bool        isCore()      const { return type==ItemType::Core; }
     bool        isMaterial()  const { return type==ItemType::Material; }
+    bool        isAmmo() const { return type == ItemType::Ammo; }
     std::string spritePath()  const;
 };

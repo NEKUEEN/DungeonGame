@@ -1,0 +1,11 @@
+{
+  "effects": [
+    { "id": "bleed",  "name": "Bleed",  "icon": "debuff_bleed",  "color": [200, 30, 30]  },
+    { "id": "poison", "name": "Poison", "icon": "debuff_poison", "color": [80, 200, 80]  },
+    { "id": "burn",   "name": "Burn",   "icon": "debuff_burn",   "color": [255, 140, 0]  },
+    { "id": "stun",   "name": "Stun",   "icon": "debuff_stun",   "color": [255, 255, 80] },
+    { "id": "slow",   "name": "Slow",   "icon": "debuff_slow",   "color": [80, 80, 200]  },
+    { "id": "regen",  "name": "Regen",  "icon": "buff_regen",    "color": [80, 255, 160] },
+    { "id": "shield", "name": "Shield", "icon": "buff_shield",   "color": [180, 180, 255]}
+  ]
+}

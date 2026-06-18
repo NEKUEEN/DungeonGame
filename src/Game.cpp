@@ -2,6 +2,7 @@
 #include "TextureManager.hpp"
 #include "MonsterDB.hpp"
 #include "StatusEffect.hpp"
+#include "StatusEffectDB.hpp"
 #include "DropTable.hpp"
 #include <iostream>
 #include <cstdlib>
@@ -29,6 +30,7 @@ Game::Game()
     DropTable::instance().loadItems("assets/data/items.json");
     SkillDB::instance().load("assets/data/skills.json");
     RaceDB::instance().load("assets/data/races.json");
+    StatusEffectDB::instance().load("assets/data/status_effects.json");
     std::cerr << "[RaceDB] loaded: " << RaceDB::instance().getAll().size() << " races\n";
 
     m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
@@ -126,11 +128,18 @@ void Game::recalcAllStats()
     m_finalStats.maxStamina  = 100;
     m_finalStats.staminaRegen = 1;
     m_finalStats.itemLevel = getItemLevelTotal();
-
+//ตรงนี้คำนวน
     m_finalStats.body = (m_finalStats.maxHp * 0.4f + m_finalStats.atk * 0.3f +
                               m_finalStats.def * 0.2f + m_finalStats.dodge * 0.1f);
-    m_finalStats.mentality = (m_finalStats.maxMana * 0.4f + m_finalStats.matk * 0.3f +
-                                   m_finalStats.mdef * 0.3f);
+    m_finalStats.mentality = (m_finalStats.maxMana * 0.4f + 
+                                m_finalStats.matk * 0.3f +
+                                m_finalStats.mdef * 0.3f +
+                               (m_finalStats.resistBleed  +
+                                m_finalStats.resistPoison +
+                                m_finalStats.resistBurn   +
+                                m_finalStats.resistStun   +
+                                m_finalStats.resistSlow)  * 0.02f);
+
     float bonusPct = 0.30f + (base.level - 1) * 0.05f;
     m_finalStats.battleIndex = (m_finalStats.body + m_finalStats.mentality +
                                      m_finalStats.itemLevel * bonusPct);
@@ -328,26 +337,56 @@ void Game::executeSkill(int hotbarIdx)
     case SkillType::ActiveRanged:
     case SkillType::ActiveWarp:
         s.mana -= sk->data.effect.manaCost;
-        // stamina หักตอน confirm ยิงจริง (fireRangedAt / executeWarp) ไม่หักตอนเข้า targeting
-        m_ui.targeting.active = true;
+        m_ui.targeting.active  = true;
         m_ui.targeting.skillId = id;
-        m_ui.targeting.targetCol = m_player->getCol();
-        m_ui.targeting.targetRow = m_player->getRow();
+
+        // ── auto-target ศัตรูใกล้สุดในระยะ ──
+        {
+            int range = sk->data.effect.range;
+            int pc = m_player->getCol();
+            int pr = m_player->getRow();
+            Enemy* nearest = nullptr;
+            float  nearDist = 999.f;
+
+            for (auto* e : m_enemies)
+            {
+                if (e->isDead()) continue;
+                float d = std::sqrt((float)((e->getCol()-pc)*(e->getCol()-pc) +
+                                        (e->getRow()-pr)*(e->getRow()-pr)));
+                if (d <= range && d < nearDist)
+                {
+                    nearDist = d;
+                    nearest  = e;
+                }
+            }
+
+            if (nearest)
+            {
+                m_ui.targeting.targetCol = nearest->getCol();
+                m_ui.targeting.targetRow = nearest->getRow();
+            }
+            else
+            {
+                m_ui.targeting.targetCol = pc;
+            m_ui.targeting.targetRow = pr;
+            }
+        }
+
         if (sk->data.type == SkillType::ActiveRanged)
-            addLog(" [Targeting] "+sk->data.name+"", sf::Color(255,220,50));
+            addLog(" [Targeting] " + sk->data.name, sf::Color(255,220,50));
         else
-            addLog(" [Warp] "+sk->data.name+"", sf::Color(100,200,255));
+            addLog(" [Warp] " + sk->data.name, sf::Color(100,200,255));
         break;
 
-    case SkillType::ActiveAoe:
-        s.mana    -= sk->data.effect.manaCost;
-        s.stamina -= sk->data.effect.staminaCost;
-        executeAoe(sk);
-        sk->cooldownLeft = sk->data.cooldown;
-        break;
+            case SkillType::ActiveAoe:
+            s.mana    -= sk->data.effect.manaCost;
+            s.stamina -= sk->data.effect.staminaCost;
+            executeAoe(sk);
+            sk->cooldownLeft = sk->data.cooldown;
+            break;
 
-    case SkillType::Passive:
-        addLog("  "+sk->data.name+" is passive.", sf::Color(120,200,120));
+        case SkillType::Passive:
+            addLog("  "+sk->data.name+" is passive.", sf::Color(120,200,120));
         break;
     }
 }
@@ -442,36 +481,32 @@ std::vector<sf::Vector2i> Game::getLine(int x0, int y0, int x1, int y1) const
 // ============================================================
 //  Targeting Mode
 // ============================================================
-void Game::enterTargetingMode()
-{
-    SkillInstance* sk = m_player->findSkill("stone_throw");
-    if (!sk || !sk->isReady()) {
-        addLog("  Stone Throw not ready", sf::Color(160,160,160));
-        return;
-    }
-    m_ui.targeting.active = true;
-    m_ui.targeting.skillId = "stone_throw";
-    m_ui.targeting.targetCol = m_player->getCol();
-    m_ui.targeting.targetRow = m_player->getRow();
-    addLog(" [Targeting] Move cursor: arrow keys | Enter=fire | Esc=cancel", sf::Color(255,220,50));
-}
-
 void Game::moveTargetCursor(int dc, int dr)
 {
     if (!m_player) return;
-    SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
-    if (!sk) return;
 
     int nc = m_ui.targeting.targetCol + dc;
     int nr = m_ui.targeting.targetRow + dr;
-    float dist = std::sqrt((float)((nc - m_player->getCol())*(nc - m_player->getCol()) + 
+
+    // ── คำนวณ range ──
+    int range = 8; // default สำหรับ bow
+    if (m_ui.targeting.skillId != "_bow_attack")
+    {
+        SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
+        if (!sk) return;
+        range = sk->data.effect.range;
+    }
+
+    float dist = std::sqrt((float)((nc - m_player->getCol())*(nc - m_player->getCol()) +
                                    (nr - m_player->getRow())*(nr - m_player->getRow())));
-    if (dist > sk->data.effect.range) {
-        addLog("  Out of range (max " + std::to_string(sk->data.effect.range) + " tiles)", sf::Color(220,100,50));
+    if (dist > range)
+    {
+        addLog("  Out of range (max " + std::to_string(range) + " tiles)", sf::Color(220, 100, 50));
         return;
     }
-    nc = std::clamp(nc, 0, m_mapCols-1);
-    nr = std::clamp(nr, 0, m_mapRows-1);
+
+    nc = std::clamp(nc, 0, m_mapCols - 1);
+    nr = std::clamp(nr, 0, m_mapRows - 1);
     m_ui.targeting.targetCol = nc;
     m_ui.targeting.targetRow = nr;
 }
@@ -479,24 +514,26 @@ void Game::moveTargetCursor(int dc, int dr)
 void Game::confirmTarget()
 {
     if (!m_player) return;
-    
+
+    m_ui.targeting.active = false;
+
+    if (m_ui.targeting.skillId == "_bow_attack")
+    {
+        fireBow();
+        return;
+    }
+
     SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     if (!sk)
     {
         cancelTargeting();
         return;
     }
-    
-    m_ui.targeting.active = false;
-    
+
     if (sk->data.type == SkillType::ActiveRanged)
-    {
         fireRangedAt(m_ui.targeting.targetCol, m_ui.targeting.targetRow);
-    }
     else if (sk->data.type == SkillType::ActiveWarp)
-    {
         executeWarp(m_ui.targeting.targetCol, m_ui.targeting.targetRow);
-    }
 }
 
 void Game::cancelTargeting()
@@ -504,6 +541,147 @@ void Game::cancelTargeting()
     m_ui.targeting.active = false;
     m_ui.targeting.skillId.clear();
     addLog("  Targeting cancelled.", sf::Color(140,140,140));
+}
+
+// ============================================================
+//  Bow System
+// ============================================================
+void Game::enterBowTargeting()
+{
+    if (!m_player) return;
+
+    const Item* mainHand = m_equipment.getItem(EquipSlot::MainHand);
+    if (!mainHand || mainHand->id.find("bow") == std::string::npos)
+    {
+        addLog("  No bow equipped!", sf::Color(220, 100, 50));
+        return;
+    }
+
+    // เช็ค arrow ใน inventory
+    bool hasArrow = false;
+    for (int i = 0; i < m_inventory.size(); ++i)
+    {
+        Item* it = m_inventory.getItem(i);
+        if (it && it->type == ItemType::Ammo) { hasArrow = true; break; }
+    }
+
+    if (!hasArrow)
+    {
+        addLog("  No arrows in inventory!", sf::Color(220, 100, 50));
+        return;
+    }
+
+    m_ui.targeting.active    = true;
+    m_ui.targeting.skillId   = "_bow_attack";
+    m_ui.targeting.targetCol = m_player->getCol();
+    m_ui.targeting.targetRow = m_player->getRow();
+
+    addLog("  [Bow] hjkl/yubn=move  Enter=fire  Esc/F=cancel",
+           sf::Color(200, 220, 100));
+}
+
+void Game::fireBow()
+{
+    if (!m_player) return;
+
+    // หา arrow ใน inventory
+    int arrowSlot = -1;
+    for (int i = 0; i < m_inventory.size(); ++i)
+    {
+        Item* it = m_inventory.getItem(i);
+        if (it && it->type == ItemType::Ammo)
+        {
+            arrowSlot = i;
+            break;
+        }
+    }
+
+    if (arrowSlot == -1)
+    {
+        addLog("  No arrows in inventory!", sf::Color(220, 100, 50));
+        return;
+    }
+
+    const int BOW_RANGE = 8;
+    int pc = m_player->getCol();
+    int pr = m_player->getRow();
+    int tc = m_ui.targeting.targetCol;
+    int tr = m_ui.targeting.targetRow;
+
+    float dist = std::sqrt((float)((tc - pc)*(tc - pc) + (tr - pr)*(tr - pr)));
+    if (dist > BOW_RANGE)
+    {
+        addLog("  Out of range! (max " + std::to_string(BOW_RANGE) + " tiles)",
+               sf::Color(220, 100, 50));
+        return;
+    }
+
+    // หักลูกธนูจาก inventory
+    m_inventory.removeItem(arrowSlot);
+    int arrowLeft = m_inventory.getCount(arrowSlot); // เหลือเท่าไหร่
+
+    int dmg  = std::max(1, getBuffedAtk() * 90 / 100);
+    bool hit = false;
+
+    auto line = getLine(pc, pr, tc, tr);
+
+    for (int i = 1; i < (int)line.size() && !hit; ++i)
+    {
+        int tx = line[i].x;
+        int ty = line[i].y;
+
+        if (m_tileMap.getTile(tx, ty) == TileType::Wall) break;
+
+        float d = std::sqrt((float)((tx - pc)*(tx - pc) + (ty - pr)*(ty - pr)));
+        if (d > BOW_RANGE) break;
+
+        for (auto* e : m_enemies)
+        {
+            if (e->isDead() || e->getCol() != tx || e->getRow() != ty) continue;
+
+            e->takeDamage(dmg);
+            addLog("  Arrow hits " + e->getName() + " for " + std::to_string(dmg) + "!",
+                   sf::Color(200, 220, 100));
+            hit = true;
+
+            if (e->isDead())
+            {
+                onEnemyKilled(e);
+                auto dropped = DropTable::instance().roll(e->getId());
+                for (const auto& itemId : dropped)
+                {
+                    const ItemData* idata = DropTable::instance().getItem(itemId);
+                    if (!idata) continue;
+                    Item drop;
+                    drop.id    = idata->id;
+                    drop.name  = idata->name;
+                    drop.type  = idata->type == "Core" ? ItemType::Core :
+                                 idata->type == "Ammo" ? ItemType::Ammo :
+                                                         ItemType::Material;
+                    drop.desc  = idata->desc;
+                    drop.value = idata->value;
+                    drop.spriteName = idata->sprite;   // ← ขาดตรงนี้
+                    drop.col   = e->getCol();
+                    drop.row   = e->getRow();
+                    m_mapItems.push_back(drop);
+                    addLog("  " + drop.name + " dropped!", sf::Color(220, 200, 80));
+                }
+            }
+            break;
+        }
+    }
+
+    if (!hit)
+        addLog("  Arrow flies into the dark.", sf::Color(140, 140, 140));
+
+    Stats& ps = m_player->getStats();
+    ps.spdCounter -= 100;
+    ps.spdCounter += ps.speedPerTurn;
+    if (ps.spdCounter > 300) ps.spdCounter = 300;
+
+    processTurn();
+    tryRespawnEnemies();
+    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
 }
 
 void Game::fireRangedAt(int targetCol, int targetRow)
@@ -585,7 +763,9 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         if (!idata) continue;
                         Item drop;
                         drop.id = idata->id;
-                        drop.type = (idata->type=="Core") ? ItemType::Core : ItemType::Material;
+                        drop.type = (idata->type=="Core") ? ItemType::Core :
+                                    idata->type == "Ammo" ? ItemType::Ammo :
+                                                            ItemType::Material;
                         drop.name = idata->name;
                         drop.desc = idata->desc;
                         drop.value = idata->value;
@@ -614,6 +794,10 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         drop.burnDurReduce = idata->burnDurReduce;
                         drop.stunDurReduce = idata->stunDurReduce;
                         drop.slowDurReduce = idata->slowDurReduce;
+                        drop.onHitChance = idata->onHitChance;
+                        drop.onHitDuration = idata->onHitDuration;
+                        drop.onHitPower = idata->onHitPower;
+                        drop.onHitStatus = idata->onHitStatus;
                         drop.spriteName = idata->sprite;
                         drop.stackable = idata->stackable;
                         drop.col = e->getCol();
@@ -936,7 +1120,7 @@ void Game::spawnItems()
 {
     std::uniform_int_distribution<int> colDist(1, m_mapCols - 2);
     std::uniform_int_distribution<int> rowDist(1, m_mapRows - 2);
-    std::uniform_int_distribution<int> typeDist(0, 9);
+    std::uniform_int_distribution<int> typeDist(0, 10);
     std::uniform_int_distribution<int> armorDist(0, 4);
 
     int count = 10 + std::uniform_int_distribution<int>(0,7)(m_rng);
@@ -953,10 +1137,11 @@ void Game::spawnItems()
         std::optional<std::string> itemId;
         int r = typeDist(m_rng);
 
-        if      (r < 3) itemId = DropTable::instance().getRandomItemIdByType("Food");
-        else if (r < 5) itemId = DropTable::instance().getRandomItemIdByType("Potion");
-        else if (r < 7) itemId = DropTable::instance().getRandomItemIdByType("Weapon");
-        else if (r < 8) itemId = DropTable::instance().getRandomItemIdByType("OffWeapon");
+        if      (r < 3)  itemId = DropTable::instance().getRandomItemIdByType("Food");
+        else if (r < 5)  itemId = DropTable::instance().getRandomItemIdByType("Potion");
+        else if (r < 7)  itemId = DropTable::instance().getRandomItemIdByType("Weapon");
+        else if (r < 8)  itemId = DropTable::instance().getRandomItemIdByType("OffWeapon");
+        else if (r == 8) itemId = DropTable::instance().getRandomItemIdByType("Ammo"); // ← เพิ่ม
         else
         {
             const char* armorTypes[] = {"Helmet","BodyArmor","Gloves","Greaves","Boots"};
@@ -981,6 +1166,7 @@ void Game::spawnItems()
                             idata->type=="Boots"     ? ItemType::Boots     :
                             idata->type=="Weapon"    ? ItemType::Weapon    :
                             idata->type=="OffWeapon" ? ItemType::OffWeapon :
+                            idata->type == "Ammo"    ? ItemType::Ammo      :  // ← เพิ่ม
                                                        ItemType::Material;
                 item.name          = idata->name;
                 item.desc          = idata->desc;
@@ -1009,6 +1195,10 @@ void Game::spawnItems()
                 item.burnDurReduce = idata->burnDurReduce;
                 item.stunDurReduce = idata->stunDurReduce;
                 item.slowDurReduce = idata->slowDurReduce;
+                item.onHitChance = idata->onHitChance;
+                item.onHitDuration = idata->onHitDuration;
+                item.onHitPower = idata->onHitPower;
+                item.onHitStatus = idata->onHitStatus;
                 item.spriteName    = idata->sprite;
                 item.stackable     = idata->stackable;
                 //ตรงนี้
@@ -1125,10 +1315,10 @@ void Game::processEvents()
                     case sf::Keyboard::Key::Num6:
                     case sf::Keyboard::Key::Num7:
                     case sf::Keyboard::Key::Num8:
-                    case sf::Keyboard::Key::Num9:   
+                    case sf::Keyboard::Key::Num9:
+                    case sf::Keyboard::Key::F:   
                     confirmTarget(); break;
-                    case sf::Keyboard::Key::Escape:
-                    case sf::Keyboard::Key::F:     cancelTargeting(); break;
+                    case sf::Keyboard::Key::Escape: cancelTargeting(); break;
                     default: break;
                 }
                 return;
@@ -1181,6 +1371,15 @@ void Game::processEvents()
                     else
                         m_ui.activePanel = UIState::Panel::Stats;
                     break;
+                    // ใน switch(key->code) หลัก เพิ่ม
+                case sf::Keyboard::Key::PageUp:
+                    if (m_ui.activePanel == UIState::Panel::Stats)
+                        m_statsScrollOffset = std::max(0, m_statsScrollOffset - 1);
+                    break;
+                case sf::Keyboard::Key::PageDown:
+                    if (m_ui.activePanel == UIState::Panel::Stats)
+                        m_statsScrollOffset++;
+                    break;
                 case sf::Keyboard::Key::C:
                     m_ui.togglePanel(UIState::Panel::Cores);
                     break;
@@ -1199,6 +1398,7 @@ void Game::processEvents()
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
                 case sf::Keyboard::Key::Space:  waitTurn();         break;
+                case sf::Keyboard::Key::F: enterBowTargeting(); break;
                 case sf::Keyboard::Key::X:
                     if (m_ui.isPanelOpen(UIState::Panel::Cores))
                         unequipCore();
@@ -1335,6 +1535,7 @@ void Game::tryPickupItem()
         {
             if (m_inventory.isFull()){addLog("  Inventory full!",sf::Color(220,120,50));return;}
             Item item=m_mapItems[i]; item.col=-1; item.row=-1;
+
             m_inventory.addItem(item);
             m_mapItems.erase(m_mapItems.begin()+i);
             addLog("  Picked up: "+item.name,sf::Color(180,220,100));
@@ -1358,6 +1559,8 @@ void Game::useOrEquipSelected()
          addLog("  Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(80,180,220));}
         m_inventory.removeItem(m_ui.selectedInvSlot);
     }
+    else if (item->type == ItemType::Ammo)
+        addLog("  " + item->name + " is ammunition. Cannot equip.", sf::Color(160, 160, 160));
     else if (item->isCore()) equipCore();
     else if (item->isMaterial()) addLog("  "+item->name+" is a trade item.",sf::Color(160,160,160));
     else if (item->isEquipment())
@@ -1541,6 +1744,43 @@ void Game::playerAttack(Enemy* enemy)
     if (powered) msg+=" [POWERED]";
     addLog(msg,sf::Color(255,200,50));
 
+    // ── On-hit status effect จาก weapon ──
+const Item* mainHand = m_equipment.getItem(EquipSlot::MainHand);
+
+if (mainHand && !mainHand->onHitStatus.empty() &&
+    mainHand->onHitDuration > 0 && mainHand->onHitChance > 0)
+{
+    std::uniform_int_distribution<int> rollDist(0, 99);
+    if (rollDist(m_rng) < mainHand->onHitChance)
+    {
+        const std::string& st = mainHand->onHitStatus;
+        StatusType stype;
+        bool valid = true;
+        if      (st == "bleed")  stype = StatusType::Bleed;
+        else if (st == "poison") stype = StatusType::Poison;
+        else if (st == "burn")   stype = StatusType::Burn;
+        else if (st == "stun")   stype = StatusType::Stun;
+        else if (st == "slow")   stype = StatusType::Slow;
+        else valid = false;
+
+        if (valid)
+        {
+            int bonus = 0;
+            if (st == "bleed")  bonus = m_finalStats.bleedBonus;
+            if (st == "poison") bonus = m_finalStats.poisonBonus;
+            if (st == "burn")   bonus = m_finalStats.burnBonus;
+            StatusEffect se;
+            se.type     = stype;
+            se.power    = mainHand->onHitPower + bonus;
+            se.duration = mainHand->onHitDuration;
+            se.sourceId = mainHand->id;
+            enemy->applyStatus(se);
+            addLog("  " + enemy->getName() + " is " + st + "!", sf::Color(200, 100, 220));
+            
+        }
+    }
+}
+
     if (enemy->isDead())
     {
         //addLog("  "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(220,80,80));
@@ -1551,7 +1791,9 @@ void Game::playerAttack(Enemy* enemy)
             if (!idata) continue;
             Item drop;
             drop.id=(idata->id);
-            drop.type=(idata->type=="Core")?ItemType::Core:ItemType::Material;
+            drop.type = idata->type == "Core" ? ItemType::Core :
+                        idata->type == "Ammo" ? ItemType::Ammo :
+                                                ItemType::Material;
             drop.name=idata->name; drop.desc=idata->desc; drop.value=idata->value;
             drop.hpBonus=idata->hpBonus; drop.atkBonus=idata->atkBonus;
             drop.defBonus=idata->defBonus; drop.dodgeBonus=idata->dodgeBonus;
@@ -1574,6 +1816,10 @@ void Game::playerAttack(Enemy* enemy)
             drop.burnDurReduce = idata->burnDurReduce;
             drop.stunDurReduce = idata->stunDurReduce;
             drop.slowDurReduce = idata->slowDurReduce;
+            drop.onHitChance = idata->onHitChance;
+            drop.onHitDuration = idata->onHitDuration;
+            drop.onHitPower = idata->onHitPower;
+            drop.onHitStatus = idata->onHitStatus;
             drop.spriteName=idata->sprite; drop.stackable=idata->stackable;
             drop.col=enemy->getCol(); drop.row=enemy->getRow();
             m_mapItems.push_back(drop);
@@ -1717,7 +1963,24 @@ void Game::processTurn()
     if (!m_player) return;
 
     regenStamina();
-
+    // ── Player DOT tick ──
+{
+    int hpDelta = 0;
+    std::string effectName;
+    m_player->tickStatusEffects(hpDelta, effectName);
+    if (hpDelta < 0)
+    {
+        addLog("  You take " + std::to_string(-hpDelta) +
+               " " + effectName + " dmg!", sf::Color(200, 80, 180));
+        Stats& ps = m_player->getStats();
+        if (ps.hp <= 0)
+        {
+            ps.hp = 0;
+            m_playerDead = true;
+            addLog("  *** YOU DIED *** [R] restart", sf::Color(255, 50, 50));
+        }
+    }
+}
     // tick cooldown + buff duration ของ player skills
 
         int pc = m_player->getCol();
@@ -1737,7 +2000,30 @@ if (hpDelta < 0)
     addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
            " " + effectName + " dmg", sf::Color(180, 80, 180));
         // 3. ตายจาก status ไหม?
-        if (e->isDead()) { onEnemyKilled(e); continue; }
+        if (e->isDead())
+        {
+            onEnemyKilled(e);
+            auto dropped = DropTable::instance().roll(e->getId());
+            for (const auto& itemId : dropped)
+            {
+                const ItemData* idata = DropTable::instance().getItem(itemId);
+                if (!idata) continue;
+                Item drop;
+                drop.id    = idata->id;
+                drop.name  = idata->name;
+                drop.type  = idata->type == "Core" ? ItemType::Core :
+                     idata->type == "Ammo" ? ItemType::Ammo :
+                                             ItemType::Material;
+                drop.desc  = idata->desc;
+                drop.value = idata->value;
+                drop.spriteName = idata->sprite;   // ← ขาดตรงนี้
+                drop.col   = e->getCol();
+                drop.row   = e->getRow();
+                m_mapItems.push_back(drop);
+                addLog("  " + drop.name + " dropped!", sf::Color(220, 200, 80));
+            }
+            continue;
+        }
 
         // 4. Stun → ข้ามเทิร์น
         if (e->hasStatus(StatusType::Stun)) continue;
@@ -2215,36 +2501,65 @@ void Game::renderStatsOverlay()
     float py = (WINDOW_H - ph) / 2.f;
     sf::RectangleShape panel({pw, ph});
     panel.setFillColor(sf::Color(12,12,18));
-    panel.setOutlineColor(sf::Color(120, 120, 120));
+    panel.setOutlineColor(sf::Color(120,120,120));
     panel.setOutlineThickness(1.f);
     panel.setPosition({px, py});
     m_window.draw(panel);
 
-    float x = px + 20.f, y = py + 16.f;
     int sz = 11;
+    float lineH = sz + 8.f;
+    float contentTop = py + 16.f;
+    float contentBot = py + ph - 16.f;
 
-    auto line = [&](const std::string& label, const std::string& val, sf::Color col = sf::Color(200,200,200)) {
-        sf::Text t(m_font, label + val, sz);
-        t.setFillColor(col);
-        t.setPosition({x, y});
-        m_window.draw(t);
-        y += sz + 8.f;
+    // y เริ่มจาก offset
+    float y = contentTop - m_statsScrollOffset * lineH;
+    float x = px + 20.f;
+
+    // วาด line เฉพาะที่อยู่ใน panel
+    auto line = [&](const std::string& label, const std::string& val,
+                    sf::Color col = sf::Color(200,200,200))
+    {
+        if (y >= contentTop && y + lineH <= contentBot)
+        {
+            sf::Text t(m_font, label + val, sz);
+            t.setFillColor(col);
+            t.setPosition({x, y});
+            m_window.draw(t);
+        }
+        y += lineH;
     };
+
+    // ส่วนที่เหลือของฟังก์ชัน (บรรทัด line(...) ทั้งหมด) ไม่ต้องแก้เลยครับ
 
     line("Level:       ", std::to_string(s.level));
     line("HP:          ", std::to_string(s.hp) + "/" + std::to_string(m_finalStats.maxHp));
     line("ATK:         ", std::to_string(m_finalStats.atk));
     line("DEF:         ", std::to_string(m_finalStats.def));
     line("Dodge:       ", std::to_string(m_finalStats.dodge));
-    line("Bleed:       ", std::to_string(m_finalStats.bleedBonus));
-    line("BldRes%:     ", std::to_string(m_finalStats.resistBleed));
-    line("BldDmgRed:   ", std::to_string(m_finalStats.bleedDmgReduce));
-    line("BldDurRed:   ", std::to_string(m_finalStats.bleedDurReduce));
+
+    line("BleedDmg:    ", std::to_string(m_finalStats.bleedBonus));
+    line("PoisonDmg:   ", std::to_string(m_finalStats.poisonBonus));
+    line("BurnDmg:     ", std::to_string(m_finalStats.burnBonus));
+
+    line("BleRes%:     ", std::to_string(m_finalStats.resistBleed));
+    line("PoiRes%:     ", std::to_string(m_finalStats.resistPoison));
+    line("BurRes%:     ", std::to_string(m_finalStats.resistBurn));
+    line("StuRes%:     ", std::to_string(m_finalStats.resistStun));
+    line("SloRes%:     ", std::to_string(m_finalStats.resistSlow));
+
+    line("BleDmgRed:   ", std::to_string(m_finalStats.bleedDmgReduce));
+    line("PoiDmgRed:   ", std::to_string(m_finalStats.poisonBonus));
+    line("BurDmgRed:   ", std::to_string(m_finalStats.burnDmgReduce));
+
+    line("BleDurRed:   ", std::to_string(m_finalStats.bleedDurReduce));
+    line("PoiDurRed:   ", std::to_string(m_finalStats.poisonDurReduce));
+    line("BurDurRed:   ", std::to_string(m_finalStats.burnDurReduce));
+    line("StuDurRed:   ", std::to_string(m_finalStats.stunDurReduce));
+    line("SloDurRed:   ", std::to_string(m_finalStats.slowDurReduce));
 
     // Stamina bar
     {
-        std::string stam = std::to_string(s.stamina) + "/" + std::to_string(s.maxStamina)
-                         + "  (+" + std::to_string(s.staminaRegen) + "/turn)";
+        std::string stam = std::to_string(s.stamina) + "/" + std::to_string(s.maxStamina);
         sf::Color stCol = s.stamina < s.maxStamina / 3 ? sf::Color(255,120,50)
                         : s.stamina < s.maxStamina * 2 / 3 ? sf::Color(255,200,80)
                         : sf::Color(80,220,140);
@@ -2772,17 +3087,38 @@ void Game::renderStatusEffects()
         const auto& se = effects[i];
         float sx = statusStartX + i * (SZ + GAP);
 
+        const StatusEffectData* data = StatusEffectDB::instance().get(se.typeId());
+
+        sf::Color outlineCol = data ? sf::Color(data->r, data->g, data->b)
+                                : sf::Color::White;
+
         sf::RectangleShape slot({SZ, SZ});
         slot.setFillColor(sf::Color(20, 20, 20, 220));
-        slot.setOutlineColor(se.color());
+        slot.setOutlineColor(outlineCol);
         slot.setOutlineThickness(2.f);
         slot.setPosition({sx, Y});
         m_window.draw(slot);
 
-        sf::Text nameTxt(m_font, se.icon(), 7);
-        nameTxt.setFillColor(se.color());
-        nameTxt.setPosition({sx + 2.f, Y + 2.f});
-        m_window.draw(nameTxt);
+        const sf::Texture* tex = data
+            ? TextureManager::instance().get(data->icon)
+            : nullptr;
+
+        if (tex)
+        {
+            sf::Sprite spr(*tex);
+            auto tsz = tex->getSize();
+            float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+            spr.setScale({sc, sc});
+            spr.setPosition({sx, Y});
+            m_window.draw(spr);
+        }
+        else
+        {
+            sf::Text nameTxt(m_font, se.typeId().substr(0, 3), 7);
+            nameTxt.setFillColor(outlineCol);
+            nameTxt.setPosition({sx + 2.f, Y + 2.f});
+            m_window.draw(nameTxt);
+        }
 
         sf::Text durTxt(m_font, std::to_string(se.duration), 9);
         durTxt.setFillColor(sf::Color::White);

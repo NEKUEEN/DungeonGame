@@ -196,6 +196,15 @@ bool Enemy::updateAI(int pc, int pr,
 {
     if (isDead()) return false;
 
+    // Stun → skip turn
+    if (hasStatus(StatusType::Stun)) return false;
+
+// Slow → ทำให้ spdCounter ลดก่อน act
+    if (hasStatus(StatusType::Slow)) {
+        m_spdCounter -= 50;
+    if (m_spdCounter < 0) m_spdCounter = 0;
+    }
+
     float dist = std::hypot((float)(pc - m_col), (float)(pr - m_row));
 
     // ── 1. Alert check: ต้องเห็นกันก่อน ──
@@ -392,6 +401,13 @@ void Enemy::tickStatusEffects(int& hpDelta, std::string& effectName)
                 break;
             case StatusType::Regen:
                 hpDelta += se.power;
+                break;
+                // เพิ่ม case ใน switch
+            case StatusType::Stun:
+                effectName = "stun";
+                break;
+            case StatusType::Slow:
+                effectName = "slow";
                 break;
             default: break;
         }
