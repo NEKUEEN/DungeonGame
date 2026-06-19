@@ -32,11 +32,12 @@
       "hotbar_slot": 1,
       "cooldown": 20,
       "duration": 15,
-      "stamina_cost": 50,
+      
       "effect": {
         "hp_pct": 100,
         "def_pct": 50,
-        "atk_pct": 100
+        "atk_pct": 100,
+        "stamina_cost": 50
       }
     },
     {
