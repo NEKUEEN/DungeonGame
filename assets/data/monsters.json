@@ -183,6 +183,8 @@
       "attack": 8,
       "defense": 3,
       "exp": 1,
+      "pierce_resist": 10,
+      "blunt_resist": -3,
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 7,
