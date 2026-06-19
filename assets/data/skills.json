@@ -32,6 +32,7 @@
       "hotbar_slot": 1,
       "cooldown": 20,
       "duration": 15,
+      "stamina_cost": 50,
       "effect": {
         "hp_pct": 100,
         "def_pct": 50,
@@ -119,6 +120,7 @@
     "hotbar_slot": 0,
     "cooldown": 1,
     "duration": 0,
+    "stamina_cost":5,
     "effect": {
         "damage_pct": 80,
         "range": 6,

@@ -11,6 +11,11 @@ struct StatBonus {
     int matk  = 0;      // เปลี่ยนจาก magicDmg
     int magicRes = 0;
     int spd   = 0;
+    // ── Weapon damage-type bonus (จาก core/item) ──
+    int slashDmgBonus  = 0;
+    int pierceDmgBonus = 0;
+    int bluntDmgBonus  = 0;
+    int cleaveDmgBonus = 0;
     // ── Status bonus ──
     int bleedBonus  = 0;
     int poisonBonus = 0;
@@ -39,6 +44,10 @@ struct StatBonus {
         matk  += other.matk;
         magicRes += other.magicRes;
         spd   += other.spd;
+        slashDmgBonus  += other.slashDmgBonus;
+        pierceDmgBonus += other.pierceDmgBonus;
+        bluntDmgBonus  += other.bluntDmgBonus;
+        cleaveDmgBonus += other.cleaveDmgBonus;
         bleedBonus  += other.bleedBonus;
         poisonBonus += other.poisonBonus;
         burnBonus   += other.burnBonus;
@@ -66,6 +75,7 @@ struct StatBonus {
 
     void clear() {
         hp = atk = def = dodge = mana = matk = magicRes = spd = bleedBonus = poisonBonus = burnBonus = 0;
+        slashDmgBonus = pierceDmgBonus = bluntDmgBonus = cleaveDmgBonus = 0;
     }
 
     std::string toString() const {

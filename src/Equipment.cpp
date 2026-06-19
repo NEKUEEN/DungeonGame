@@ -53,6 +53,11 @@ StatBonus Equipment::getTotalBonus() const {
         total.burnDurReduce += item.burnDurReduce;
         total.stunDurReduce += item.stunDurReduce;
         total.slowDurReduce += item.slowDurReduce;
+
+        total.slashDmgBonus += item.slashDmgBonus;
+        total.pierceDmgBonus += item.pierceDmgBonus;
+        total.bluntDmgBonus += item.bluntDmgBonus;
+        total.cleaveDmgBonus += item.cleaveDmgBonus;
     }
     return total;
 }

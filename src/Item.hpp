@@ -6,6 +6,28 @@
 enum class ItemType
 { Food, Potion, Helmet, BodyArmor, Gloves, Greaves, Boots, Weapon, OffWeapon, Core, Material, Ammo, };
 
+// ── Weapon damage types: ฟัน(Slash) แทง(Pierce) ทุบ(Blunt) ฟาด(Cleave) ──
+enum class DamageType { Slash, Pierce, Blunt, Cleave };
+
+inline DamageType damageTypeFromString(const std::string& s)
+{
+    if (s == "pierce") return DamageType::Pierce;
+    if (s == "blunt")  return DamageType::Blunt;
+    if (s == "cleave") return DamageType::Cleave;
+    return DamageType::Slash; // default
+}
+
+inline std::string damageTypeToString(DamageType t)
+{
+    switch (t)
+    {
+        case DamageType::Pierce: return "pierce";
+        case DamageType::Blunt:  return "blunt";
+        case DamageType::Cleave: return "cleave";
+        default:                 return "slash";
+    }
+}
+
 struct Item
 {
     std::string id;          // ← เพิ่ม: ใช้ lookup core_stats จาก DropTable
@@ -22,6 +44,11 @@ struct Item
     int         magicDmgBonus = 0; // เพิ่ม: สำหรับ Core ที่มี bonus magic damage
     int         magicResBonus = 0;
     int         spdBonus   = 0;  // +/- speed (บวก=เร็ว, ลบ=ช้า) // เพิ่ม: สำหรับ Core ที่มี bonus magic resistance
+    DamageType  damageType = DamageType::Slash;  // ← เพิ่ม: ประเภทดาเมจของอาวุธ (ฟัน/แทง/ทุบ/ฟาด)
+    int slashDmgBonus  = 0;
+    int pierceDmgBonus = 0;
+    int bluntDmgBonus  = 0;
+    int cleaveDmgBonus = 0;
     int bleedBonus  = 0;
     int poisonBonus = 0;
     int burnBonus   = 0;
@@ -57,6 +84,10 @@ struct Item
             .matk  = magicDmgBonus,   // เปลี่ยน
             .magicRes = magicResBonus,
             .spd   = spdBonus,
+            .slashDmgBonus  = slashDmgBonus,
+            .pierceDmgBonus = pierceDmgBonus,
+            .bluntDmgBonus  = bluntDmgBonus,
+            .cleaveDmgBonus = cleaveDmgBonus,
             .bleedBonus  = bleedBonus,
             .poisonBonus = poisonBonus,
             .burnBonus   = burnBonus,

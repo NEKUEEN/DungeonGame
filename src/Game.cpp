@@ -5,7 +5,6 @@
 #include "StatusEffectDB.hpp"
 #include "DropTable.hpp"
 #include <iostream>
-#include <cstdlib>
 #include <algorithm>
 #include <optional>
 #include <cmath>
@@ -94,6 +93,10 @@ void Game::recalcAllStats()
     m_finalStats.burnDurReduce = bonus.burnDurReduce;
     m_finalStats.stunDurReduce = bonus.stunDurReduce;
     m_finalStats.slowDurReduce = bonus.slowDurReduce;
+    m_finalStats.slashDmgBonus  = bonus.slashDmgBonus;
+    m_finalStats.pierceDmgBonus = bonus.pierceDmgBonus;
+    m_finalStats.bluntDmgBonus  = bonus.bluntDmgBonus;
+    m_finalStats.cleaveDmgBonus = bonus.cleaveDmgBonus;
 
 
     int atkPercentBonus = 0, defPercentBonus = 0, magicPercentBonus = 0, hpPercentBonus = 0;
@@ -1179,6 +1182,11 @@ void Game::spawnItems()
                 item.magicDmgBonus = idata->magicDmgBonus;
                 item.magicResBonus = idata->magicResBonus;
                 item.spdBonus      = idata->spdBonus;
+                item.damageType    = damageTypeFromString(idata->damageType);
+                item.slashDmgBonus  = idata->slashDmgBonus;
+                item.pierceDmgBonus = idata->pierceDmgBonus;
+                item.bluntDmgBonus  = idata->bluntDmgBonus;
+                item.cleaveDmgBonus = idata->cleaveDmgBonus;
                 item.bleedBonus  = idata->bleedBonus;
                 item.poisonBonus = idata->poisonBonus;
                 item.burnBonus   = idata->burnBonus;
@@ -1732,7 +1740,25 @@ void Game::playerAttack(Enemy* enemy)
 {
     if (!m_player) return;
     int atk=getBuffedAtk();
-    int dmg=std::max(1,atk+std::rand()%4-enemy->getDefense());
+    int dmg=std::max(1,atk-enemy->getDefense());
+
+    // ── ดาเมจตามประเภทอาวุธ (ฟัน/แทง/ทุบ/ฟาด) vs resist ของมอน ──
+    const Item* mainHand = m_equipment.getItem(EquipSlot::MainHand);
+    DamageType  weaponDmgType = mainHand ? mainHand->damageType : DamageType::Slash;
+
+    int dmgTypeBonus = 0;
+    switch (weaponDmgType)
+    {
+        case DamageType::Slash:  dmgTypeBonus = m_finalStats.slashDmgBonus;  break;
+        case DamageType::Pierce: dmgTypeBonus = m_finalStats.pierceDmgBonus; break;
+        case DamageType::Blunt:  dmgTypeBonus = m_finalStats.bluntDmgBonus;  break;
+        case DamageType::Cleave: dmgTypeBonus = m_finalStats.cleaveDmgBonus; break;
+    }
+    dmg += dmgTypeBonus;
+
+    int resist = std::clamp(enemy->getResist(weaponDmgType), -100, 100);
+    dmg = std::max(1, dmg * (100 - resist) / 100);
+
     enemy->takeDamage(dmg);
 
     bool powered = false;
@@ -1745,8 +1771,6 @@ void Game::playerAttack(Enemy* enemy)
     addLog(msg,sf::Color(255,200,50));
 
     // ── On-hit status effect จาก weapon ──
-const Item* mainHand = m_equipment.getItem(EquipSlot::MainHand);
-
 if (mainHand && !mainHand->onHitStatus.empty() &&
     mainHand->onHitDuration > 0 && mainHand->onHitChance > 0)
 {
@@ -1856,9 +1880,9 @@ void Game::enemyAttack(Enemy* enemy)
     int def=getBuffedDef();
     int dodge=s.maxDodge+m_equipment.getTotalDodgeBonus();
     float dodgeChance=std::min(0.45f,0.06f+dodge*0.05f);
-    if ((std::rand()%100)<(int)(dodgeChance*100))
+    if (std::uniform_int_distribution<int>(0,99)(m_rng)<(int)(dodgeChance*100))
     {addLog("  You dodged "+enemy->getName()+"!",sf::Color(150,220,150));return;}
-    int dmg=std::max(1,enemy->getAttack()-def+std::rand()%3);
+    int dmg=std::max(1,enemy->getAttack()-def);
     s.hp -= dmg;
 
 // ── Apply status on hit ──
@@ -2536,6 +2560,11 @@ void Game::renderStatsOverlay()
     line("ATK:         ", std::to_string(m_finalStats.atk));
     line("DEF:         ", std::to_string(m_finalStats.def));
     line("Dodge:       ", std::to_string(m_finalStats.dodge));
+
+    line("SlaDmg:      ", std::to_string(m_finalStats.slashDmgBonus));
+    line("PieDmg:      ", std::to_string(m_finalStats.pierceDmgBonus));
+    line("BluDmg:      ", std::to_string(m_finalStats.bluntDmgBonus));
+    line("CleDmg:      ", std::to_string(m_finalStats.cleaveDmgBonus));
 
     line("BleedDmg:    ", std::to_string(m_finalStats.bleedBonus));
     line("PoisonDmg:   ", std::to_string(m_finalStats.poisonBonus));

@@ -29,31 +29,6 @@
       ]
     },
     {
-      "id": "dummy",
-      "name": "Dummy",
-      "family": "Rat",
-      "rank": "Normal",
-      "sprite": "dummy.png",
-      "hp": 200,
-      "attack": 0,
-      "defense": 0,
-      "exp": 1,
-      "ai_type": "coward",
-      "preferred_range": 1,
-      "alert_range": 6,
-      "spd": 1,
-      "drops": [
-        {
-          "item": "magic_stone",
-          "chance": 0.55
-        },
-        {
-          "item": "rat_core",
-          "chance": 0.99
-        }
-      ]
-    },
-    {
       "id": "goblin_archer",
       "name": "Goblin Archer",
       "family": "Goblin",

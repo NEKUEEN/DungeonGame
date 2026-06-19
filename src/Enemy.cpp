@@ -2,7 +2,7 @@
 #include "TileMap.hpp"
 #include "MonsterDB.hpp"
 #include "SkillDB.hpp"
-#include <cstdlib>
+
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <functional>
 #include "StatusEffect.hpp"
+#include "TextureManager.hpp"
 
 // ============================================================
 //  Constructor
@@ -35,6 +36,11 @@ Enemy::Enemy(const std::string& monsterId, int col, int row,
         m_preferredRange = data->preferredRange;
         m_alertRange     = data->alertRange;
         m_spd            = data->spd;
+
+        m_slashResist  = data->slashResist;
+        m_pierceResist = data->pierceResist;
+        m_bluntResist  = data->bluntResist;
+        m_cleaveResist = data->cleaveResist;
 
         float scale = 1.f + (floor - 1) * 0.1f;
         m_maxHp   = (int)(data->hp      * scale);
@@ -305,7 +311,8 @@ bool Enemy::updateAI(int pc, int pr,
             const int sdx[] = {0,0,1,-1,1,1,-1,-1};
             const int sdy[] = {1,-1,0,0,1,-1,1,-1};
             // ลองเดินสุ่มสักทิศ
-            int start = std::rand() % 8;
+            static thread_local std::mt19937 rng{std::random_device{}()};
+            int start = std::uniform_int_distribution<int>(0,7)(rng);
             for (int i = 0; i < 8; ++i)
             {
                 int idx = (start + i) % 8;
@@ -368,6 +375,49 @@ void Enemy::drawHPBar(sf::RenderWindow& window)
         dot.setFillColor(m_searching ? sf::Color(255,200,0) : sf::Color(255,50,50));
         dot.setPosition({bx+bw-4.f, by-4.f});
         window.draw(dot);
+    }
+
+    // ── Debuff icons เหนือ HP bar ──
+    if (m_statusEffects.empty()) return;
+
+    struct DebuffInfo { StatusType type; const char* key; sf::Color fallback; };
+    const DebuffInfo debuffs[] = {
+        { StatusType::Bleed,  "debuff_e_bleed",  sf::Color(200,  0,  0) },
+        { StatusType::Poison, "debuff_e_poison", sf::Color( 80, 180, 60) },
+        { StatusType::Burn,   "debuff_e_burn",   sf::Color(255, 140,  0) },
+        { StatusType::Stun,   "debuff_e_stun",   sf::Color(255, 230,  0) },
+        { StatusType::Slow,   "debuff_e_slow",   sf::Color( 80, 160, 255) },
+    };
+
+    const float SZ  = 10.f;
+    const float GAP = 2.f;
+    float ix = bx;
+    float iy = by - SZ - 3.f;
+
+    auto& tm = TextureManager::instance();
+
+    for (const auto& info : debuffs)
+    {
+        if (!hasStatus(info.type)) continue;
+
+        const sf::Texture* tex = tm.get(info.key);
+        if (tex)
+        {
+            sf::Sprite spr(*tex);
+            auto sz = tex->getSize();
+            float sc = SZ / std::max((float)sz.x, (float)sz.y);
+            spr.setScale({sc, sc});
+            spr.setPosition({ix, iy});
+            window.draw(spr);
+        }
+        else
+        {
+            sf::RectangleShape icon({SZ, SZ});
+            icon.setFillColor(info.fallback);
+            icon.setPosition({ix, iy});
+            window.draw(icon);
+        }
+        ix += SZ + GAP;
     }
 }
 
@@ -438,3 +488,5 @@ sf::Color Enemy::rankColor() const
         default:               return sf::Color::White;
     }
 }
+
+// ── patch: replace drawHPBar ──

@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include "Skill.hpp"
 #include "StatusEffect.hpp"
+#include "Item.hpp"
 
 // ── เพิ่ม Rare เข้าไประหว่าง Normal และ Elite ──
 enum class EnemyRank { Normal, Rare, Elite, Boss };
@@ -29,6 +30,19 @@ public:
     int  getExp()     const { return m_exp; }
     void takeDamage(int dmg) { m_hp -= dmg; }
     bool isDead()     const { return m_hp <= 0; }
+
+    // ── Weapon damage-type resist (%, ลบ = แพ้ทาง) ──
+    int getResist(DamageType type) const
+    {
+        switch (type)
+        {
+            case DamageType::Slash:  return m_slashResist;
+            case DamageType::Pierce: return m_pierceResist;
+            case DamageType::Blunt:  return m_bluntResist;
+            case DamageType::Cleave: return m_cleaveResist;
+        }
+        return 0;
+    }
 
     int         getCol()    const { return m_col; }
     int         getRow()    const { return m_row; }
@@ -105,6 +119,12 @@ private:
 
     int m_spd        = 0;    // ค่า speed ของมอน (บวก=เร็ว, ลบ=ช้า)
     int m_spdCounter = 0;    // accumulator — เมื่อถึง 100 ได้ขยับ 1 ครั้ง
+
+    // ── Weapon damage-type resist ──
+    int m_slashResist  = 0;
+    int m_pierceResist = 0;
+    int m_bluntResist  = 0;
+    int m_cleaveResist = 0;
 
     bool m_alerted      = false;
     int  m_lastKnownCol = -1;

@@ -54,6 +54,10 @@ struct FinalStats {
     int matk = 0;      // magic attack
     int mdef = 0;      // magic resist
     int spd = 0;       // speed bonus (อาจติดลบ)
+    int slashDmgBonus  = 0;
+    int pierceDmgBonus = 0;
+    int bluntDmgBonus  = 0;
+    int cleaveDmgBonus = 0;
     int bleedBonus  = 0;
     int poisonBonus = 0;
     int burnBonus   = 0;

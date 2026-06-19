@@ -23,6 +23,13 @@ struct MonsterData
     int exp      = 1;
     int spd      = 0;   // ความเร็ว: บวก=เร็ว, ลบ=ช้า (boss/ตัวใหญ่)
 
+    // ── Weapon damage-type resist (%) ──
+    // ค่าบวก = ต้านทาน (ลดดาเมจที่ได้รับ), ค่าลบ = แพ้ทาง (เพิ่มดาเมจที่ได้รับ)
+    int slashResist  = 0;
+    int pierceResist = 0;
+    int bluntResist  = 0;
+    int cleaveResist = 0;
+
     // ── AI ──
     // "melee" (default) | "ranged" | "caster" | "coward"
     std::string aiType        = "melee";
@@ -78,6 +85,12 @@ public:
                 d.applyStatus    = m.contains("apply_status")    ? m["apply_status"].get<std::string>() : "";
                 d.statusPower    = m.contains("status_power")    ? m["status_power"].get<int>()         : 0;
                 d.statusDuration = m.contains("status_duration") ? m["status_duration"].get<int>()      : 0;
+
+                // ── Weapon damage-type resist (optional) ──
+                d.slashResist  = m.contains("slash_resist")  ? m["slash_resist"].get<int>()  : 0;
+                d.pierceResist = m.contains("pierce_resist") ? m["pierce_resist"].get<int>() : 0;
+                d.bluntResist  = m.contains("blunt_resist")  ? m["blunt_resist"].get<int>()  : 0;
+                d.cleaveResist = m.contains("cleave_resist") ? m["cleave_resist"].get<int>() : 0;
 
                 // ── Skills (optional) ──
                 if (m.contains("skills"))

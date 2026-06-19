@@ -30,6 +30,12 @@ struct ItemData
     int  magicDmgBonus = 0;
     int  magicResBonus = 0;
     int  spdBonus   = 0;
+    std::string damageType = "slash";  // ← เพิ่ม: "slash" | "pierce" | "blunt" | "cleave" (สำหรับ weapon)
+    // ── Weapon damage-type bonus (ใส่ตรงๆ บนตัว item เอง เช่น weapon/armor พิเศษ) ──
+    int slashDmgBonus  = 0;
+    int pierceDmgBonus = 0;
+    int bluntDmgBonus  = 0;
+    int cleaveDmgBonus = 0;
     int bleedBonus = 0;
     int poisonBonus = 0;
     int burnBonus = 0;
@@ -57,6 +63,28 @@ struct ItemData
     int coreMagicDmg = 0;
     int coreMagicRes = 0;
     int coreSpdBonus = 0;
+    int coreSlashDmg  = 0;
+    int corePierceDmg = 0;
+    int coreBluntDmg  = 0;
+    int coreCleaveDmg = 0;
+    // core status bonus
+    int coreBleedBonus  = 0;
+    int corePoisonBonus = 0;
+    int coreBurnBonus   = 0;
+    int coreResistBleed  = 0;
+    int coreResistPoison = 0;
+    int coreResistBurn   = 0;
+    int coreResistStun   = 0;
+    int coreResistSlow   = 0;
+    // core reduce
+    int coreBleedDmgReduce  = 0;
+    int coreBleedDurReduce  = 0;
+    int corePoisonDmgReduce = 0;
+    int corePoisonDurReduce = 0;
+    int coreBurnDmgReduce   = 0;
+    int coreBurnDurReduce   = 0;
+    int coreStunDurReduce   = 0;
+    int coreSlowDurReduce   = 0;
 
     // skills ที่ core นี้ให้เมื่อ equip
     std::vector<std::string> coreSkills;
@@ -99,6 +127,11 @@ public:
             d.magicDmgBonus  = it.contains("magic_dmg")  ? it["magic_dmg"].get<int>()  : 0;
             d.magicResBonus  = it.contains("magic_res")  ? it["magic_res"].get<int>()  : 0;
             d.spdBonus    = it.contains("spd")   ? it["spd"].get<int>()   : 0;
+            d.damageType  = it.contains("damage_type") ? it["damage_type"].get<std::string>() : "slash";
+            d.slashDmgBonus  = it.contains("slash_dmg")  ? it["slash_dmg"].get<int>()  : 0;
+            d.pierceDmgBonus = it.contains("pierce_dmg") ? it["pierce_dmg"].get<int>() : 0;
+            d.bluntDmgBonus  = it.contains("blunt_dmg")  ? it["blunt_dmg"].get<int>()  : 0;
+            d.cleaveDmgBonus = it.contains("cleave_dmg") ? it["cleave_dmg"].get<int>() : 0;
             d.bleedBonus  = it.contains("bleed_bonus")  ? it["bleed_bonus"].get<int>()  : 0;
             d.poisonBonus = it.contains("poison_bonus") ? it["poison_bonus"].get<int>() : 0;
             d.burnBonus   = it.contains("burn_bonus")   ? it["burn_bonus"].get<int>()   : 0;
@@ -132,7 +165,26 @@ public:
                 d.coreMagicDmg  = cs.contains("magic_dmg")  ? cs["magic_dmg"].get<int>()  : 0;
                 d.coreMagicRes  = cs.contains("magic_res")  ? cs["magic_res"].get<int>()  : 0;
                 d.coreSpdBonus = cs.contains("spd")   ? cs["spd"].get<int>()   : 0;
-
+                d.coreSlashDmg  = cs.contains("slash_dmg")  ? cs["slash_dmg"].get<int>()  : 0;
+                d.corePierceDmg = cs.contains("pierce_dmg") ? cs["pierce_dmg"].get<int>() : 0;
+                d.coreBluntDmg  = cs.contains("blunt_dmg")  ? cs["blunt_dmg"].get<int>()  : 0;
+                d.coreCleaveDmg = cs.contains("cleave_dmg") ? cs["cleave_dmg"].get<int>() : 0;
+                d.coreBleedBonus  = cs.contains("bleed_bonus")  ? cs["bleed_bonus"].get<int>()  : 0;
+                d.corePoisonBonus = cs.contains("poison_bonus") ? cs["poison_bonus"].get<int>() : 0;
+                d.coreBurnBonus   = cs.contains("burn_bonus")   ? cs["burn_bonus"].get<int>()   : 0;
+                d.coreResistBleed  = cs.contains("resist_bleed")  ? cs["resist_bleed"].get<int>()  : 0;
+                d.coreResistPoison = cs.contains("resist_poison") ? cs["resist_poison"].get<int>() : 0;
+                d.coreResistBurn   = cs.contains("resist_burn")   ? cs["resist_burn"].get<int>()   : 0;
+                d.coreResistStun   = cs.contains("resist_stun")   ? cs["resist_stun"].get<int>()   : 0;
+                d.coreResistSlow   = cs.contains("resist_slow")   ? cs["resist_slow"].get<int>()   : 0;
+                d.coreBleedDmgReduce  = cs.contains("bleed_dmg_reduce")  ? cs["bleed_dmg_reduce"].get<int>()  : 0;
+                d.coreBleedDurReduce  = cs.contains("bleed_dur_reduce")  ? cs["bleed_dur_reduce"].get<int>()  : 0;
+                d.corePoisonDmgReduce = cs.contains("poison_dmg_reduce") ? cs["poison_dmg_reduce"].get<int>() : 0;
+                d.corePoisonDurReduce = cs.contains("poison_dur_reduce") ? cs["poison_dur_reduce"].get<int>() : 0;
+                d.coreBurnDmgReduce   = cs.contains("burn_dmg_reduce")   ? cs["burn_dmg_reduce"].get<int>()   : 0;
+                d.coreBurnDurReduce   = cs.contains("burn_dur_reduce")   ? cs["burn_dur_reduce"].get<int>()   : 0;
+                d.coreStunDurReduce   = cs.contains("stun_dur_reduce")   ? cs["stun_dur_reduce"].get<int>()   : 0;
+                d.coreSlowDurReduce   = cs.contains("slow_dur_reduce")   ? cs["slow_dur_reduce"].get<int>()   : 0;
             }
 
             // skills ที่ core ให้

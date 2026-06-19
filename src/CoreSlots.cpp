@@ -43,6 +43,26 @@ StatBonus CoreSlots::readStats(const Item& core) const {
     cs.matk  = data->coreMagicDmg;     // เปลี่ยน
     cs.magicRes = data->coreMagicRes;
     cs.spd   = data->coreSpdBonus;
+    cs.slashDmgBonus  = data->coreSlashDmg;
+    cs.pierceDmgBonus = data->corePierceDmg;
+    cs.bluntDmgBonus  = data->coreBluntDmg;
+    cs.cleaveDmgBonus = data->coreCleaveDmg;
+    cs.bleedBonus   = data->coreBleedBonus;
+    cs.poisonBonus  = data->corePoisonBonus;
+    cs.burnBonus    = data->coreBurnBonus;
+    cs.resistBleed  = data->coreResistBleed;
+    cs.resistPoison = data->coreResistPoison;
+    cs.resistBurn   = data->coreResistBurn;
+    cs.resistStun   = data->coreResistStun;
+    cs.resistSlow   = data->coreResistSlow;
+    cs.bleedDmgReduce  = data->coreBleedDmgReduce;
+    cs.bleedDurReduce  = data->coreBleedDurReduce;
+    cs.poisonDmgReduce = data->corePoisonDmgReduce;
+    cs.poisonDurReduce = data->corePoisonDurReduce;
+    cs.burnDmgReduce   = data->coreBurnDmgReduce;
+    cs.burnDurReduce   = data->coreBurnDurReduce;
+    cs.stunDurReduce   = data->coreStunDurReduce;
+    cs.slowDurReduce   = data->coreSlowDurReduce;
     return cs;
 }
 
@@ -114,6 +134,10 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         if (cs.mana)  info += " MANA+"+std::to_string(cs.mana);
         if (cs.matk)  info += " MATK+"+std::to_string(cs.matk);    // เปลี่ยน
         if (cs.magicRes) info += " MRES+"+std::to_string(cs.magicRes);
+        if (cs.slashDmgBonus)  info += " SLA+"+std::to_string(cs.slashDmgBonus);
+        if (cs.pierceDmgBonus) info += " PIE+"+std::to_string(cs.pierceDmgBonus);
+        if (cs.bluntDmgBonus)  info += " BLU+"+std::to_string(cs.bluntDmgBonus);
+        if (cs.cleaveDmgBonus) info += " CLE+"+std::to_string(cs.cleaveDmgBonus);
 
         sf::Text infoTxt(font, info, 8);
         infoTxt.setFillColor(sf::Color(100,200,255));
