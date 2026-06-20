@@ -19,7 +19,8 @@ struct UIState {
         std::string skillId;
         bool isArea     = false;
         int  areaRadius = 0;
-        void reset() { active = false; skillId.clear(); isArea = false; areaRadius = 0; }
+        bool locked     = false;   // true = ล็อกอยู่กับตัว ขยับ cursor ไม่ได้ (AOE self)
+        void reset() { active = false; skillId.clear(); isArea = false; areaRadius = 0; locked = false; }
     } targeting;
 
     void togglePanel(Panel p) {

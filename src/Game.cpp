@@ -390,9 +390,23 @@ void Game::executeSkill(int hotbarIdx)
             m_ui.targeting.skillId    = id;
             m_ui.targeting.isArea     = true;
             m_ui.targeting.areaRadius = sk->data.effect.aoeRadius;
+            m_ui.targeting.locked     = false;
             m_ui.targeting.targetCol  = m_player->getCol();
             m_ui.targeting.targetRow  = m_player->getRow();
             addLog(" [AOE Targeting] " + sk->data.name, sf::Color(255,180,50));
+            break;
+
+            case SkillType::ActiveAoeSelf:
+            s.mana -= sk->data.effect.manaCost;
+            // หัก stamina ตอน confirm จริง — เหมือนกัน
+            m_ui.targeting.active     = true;
+            m_ui.targeting.skillId    = id;
+            m_ui.targeting.isArea     = true;
+            m_ui.targeting.areaRadius = sk->data.effect.aoeRadius;
+            m_ui.targeting.locked     = true;     // ← ล็อกอยู่กับตัว ขยับไม่ได้
+            m_ui.targeting.targetCol  = m_player->getCol();
+            m_ui.targeting.targetRow  = m_player->getRow();
+            addLog(" [AOE] " + sk->data.name + " — press again to release", sf::Color(180,140,255));
             break;
 
         case SkillType::Passive:
@@ -526,6 +540,7 @@ std::vector<sf::Vector2i> Game::getLine(int x0, int y0, int x1, int y1) const
 void Game::moveTargetCursor(int dc, int dr)
 {
     if (!m_player) return;
+    if (m_ui.targeting.locked) return;   // ← ล็อกอยู่กับตัว ห้ามขยับ
 
     int nc = m_ui.targeting.targetCol + dc;
     int nr = m_ui.targeting.targetRow + dr;
@@ -575,7 +590,7 @@ void Game::confirmTarget()
         fireRangedAt(tc, tr);
     else if (type == SkillType::ActiveWarp)
         executeWarp(tc, tr);
-    else if (type == SkillType::ActiveAoe)
+    else if (type == SkillType::ActiveAoe || type == SkillType::ActiveAoeSelf)
     {
         executeAoeAt(sk, tc, tr);
         m_player->getStats().stamina -= sk->data.effect.staminaCost;
@@ -2324,6 +2339,10 @@ void Game::renderTargeting()
         int radius = m_ui.targeting.areaRadius;
         int tc = m_ui.targeting.targetCol;
         int tr = m_ui.targeting.targetRow;
+        bool locked = m_ui.targeting.locked;
+
+        sf::Color fillCol    = locked ? sf::Color(150,90,255,90) : sf::Color(255,140,40,90);
+        sf::Color outlineCol = locked ? sf::Color(190,150,255)   : sf::Color(255,200,50);
 
         for (int dy = -radius; dy <= radius; ++dy)
         for (int dx = -radius; dx <= radius; ++dx)
@@ -2333,14 +2352,14 @@ void Game::renderTargeting()
             if (tx < 0 || ty < 0 || tx >= m_mapCols || ty >= m_mapRows) continue;
 
             sf::RectangleShape highlight({ts, ts});
-            highlight.setFillColor(sf::Color(255,140,40,90));
+            highlight.setFillColor(fillCol);
             highlight.setPosition({tx*ts, ty*ts});
             m_window.draw(highlight);
         }
 
         sf::RectangleShape center({ts, ts});
         center.setFillColor(sf::Color::Transparent);
-        center.setOutlineColor(sf::Color(255,200,50));
+        center.setOutlineColor(outlineCol);
         center.setOutlineThickness(2.f);
         center.setPosition({tc*ts, tr*ts});
         m_window.draw(center);

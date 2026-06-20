@@ -11,7 +11,8 @@ enum class SkillType
     ActiveRanged,  // กด key -> targeting -> ยิง projectile
     ActiveHeal,    // กด key -> heal ทันที
     ActiveWarp,    // กด key -> targeting -> teleport
-    ActiveAoe,     // กด key -> AOE รอบตัว
+    ActiveAoe,     // กด key -> AOE เลือกตำแหน่งได้ (ขยับ cursor ได้)
+    ActiveAoeSelf, // กด key -> AOE ล็อกอยู่กับตัว ขยับ cursor ไม่ได้ กดอีกทีเพื่อปล่อย
 };
 
 // ============================================================

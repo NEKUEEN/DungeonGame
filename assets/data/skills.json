@@ -17,7 +17,7 @@
     "icon": "groundSlam",
     "name": "Ground Slam",
     "desc": "Slam the ground, hitting all enemies in a 2-tile radius.",
-    "type": "active_aoe",
+    "type": "active_aoe_self",
     "hotbar_slot": 3,
     "cooldown": 12,
     "duration": 0,
