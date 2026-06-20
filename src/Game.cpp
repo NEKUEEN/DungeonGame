@@ -415,6 +415,37 @@ void Game::executeSkill(int hotbarIdx)
     }
 }
 
+void Game::applyStatusOnHit(SkillInstance* sk, Enemy* e)
+{
+    if (!sk || !e) return;
+    if (sk->data.effect.applyStatus.empty() || sk->data.effect.statusDuration <= 0) return;
+
+    const std::string& st = sk->data.effect.applyStatus;
+    StatusType stype;
+    bool valid = true;
+
+    if      (st == "bleed")  stype = StatusType::Bleed;
+    else if (st == "poison") stype = StatusType::Poison;
+    else if (st == "burn")   stype = StatusType::Burn;
+    else if (st == "stun")   stype = StatusType::Stun;
+    else if (st == "slow")   stype = StatusType::Slow;
+    else valid = false;
+
+    if (!valid) return;
+
+    StatusEffect se;
+    se.type = stype;
+    int bonus = 0;
+    if (st == "bleed")  bonus = m_finalStats.bleedBonus;
+    if (st == "poison") bonus = m_finalStats.poisonBonus;
+    if (st == "burn")   bonus = m_finalStats.burnBonus;
+    se.power    = sk->data.effect.statusPower + bonus;
+    se.duration = sk->data.effect.statusDuration;
+    se.sourceId = sk->data.id;
+    e->applyStatus(se);
+    addLog("  " + e->getName() + " is " + st + "!", sf::Color(200, 100, 220));
+}
+
 void Game::executeAoe(SkillInstance* sk)
 {
     if (!m_player || !sk) return;
@@ -434,6 +465,7 @@ void Game::executeAoe(SkillInstance* sk)
             e->takeDamage(dmg);
             addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
                    sf::Color(255,180,50));
+            applyStatusOnHit(sk, e);
             hits++;
         }
     }
@@ -468,6 +500,7 @@ void Game::executeAoeAt(SkillInstance* sk, int col, int row)
             e->takeDamage(dmg);
             addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
                    sf::Color(255,180,50));
+            applyStatusOnHit(sk, e);
             hits++;
         }
     }

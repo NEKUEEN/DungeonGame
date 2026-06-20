@@ -167,6 +167,7 @@ private:
     // skill helpers (จะใช้ค่าจาก m_finalStats)
     void useSkillBuff(const std::string& skillId);
     void fireRangedAt(int targetCol, int targetRow);
+    void applyStatusOnHit(SkillInstance* sk, Enemy* e);  // ← ใช้ apply status effect ตอน AOE โดน (ใช้ pattern เดียวกับ fireRangedAt)
     
     int  getScaledDamage(const SkillEffect& effect) const;
     int  getBuffedAtk() const { return m_finalStats.atk; }

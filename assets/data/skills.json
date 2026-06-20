@@ -30,7 +30,7 @@
       "mana_cost": 0,
       "apply_status": "stun",
       "status_power": 1,
-      "status_duration": 1
+      "status_duration": 100
       }
     },
     {
