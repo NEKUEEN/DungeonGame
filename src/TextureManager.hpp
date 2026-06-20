@@ -78,6 +78,7 @@ public:
         load("ironSkin", "assets/textures/ironSkin.png");
         //skill
         load("arrow", "assets/textures/arrow.png");
+        load("goundSlam", "assets/textures/goundSlam.png");
         //Debuff icon
         load("debuff_bleed", "assets/textures/debuff_bleed.png");
         load("debuff_poison",    "assets/textures/debuff_poison.png");

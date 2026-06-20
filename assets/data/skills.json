@@ -13,6 +13,27 @@
       }
     },
     {
+    "id": "ground_slam",
+    "icon": "groundSlam",
+    "name": "Ground Slam",
+    "desc": "Slam the ground, hitting all enemies in a 2-tile radius.",
+    "type": "active_aoe",
+    "hotbar_slot": 3,
+    "cooldown": 12,
+    "duration": 0,
+    "effect": {
+      "damage_pct": 70,
+      "scaling_stat": "atk",
+      "aoe_radius": 2,
+      "range": 4,
+      "stamina_cost": 15,
+      "mana_cost": 0,
+      "apply_status": "stun",
+      "status_power": 1,
+      "status_duration": 1
+      }
+    },
+    {
       "id": "mana_erupt",
       "name": "Mana Erupt",
       "desc": "Buff MATK +50% for 5 turns.",

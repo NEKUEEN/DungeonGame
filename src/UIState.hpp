@@ -17,7 +17,9 @@ struct UIState {
         bool active = false;
         int targetCol = 0, targetRow = 0;
         std::string skillId;
-        void reset() { active = false; skillId.clear(); }
+        bool isArea     = false;
+        int  areaRadius = 0;
+        void reset() { active = false; skillId.clear(); isArea = false; areaRadius = 0; }
     } targeting;
 
     void togglePanel(Panel p) {

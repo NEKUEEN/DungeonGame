@@ -125,7 +125,9 @@ private:
     void renderRaceSelect();
 
     void executeSkill(int hotbarIdx);
-    void executeAoe(SkillInstance* sk);
+    void executeAoe(SkillInstance* sk);                 // ใช้กับตำแหน่งผู้เล่น (ของเดิม ไว้เผื่อ legacy call)
+    void executeAoeAt(SkillInstance* sk, int col, int row);  // ← เพิ่ม: ปล่อย AOE ที่ตำแหน่ง targeting
+
     void executeWarp(int col, int row);
 
     void enterTargetingMode();

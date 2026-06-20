@@ -342,6 +342,8 @@ void Game::executeSkill(int hotbarIdx)
         s.mana -= sk->data.effect.manaCost;
         m_ui.targeting.active  = true;
         m_ui.targeting.skillId = id;
+        m_ui.targeting.isArea     = false;   // ← เพิ่ม
+        m_ui.targeting.areaRadius = 0;       // ← เพิ่ม
 
         // ── auto-target ศัตรูใกล้สุดในระยะ ──
         {
@@ -382,10 +384,15 @@ void Game::executeSkill(int hotbarIdx)
         break;
 
             case SkillType::ActiveAoe:
-            s.mana    -= sk->data.effect.manaCost;
-            s.stamina -= sk->data.effect.staminaCost;
-            executeAoe(sk);
-            sk->cooldownLeft = sk->data.cooldown;
+            s.mana -= sk->data.effect.manaCost;
+            // หัก stamina ตอน confirm จริง — เหมือน Warp
+            m_ui.targeting.active     = true;
+            m_ui.targeting.skillId    = id;
+            m_ui.targeting.isArea     = true;
+            m_ui.targeting.areaRadius = sk->data.effect.aoeRadius;
+            m_ui.targeting.targetCol  = m_player->getCol();
+            m_ui.targeting.targetRow  = m_player->getRow();
+            addLog(" [AOE Targeting] " + sk->data.name, sf::Color(255,180,50));
             break;
 
         case SkillType::Passive:
@@ -425,6 +432,38 @@ void Game::executeAoe(SkillInstance* sk)
         ps.spdCounter += ps.speedPerTurn;
         if (ps.spdCounter > 300) ps.spdCounter = 300;
     }
+
+    processTurn(); tryRespawnEnemies();
+    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+}
+
+void Game::executeAoeAt(SkillInstance* sk, int col, int row)
+{
+    if (!m_player || !sk) return;
+    int radius  = sk->data.effect.aoeRadius;
+    int baseAtk = getBuffedAtk();
+    int dmg = std::max(1, baseAtk * sk->data.effect.damagePct / 100);
+    int hits = 0;
+
+    for (auto* e : m_enemies)
+    {
+        if (e->isDead()) continue;
+        int dx = e->getCol() - col, dy = e->getRow() - row;
+        if (dx*dx + dy*dy <= radius*radius)
+        {
+            e->takeDamage(dmg);
+            addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
+                   sf::Color(255,180,50));
+            hits++;
+        }
+    }
+    if (hits == 0)
+        addLog("  "+sk->data.name+"  no targets in range.", sf::Color(140,140,140));
+
+    Stats& ps = m_player->getStats();
+    ps.spdCounter -= 100;
+    ps.spdCounter += ps.speedPerTurn;
+    if (ps.spdCounter > 300) ps.spdCounter = 300;
 
     processTurn(); tryRespawnEnemies();
     m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
@@ -518,31 +557,37 @@ void Game::confirmTarget()
 {
     if (!m_player) return;
 
-    m_ui.targeting.active = false;
-
     if (m_ui.targeting.skillId == "_bow_attack")
     {
+        m_ui.targeting.reset();
         fireBow();
         return;
     }
 
     SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
-    if (!sk)
+    int tc = m_ui.targeting.targetCol;
+    int tr = m_ui.targeting.targetRow;
+    SkillType type = sk ? sk->data.type : SkillType::Passive;
+
+    if (!sk) { m_ui.targeting.reset(); return; }
+
+    if (type == SkillType::ActiveRanged)
+        fireRangedAt(tc, tr);
+    else if (type == SkillType::ActiveWarp)
+        executeWarp(tc, tr);
+    else if (type == SkillType::ActiveAoe)
     {
-        cancelTargeting();
-        return;
+        executeAoeAt(sk, tc, tr);
+        m_player->getStats().stamina -= sk->data.effect.staminaCost;
+        sk->cooldownLeft = sk->data.cooldown;
     }
 
-    if (sk->data.type == SkillType::ActiveRanged)
-        fireRangedAt(m_ui.targeting.targetCol, m_ui.targeting.targetRow);
-    else if (sk->data.type == SkillType::ActiveWarp)
-        executeWarp(m_ui.targeting.targetCol, m_ui.targeting.targetRow);
+    m_ui.targeting.reset();   // เคลียร์หลังยิงเสร็จ กัน state ค้าง
 }
 
 void Game::cancelTargeting()
 {
-    m_ui.targeting.active = false;
-    m_ui.targeting.skillId.clear();
+    m_ui.targeting.reset();
     addLog("  Targeting cancelled.", sf::Color(140,140,140));
 }
 
@@ -2273,6 +2318,34 @@ void Game::renderTargeting()
     int pc = m_player->getCol();
     int pr = m_player->getRow();
     float ts = (float)TILE_SIZE;
+    // ↓↓↓↓↓↓↓↓↓↓ แทรกตรงนี้ ↓↓↓↓↓↓↓↓↓↓
+    if (m_ui.targeting.isArea)
+    {
+        int radius = m_ui.targeting.areaRadius;
+        int tc = m_ui.targeting.targetCol;
+        int tr = m_ui.targeting.targetRow;
+
+        for (int dy = -radius; dy <= radius; ++dy)
+        for (int dx = -radius; dx <= radius; ++dx)
+        {
+            if (dx*dx + dy*dy > radius*radius) continue;
+            int tx = tc + dx, ty = tr + dy;
+            if (tx < 0 || ty < 0 || tx >= m_mapCols || ty >= m_mapRows) continue;
+
+            sf::RectangleShape highlight({ts, ts});
+            highlight.setFillColor(sf::Color(255,140,40,90));
+            highlight.setPosition({tx*ts, ty*ts});
+            m_window.draw(highlight);
+        }
+
+        sf::RectangleShape center({ts, ts});
+        center.setFillColor(sf::Color::Transparent);
+        center.setOutlineColor(sf::Color(255,200,50));
+        center.setOutlineThickness(2.f);
+        center.setPosition({tc*ts, tr*ts});
+        m_window.draw(center);
+        return;
+    }
 
     SkillInstance* sk = m_player->findSkill(m_ui.targeting.skillId);
     int maxRange = sk ? sk->data.effect.range : 6;
