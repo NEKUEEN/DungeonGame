@@ -42,6 +42,7 @@ public:
             else if (t == "active_warp")   d.type = SkillType::ActiveWarp;
             else if (t == "active_aoe")    d.type = SkillType::ActiveAoe;
             else if (t == "active_aoe_self") d.type = SkillType::ActiveAoeSelf;
+            else if (t == "active_aoe_warp") d.type = SkillType::ActiveAoeWarp;
             else                           d.type = SkillType::Passive;
 
             // effect — รองรับทั้ง format ใหม่ (effect object) และเก่า (flat fields)

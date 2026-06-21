@@ -409,6 +409,19 @@ void Game::executeSkill(int hotbarIdx)
             addLog(" [AOE] " + sk->data.name + " — press again to release", sf::Color(180,140,255));
             break;
 
+            case SkillType::ActiveAoeWarp:
+            s.mana -= sk->data.effect.manaCost;
+            // หัก stamina ตอน confirm จริง — เหมือน Warp/AOE
+            m_ui.targeting.active     = true;
+            m_ui.targeting.skillId    = id;
+            m_ui.targeting.isArea     = true;
+            m_ui.targeting.areaRadius = sk->data.effect.aoeRadius;
+            m_ui.targeting.locked     = false;   // เลือกตำแหน่งที่จะโดดไปได้
+            m_ui.targeting.targetCol  = m_player->getCol();
+            m_ui.targeting.targetRow  = m_player->getRow();
+            addLog(" [Leap] " + sk->data.name, sf::Color(120,255,170));
+            break;
+
         case SkillType::Passive:
             addLog("  "+sk->data.name+" is passive.", sf::Color(120,200,120));
         break;
@@ -595,6 +608,26 @@ void Game::executeWarp(int col, int row)
     tryRespawnEnemies();
 }
 
+void Game::executeAoeWarp(SkillInstance* sk, int col, int row)
+{
+    if (!m_player || !sk) return;
+
+    if (!m_tileMap.isWalkable(col, row))
+    {
+        addLog("  Cannot leap there!", sf::Color(220,100,50));
+        return;
+    }
+
+    m_player->setPos(col, row);
+    addLog("  " + sk->data.name + " — leap!", sf::Color(120,255,170));
+    updateCamera();
+
+    executeAoeAt(sk, col, row);   // ดาเมจ + status + knockback + processTurn + fog ครบในตัว
+
+    m_player->getStats().stamina -= sk->data.effect.staminaCost;
+    sk->cooldownLeft = sk->data.cooldown;
+}
+
 // ============================================================
 //  Line Helper
 // ============================================================
@@ -678,6 +711,8 @@ void Game::confirmTarget()
         m_player->getStats().stamina -= sk->data.effect.staminaCost;
         sk->cooldownLeft = sk->data.cooldown;
     }
+    else if (type == SkillType::ActiveAoeWarp)
+        executeAoeWarp(sk, tc, tr);
 
     m_ui.targeting.reset();   // เคลียร์หลังยิงเสร็จ กัน state ค้าง
 }
@@ -1022,7 +1057,7 @@ void Game::newDungeon(bool keepPlayer)
 
     m_fog.reset();
     m_playerDead = false;
-
+    
     if (!keepPlayer)
     {
         delete m_player; m_player=nullptr;
@@ -1033,6 +1068,7 @@ void Game::newDungeon(bool keepPlayer)
         m_familyKillCount.clear();
         m_bossActive.clear();
         m_firstKillDone.clear();
+        m_log.clear();   // เคลียร์ log ทุกครั้งที่เริ่ม dungeon ใหม่ (รวมถึงตอน restart หลังตาย)
     }
 
     std::vector<std::pair<int,int>> floorTiles;
@@ -2426,8 +2462,13 @@ void Game::renderTargeting()
         int tr = m_ui.targeting.targetRow;
         bool locked = m_ui.targeting.locked;
 
-        sf::Color fillCol    = locked ? sf::Color(150,90,255,90) : sf::Color(255,140,40,90);
-        sf::Color outlineCol = locked ? sf::Color(190,150,255)   : sf::Color(255,200,50);
+        SkillInstance* curSk = m_player->findSkill(m_ui.targeting.skillId);
+        bool isLeap = curSk && curSk->data.type == SkillType::ActiveAoeWarp;
+
+        sf::Color fillCol, outlineCol;
+        if (isLeap)      { fillCol = sf::Color(80,255,170,90); outlineCol = sf::Color(120,255,190); }
+        else if (locked) { fillCol = sf::Color(150,90,255,90); outlineCol = sf::Color(190,150,255); }
+        else             { fillCol = sf::Color(255,140,40,90); outlineCol = sf::Color(255,200,50);  }
 
         for (int dy = -radius; dy <= radius; ++dy)
         for (int dx = -radius; dx <= radius; ++dx)
@@ -2733,10 +2774,29 @@ void Game::renderStatsOverlay()
     // ส่วนที่เหลือของฟังก์ชัน (บรรทัด line(...) ทั้งหมด) ไม่ต้องแก้เลยครับ
 
     line("Level:       ", std::to_string(s.level));
+    line("EXP:         ", std::to_string(s.exp) + "/" + std::to_string(s.expToNext));
     line("HP:          ", std::to_string(s.hp) + "/" + std::to_string(m_finalStats.maxHp));
     line("ATK:         ", std::to_string(m_finalStats.atk));
+    line("MATK:        ", std::to_string(m_finalStats.matk));
     line("DEF:         ", std::to_string(m_finalStats.def));
+    line("MDEF:        ", std::to_string(m_finalStats.mdef));
+    
+    // Stamina bar
+    {
+        std::string stam = std::to_string(s.stamina) + "/" + std::to_string(s.maxStamina);
+        sf::Color stCol = s.stamina < s.maxStamina / 3 ? sf::Color(255,120,50)
+                        : s.stamina < s.maxStamina * 2 / 3 ? sf::Color(255,200,80)
+                        : sf::Color(80,220,140);
+        line("Stamina:     ", stam, stCol);
+    }
+    line("Mana:        ", std::to_string(s.mana) + "/" + std::to_string(m_finalStats.maxMana));
+    
+    
     line("Dodge:       ", std::to_string(m_finalStats.dodge));
+    line("Hunger:      ", std::to_string(s.hunger) + "/100");
+    
+
+    
 
     line("SlaDmg:      ", std::to_string(m_finalStats.slashDmgBonus));
     line("PieDmg:      ", std::to_string(m_finalStats.pierceDmgBonus));
@@ -2763,14 +2823,7 @@ void Game::renderStatsOverlay()
     line("StuDurRed:   ", std::to_string(m_finalStats.stunDurReduce));
     line("SloDurRed:   ", std::to_string(m_finalStats.slowDurReduce));
 
-    // Stamina bar
-    {
-        std::string stam = std::to_string(s.stamina) + "/" + std::to_string(s.maxStamina);
-        sf::Color stCol = s.stamina < s.maxStamina / 3 ? sf::Color(255,120,50)
-                        : s.stamina < s.maxStamina * 2 / 3 ? sf::Color(255,200,80)
-                        : sf::Color(80,220,140);
-        line("Stamina:     ", stam, stCol);
-    }
+    
 
     // Speed — แสดง modifier + counter
     {
@@ -2782,11 +2835,7 @@ void Game::renderStatsOverlay()
         line("Speed:       ", spdStr, spdCol);
     }
 
-    line("Mana:        ", std::to_string(s.mana) + "/" + std::to_string(m_finalStats.maxMana));
-    line("MATK:        ", std::to_string(m_finalStats.matk));
-    line("MDEF:        ", std::to_string(m_finalStats.mdef));
-    line("Hunger:      ", std::to_string(s.hunger) + "/100");
-    line("EXP:         ", std::to_string(s.exp) + "/" + std::to_string(s.expToNext));
+    
 }
 
 // ============================================================

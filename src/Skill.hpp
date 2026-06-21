@@ -13,6 +13,7 @@ enum class SkillType
     ActiveWarp,    // กด key -> targeting -> teleport
     ActiveAoe,     // กด key -> AOE เลือกตำแหน่งได้ (ขยับ cursor ได้)
     ActiveAoeSelf, // กด key -> AOE ล็อกอยู่กับตัว ขยับ cursor ไม่ได้ กดอีกทีเพื่อปล่อย
+    ActiveAoeWarp, // กด key -> เลือกตำแหน่ง -> วาร์ปตัวเองไปจุดนั้น + AOE รอบจุดที่ลง (สกิลโดด)
 };
 
 // ============================================================

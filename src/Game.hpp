@@ -129,6 +129,7 @@ private:
     void executeAoeAt(SkillInstance* sk, int col, int row);  // ← เพิ่ม: ปล่อย AOE ที่ตำแหน่ง targeting
 
     void executeWarp(int col, int row);
+    void executeAoeWarp(SkillInstance* sk, int col, int row);  // ← สกิลโดด: วาร์ป + AOE รอบจุดที่ลง
 
     void enterTargetingMode();
     void moveTargetCursor(int dc, int dr);

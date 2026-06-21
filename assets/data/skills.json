@@ -35,6 +35,27 @@
       }
     },
     {
+    "id": "leap_slam",
+    "name": "Leap Slam",
+    "type": "active_aoe_warp",
+    "desc": "Slam the ground, hitting all enemies in a 2-tile radius.",
+    "cooldown": 6,
+    "duration": 0,
+    "hotbar_slot": 2,
+    "effect": {
+      "scaling_stat": "atk",
+      "range": 5,
+      "aoe_radius": 2,
+      "damage_pct": 140,
+      "knockback_tiles": 2,
+      "mana_cost": 15,
+      "stamina_cost": 10,
+      "apply_status": "stun",
+      "status_power": 0,
+      "status_duration": 3
+      }
+    },
+    {
       "id": "mana_erupt",
       "name": "Mana Erupt",
       "desc": "Buff MATK +50% for 5 turns.",
