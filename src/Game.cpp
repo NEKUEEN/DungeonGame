@@ -2373,75 +2373,100 @@ void Game::renderHotbar()
     const float SZ  = 32.f;
     const float GAP = 4.f;
     const int   N   = 9;
-    float totalW = N * (SZ + GAP) - GAP;
     float startX = 8.f;
     float startY = 558.f;
+
+    if ((int)m_hotbarCache.size() != N)
+        m_hotbarCache.assign(N, HotbarSlotCache{});
 
     for (int i = 0; i < N; ++i)
     {
         float sx = startX + i * (SZ + GAP);
         const std::string& id = m_player->getHotbar(i);
         const SkillInstance* sk = id.empty() ? nullptr : m_player->findSkill(id);
+        HotbarSlotCache& c = m_hotbarCache[i];
 
-        sf::RectangleShape slot({SZ, SZ});
-        slot.setFillColor(sf::Color(8, 8, 8, 200));
-        slot.setOutlineColor(sf::Color(120, 120, 120));
-        slot.setOutlineThickness(1.f);
-        slot.setPosition({sx, startY});
-        m_window.draw(slot);
+        // ── slot bg (geometry เปลี่ยนน้อย, setPosition ทุกเฟรมพอ) ──
+        c.slotBg.setFillColor(sf::Color(8, 8, 8, 200));
+        c.slotBg.setOutlineColor(sf::Color(120, 120, 120));
+        c.slotBg.setOutlineThickness(1.f);
+        c.slotBg.setPosition({sx, startY});
+        m_window.draw(c.slotBg);
 
-        sf::Text numTxt(m_font, std::to_string(i+1), 8);
-        numTxt.setFillColor(sf::Color(120, 120, 120));
-        numTxt.setPosition({sx + 2.f, startY + 1.f});
-        m_window.draw(numTxt);
-
-        if (sk)
+        // ── เลขช่อง 1-9: ไม่เปลี่ยนเลย สร้างครั้งเดียวพอ ──
+        if (!c.numTxt)
         {
-            // ── Icon sprite ──
+            c.numTxt.emplace(m_font, std::to_string(i + 1), 8);
+            c.numTxt->setFillColor(sf::Color(120, 120, 120));
+        }
+        c.numTxt->setPosition({sx + 2.f, startY + 1.f});
+        m_window.draw(*c.numTxt);
+
+        if (!sk)
+        {
+            c.lastSkillId.clear();
+            continue;
+        }
+
+        // ── Icon sprite: rebuild เฉพาะตอนสกิลใน slot นี้เปลี่ยน ──
+        if (id != c.lastSkillId)
+        {
+            c.lastSkillId = id;
+            c.icon.reset();
             if (!sk->data.icon.empty())
             {
                 const sf::Texture* tex = TextureManager::instance().get(sk->data.icon);
                 if (tex)
                 {
-                    sf::Sprite spr(*tex);
+                    c.icon.emplace(*tex);
                     auto tsz = tex->getSize();
                     float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
-                    spr.setScale({sc, sc});
-                    spr.setPosition({sx, startY});
-                    m_window.draw(spr);
+                    c.icon->setScale({sc, sc});
                 }
             }
-
-            if (!sk->isReady())  // ← บรรทัด 1846 เดิม
-            {
-                float ratio = sk->data.cooldown > 0
-                    ? (float)sk->cooldownLeft / sk->data.cooldown : 1.f;
-                sf::RectangleShape cd({SZ, SZ * ratio});
-                cd.setFillColor(sf::Color(0, 0, 0, 160));
-                cd.setPosition({sx, startY + SZ * (1.f - ratio)});
-                m_window.draw(cd);
-
-                sf::Text cdTxt(m_font, std::to_string(sk->cooldownLeft), 9);
-                cdTxt.setFillColor(sf::Color(220, 100, 100));
-                cdTxt.setPosition({sx + SZ/2.f - 5.f, startY + SZ/2.f - 6.f});
-                m_window.draw(cdTxt);
-            }
-            else if (sk->buffActive)
-            {
-                sf::RectangleShape activeGlow({SZ, SZ});
-                activeGlow.setFillColor(sf::Color(255, 200, 50, 40));
-                activeGlow.setOutlineColor(sf::Color(255, 200, 50));
-                activeGlow.setOutlineThickness(2.f);
-                activeGlow.setPosition({sx, startY});
-                m_window.draw(activeGlow);
-            }
-
             std::string label = sk->data.name.substr(0, 4);
-            sf::Text nameTxt(m_font, label, 7);
-            nameTxt.setFillColor(sk->isReady() ? sf::Color(200, 200, 200) : sf::Color(100, 100, 100));
-            nameTxt.setPosition({sx + 2.f, startY + SZ - 10.f});
-            m_window.draw(nameTxt);
+            c.nameTxt.emplace(m_font, label, 7);
         }
+        if (c.icon)
+        {
+            c.icon->setPosition({sx, startY});
+            m_window.draw(*c.icon);
+        }
+
+        if (!sk->isReady())  // ← บรรทัด 1846 เดิม
+        {
+            float ratio = sk->data.cooldown > 0
+                ? (float)sk->cooldownLeft / sk->data.cooldown : 1.f;
+            c.cooldownOverlay.setSize({SZ, SZ * ratio});
+            c.cooldownOverlay.setFillColor(sf::Color(0, 0, 0, 160));
+            c.cooldownOverlay.setPosition({sx, startY + SZ * (1.f - ratio)});
+            m_window.draw(c.cooldownOverlay);
+
+            // เลข cooldown เปลี่ยนทุกเทิร์น → setString แทนสร้างใหม่
+            if (!c.cooldownTxt)
+            {
+                c.cooldownTxt.emplace(m_font, std::to_string(sk->cooldownLeft), 9);
+                c.cooldownTxt->setFillColor(sf::Color(220, 100, 100));
+            }
+            else
+            {
+                c.cooldownTxt->setString(std::to_string(sk->cooldownLeft));
+            }
+            c.cooldownTxt->setPosition({sx + SZ/2.f - 5.f, startY + SZ/2.f - 6.f});
+            m_window.draw(*c.cooldownTxt);
+        }
+        else if (sk->buffActive)
+        {
+            c.activeGlow.setFillColor(sf::Color(255, 200, 50, 40));
+            c.activeGlow.setOutlineColor(sf::Color(255, 200, 50));
+            c.activeGlow.setOutlineThickness(2.f);
+            c.activeGlow.setPosition({sx, startY});
+            m_window.draw(c.activeGlow);
+        }
+
+        c.nameTxt->setFillColor(sk->isReady() ? sf::Color(200, 200, 200) : sf::Color(100, 100, 100));
+        c.nameTxt->setPosition({sx + 2.f, startY + SZ - 10.f});
+        m_window.draw(*c.nameTxt);
     }
 }
 
@@ -3011,7 +3036,7 @@ void Game::renderRightPanel()
 
 void Game::addLog(const std::string& msg, sf::Color color)
 {
-    m_log.push_back({msg, color});
+    m_log.emplace_back(m_font, msg, color);
     while ((int)m_log.size() > LOG_MAX_LINES)
         m_log.erase(m_log.begin());
 }
@@ -3027,11 +3052,9 @@ void Game::renderLogPanel()
     m_window.draw(panel);
     if (!m_fontLoaded) return;
     float y=panelY+8.f;
-    for (const auto& entry:m_log)
+    for (auto& entry:m_log)
     {
-        sf::Text t(m_font,entry.text,8);
-        t.setFillColor(entry.color);
-        t.setPosition({8.f,y}); m_window.draw(t);
+        entry.renderText.setPosition({8.f,y}); m_window.draw(entry.renderText);
         y+=17.f;
     }
 }
@@ -3249,38 +3272,53 @@ void Game::renderStatusEffects()
         if (sk.data.type == SkillType::Passive && sk.fromCore)
             passives.push_back(&sk);
 
+    if (m_passiveCache.size() < passives.size())
+        m_passiveCache.resize(passives.size());
+
     float passiveStartX = RIGHT - passives.size() * (SZ + GAP);
     for (int i = 0; i < (int)passives.size(); ++i)
     {
         const auto& sk = *passives[i];
         float sx = passiveStartX + i * (SZ + GAP);
+        StatusIconCache& c = m_passiveCache[i];
 
-        sf::RectangleShape slot({SZ, SZ});
-        slot.setFillColor(sf::Color(20, 20, 20, 220));
-        slot.setOutlineColor(sf::Color(100, 200, 255));
-        slot.setOutlineThickness(2.f);
-        slot.setPosition({sx, Y});
-        m_window.draw(slot);
+        c.slotBg.setFillColor(sf::Color(20, 20, 20, 220));
+        c.slotBg.setOutlineColor(sf::Color(100, 200, 255));
+        c.slotBg.setOutlineThickness(2.f);
+        c.slotBg.setPosition({sx, Y});
+        m_window.draw(c.slotBg);
 
-        if (!sk.data.icon.empty())
+        if (sk.data.id != c.lastKey)
         {
-            const sf::Texture* tex = TextureManager::instance().get(sk.data.icon);
-            if (tex)
+            c.lastKey = sk.data.id;
+            c.icon.reset();
+            c.fallbackTxt.reset();
+            if (!sk.data.icon.empty())
             {
-                sf::Sprite spr(*tex);
-                auto tsz = tex->getSize();
-                float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
-                spr.setScale({sc, sc});
-                spr.setPosition({sx, Y});
-                m_window.draw(spr);
+                const sf::Texture* tex = TextureManager::instance().get(sk.data.icon);
+                if (tex)
+                {
+                    c.icon.emplace(*tex);
+                    auto tsz = tex->getSize();
+                    float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+                    c.icon->setScale({sc, sc});
+                }
+            }
+            if (!c.icon)
+            {
+                c.fallbackTxt.emplace(m_font, sk.data.name.substr(0, 3), 7);
+                c.fallbackTxt->setFillColor(sf::Color(100, 200, 255));
             }
         }
-        else
+        if (c.icon)
         {
-            sf::Text txt(m_font, sk.data.name.substr(0, 3), 7);
-            txt.setFillColor(sf::Color(100, 200, 255));
-            txt.setPosition({sx + 2.f, Y + 2.f});
-            m_window.draw(txt);
+            c.icon->setPosition({sx, Y});
+            m_window.draw(*c.icon);
+        }
+        else if (c.fallbackTxt)
+        {
+            c.fallbackTxt->setPosition({sx + 2.f, Y + 2.f});
+            m_window.draw(*c.fallbackTxt);
         }
     }
 
@@ -3290,49 +3328,75 @@ void Game::renderStatusEffects()
         if (sk.data.type == SkillType::ActiveBuff && sk.buffActive)
             buffs.push_back(&sk);
 
+    if (m_buffCache.size() < buffs.size())
+        m_buffCache.resize(buffs.size());
+
     float buffStartX = passiveStartX - buffs.size() * (SZ + GAP) - GAP;
     for (int i = 0; i < (int)buffs.size(); ++i)
     {
         const auto& sk = *buffs[i];
         float sx = buffStartX + i * (SZ + GAP);
+        StatusIconCache& c = m_buffCache[i];
 
-        sf::RectangleShape slot({SZ, SZ});
-        slot.setFillColor(sf::Color(20, 20, 20, 220));
-        slot.setOutlineColor(sf::Color(255, 200, 50));
-        slot.setOutlineThickness(2.f);
-        slot.setPosition({sx, Y});
-        m_window.draw(slot);
+        c.slotBg.setFillColor(sf::Color(20, 20, 20, 220));
+        c.slotBg.setOutlineColor(sf::Color(255, 200, 50));
+        c.slotBg.setOutlineThickness(2.f);
+        c.slotBg.setPosition({sx, Y});
+        m_window.draw(c.slotBg);
 
-        if (!sk.data.icon.empty())
+        if (sk.data.id != c.lastKey)
         {
-            const sf::Texture* tex = TextureManager::instance().get(sk.data.icon);
-            if (tex)
+            c.lastKey = sk.data.id;
+            c.icon.reset();
+            c.fallbackTxt.reset();
+            if (!sk.data.icon.empty())
             {
-                sf::Sprite spr(*tex);
-                auto tsz = tex->getSize();
-                float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
-                spr.setScale({sc, sc});
-                spr.setPosition({sx, Y});
-                m_window.draw(spr);
+                const sf::Texture* tex = TextureManager::instance().get(sk.data.icon);
+                if (tex)
+                {
+                    c.icon.emplace(*tex);
+                    auto tsz = tex->getSize();
+                    float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+                    c.icon->setScale({sc, sc});
+                }
             }
+            if (!c.icon)
+            {
+                c.fallbackTxt.emplace(m_font, sk.data.name.substr(0, 3), 7);
+                c.fallbackTxt->setFillColor(sf::Color(255, 200, 50));
+            }
+        }
+        if (c.icon)
+        {
+            c.icon->setPosition({sx, Y});
+            m_window.draw(*c.icon);
+        }
+        else if (c.fallbackTxt)
+        {
+            c.fallbackTxt->setPosition({sx + 2.f, Y + 2.f});
+            m_window.draw(*c.fallbackTxt);
+        }
+
+        // duration remaining — เปลี่ยนทุกเทิร์น ใช้ setString แทนสร้างใหม่
+        if (!c.durTxt)
+        {
+            c.durTxt.emplace(m_font, std::to_string(sk.durationLeft), 9);
+            c.durTxt->setFillColor(sf::Color::White);
         }
         else
         {
-            sf::Text txt(m_font, sk.data.name.substr(0, 3), 7);
-            txt.setFillColor(sf::Color(255, 200, 50));
-            txt.setPosition({sx + 2.f, Y + 2.f});
-            m_window.draw(txt);
+            c.durTxt->setString(std::to_string(sk.durationLeft));
         }
-
-        // duration remaining
-        sf::Text durTxt(m_font, std::to_string(sk.durationLeft), 9);
-        durTxt.setFillColor(sf::Color::White);
-        durTxt.setPosition({sx + 2.f, Y + SZ - 11.f});
-        m_window.draw(durTxt);
+        c.durTxt->setPosition({sx + 2.f, Y + SZ - 11.f});
+        m_window.draw(*c.durTxt);
     }
 
     // ── 3. Status effects (debuff) — ซ้ายของ buff ──
     const auto& effects = m_player->getStats().statusEffects;
+
+    if (m_statusEffectCache.size() < effects.size())
+        m_statusEffectCache.resize(effects.size());
+
     float statusStartX = buffs.empty()
         ? passiveStartX - effects.size() * (SZ + GAP) - GAP
         : buffStartX - effects.size() * (SZ + GAP) - GAP;
@@ -3341,43 +3405,61 @@ void Game::renderStatusEffects()
     {
         const auto& se = effects[i];
         float sx = statusStartX + i * (SZ + GAP);
+        StatusIconCache& c = m_statusEffectCache[i];
 
         const StatusEffectData* data = StatusEffectDB::instance().get(se.typeId());
-
         sf::Color outlineCol = data ? sf::Color(data->r, data->g, data->b)
                                 : sf::Color::White;
 
-        sf::RectangleShape slot({SZ, SZ});
-        slot.setFillColor(sf::Color(20, 20, 20, 220));
-        slot.setOutlineColor(outlineCol);
-        slot.setOutlineThickness(2.f);
-        slot.setPosition({sx, Y});
-        m_window.draw(slot);
+        c.slotBg.setFillColor(sf::Color(20, 20, 20, 220));
+        c.slotBg.setOutlineColor(outlineCol);
+        c.slotBg.setOutlineThickness(2.f);
+        c.slotBg.setPosition({sx, Y});
+        m_window.draw(c.slotBg);
 
-        const sf::Texture* tex = data
-            ? TextureManager::instance().get(data->icon)
-            : nullptr;
-
-        if (tex)
+        if (se.typeId() != c.lastKey)
         {
-            sf::Sprite spr(*tex);
-            auto tsz = tex->getSize();
-            float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
-            spr.setScale({sc, sc});
-            spr.setPosition({sx, Y});
-            m_window.draw(spr);
+            c.lastKey = se.typeId();
+            c.icon.reset();
+            c.fallbackTxt.reset();
+            const sf::Texture* tex = data
+                ? TextureManager::instance().get(data->icon)
+                : nullptr;
+            if (tex)
+            {
+                c.icon.emplace(*tex);
+                auto tsz = tex->getSize();
+                float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
+                c.icon->setScale({sc, sc});
+            }
+            else
+            {
+                c.fallbackTxt.emplace(m_font, se.typeId().substr(0, 3), 7);
+            }
+        }
+        // สีของ fallback อาจเปลี่ยนได้ถ้า data เปลี่ยน (rare) — เซ็ตสีทุกเฟรมไว้ ถูกกว่าสร้างใหม่มาก
+        if (c.icon)
+        {
+            c.icon->setPosition({sx, Y});
+            m_window.draw(*c.icon);
+        }
+        else if (c.fallbackTxt)
+        {
+            c.fallbackTxt->setFillColor(outlineCol);
+            c.fallbackTxt->setPosition({sx + 2.f, Y + 2.f});
+            m_window.draw(*c.fallbackTxt);
+        }
+
+        if (!c.durTxt)
+        {
+            c.durTxt.emplace(m_font, std::to_string(se.duration), 9);
+            c.durTxt->setFillColor(sf::Color::White);
         }
         else
         {
-            sf::Text nameTxt(m_font, se.typeId().substr(0, 3), 7);
-            nameTxt.setFillColor(outlineCol);
-            nameTxt.setPosition({sx + 2.f, Y + 2.f});
-            m_window.draw(nameTxt);
+            c.durTxt->setString(std::to_string(se.duration));
         }
-
-        sf::Text durTxt(m_font, std::to_string(se.duration), 9);
-        durTxt.setFillColor(sf::Color::White);
-        durTxt.setPosition({sx + 2.f, Y + SZ - 11.f});
-        m_window.draw(durTxt);
+        c.durTxt->setPosition({sx + 2.f, Y + SZ - 11.f});
+        m_window.draw(*c.durTxt);
     }
 }

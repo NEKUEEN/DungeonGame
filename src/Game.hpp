@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 #include <random>
+#include <optional>
 #include "TileMap.hpp"
 #include "Player.hpp"
 #include "Enemy.hpp"
@@ -222,7 +223,43 @@ private:
     float m_deltaBody = 0, m_deltaMentality = 0, m_deltaBattleIndex = 0;
     int m_deltaTimer = 0;
 
-    struct LogEntry { std::string text; sf::Color color; };
+    struct LogEntry {
+        std::string text;
+        sf::Color color;
+        sf::Text renderText;   // cache: สร้าง sf::Text ครั้งเดียวตอน addLog ไม่ต้องสร้างใหม่ทุกเฟรม
+        LogEntry(const sf::Font& font, std::string t, sf::Color c)
+            : text(std::move(t)), color(c), renderText(font, text, 8)
+        {
+            renderText.setFillColor(color);
+        }
+    };
     std::vector<LogEntry> m_log;
     int m_turnCount = 0;
+
+    // ── Hotbar render cache (ลด sf::Text/RectangleShape allocation ทุกเฟรม) ──
+    // หนึ่ง slot คงที่ 9 ช่อง สร้าง sf::Text/Sprite ครั้งเดียวตอนเปิดเกม (lazy, ใน renderHotbar)
+    // แล้ว frame ต่อไปแค่ setString/setFillColor/setPosition แทนสร้างใหม่
+    struct HotbarSlotCache {
+        sf::RectangleShape slotBg{ {32.f, 32.f} };
+        std::optional<sf::Text> numTxt;       // เลขช่อง 1-9 (ไม่เปลี่ยน เซ็ตครั้งแรกพอ)
+        std::optional<sf::Sprite> icon;       // ไอคอนสกิล
+        sf::RectangleShape cooldownOverlay{ {32.f, 32.f} };
+        std::optional<sf::Text> cooldownTxt;  // เลข cooldown เหลือ (เปลี่ยนบ่อย → setString)
+        sf::RectangleShape activeGlow{ {32.f, 32.f} };
+        std::optional<sf::Text> nameTxt;      // ชื่อสกิลย่อ (เปลี่ยนเมื่อสลับสกิลใน hotbar)
+        std::string lastSkillId;              // ใช้เช็คว่าต้อง rebuild icon/nameTxt ไหม
+    };
+    std::vector<HotbarSlotCache> m_hotbarCache;  // size = 9, lazy-built ใน renderHotbar()
+
+    // ── Status effect icon cache (passive / buff / debuff แถบล่างขวา) ──
+    struct StatusIconCache {
+        sf::RectangleShape slotBg{ {32.f, 32.f} };
+        std::optional<sf::Sprite> icon;
+        std::optional<sf::Text> fallbackTxt;   // ใช้เมื่อไม่มี icon texture
+        std::optional<sf::Text> durTxt;        // ตัวเลข duration (เปลี่ยนทุกเทิร์น → setString)
+        std::string lastKey;                   // skill id / status typeId ปัจจุบันของ slot นี้
+    };
+    std::vector<StatusIconCache> m_passiveCache;
+    std::vector<StatusIconCache> m_buffCache;
+    std::vector<StatusIconCache> m_statusEffectCache;
 };
