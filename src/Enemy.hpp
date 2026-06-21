@@ -46,6 +46,7 @@ public:
 
     int         getCol()    const { return m_col; }
     int         getRow()    const { return m_row; }
+    void        setPos(int col, int row) { m_col = col; m_row = row; }  // ← ใช้กับ knockback
     EnemyRank   getRank()   const { return m_rank; }
     EnemyAIType getAIType() const { return m_aiType; }
     std::string getName()   const { return m_name; }

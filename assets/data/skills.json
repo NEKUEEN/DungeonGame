@@ -29,6 +29,7 @@
       "stamina_cost": 15,
       "mana_cost": 0,
       "apply_status": "stun",
+      "knockback_tiles": 2,
       "status_power": 1,
       "status_duration": 100
       }

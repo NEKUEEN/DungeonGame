@@ -35,6 +35,7 @@ struct SkillEffect
     int speedBonus   = 0;   // AP bonus (+1 AP per turn)
     int atkSpeedPct  = 100; // AP cost ของการโจมตี x100 (100=ปกติ, 50=ถูกกว่า)
     int aoeRadius    = 0;   // radius ของ AOE
+    int knockbackTiles = 0; // จำนวนช่องที่ผลักศัตรูออกเมื่อโดนสกิลนี้ (0 = ไม่ผลัก)
     std::string scalingStat = "atk"; // "atk", "def", "dodge", "magic_dmg" - stat ที่ใช้ในการคำนวณ damage ของ ranged/aoe
     // ── Status Effect on hit ──
     std::string applyStatus  = "";   // "bleed", "poison", "burn", "stun", "slow"

@@ -446,6 +446,51 @@ void Game::applyStatusOnHit(SkillInstance* sk, Enemy* e)
     addLog("  " + e->getName() + " is " + st + "!", sf::Color(200, 100, 220));
 }
 
+void Game::applyKnockback(Enemy* e, int sourceCol, int sourceRow, int tiles)
+{
+    if (!e || tiles <= 0) return;
+    if (e->isDead()) return;   // ศพไม่ผลัก
+
+    int dx = e->getCol() - sourceCol;
+    int dy = e->getRow() - sourceRow;
+
+    // normalize เป็นทิศทางกริด 8 ทิศ (-1/0/1)
+    int stepX = (dx > 0) - (dx < 0);
+    int stepY = (dy > 0) - (dy < 0);
+    if (stepX == 0 && stepY == 0) return;   // อยู่จุดเดียวกับศูนย์กลาง ไม่รู้จะผลักทางไหน
+
+    int curC = e->getCol();
+    int curR = e->getRow();
+    int pushed = 0;
+
+    for (int i = 0; i < tiles; ++i)
+    {
+        int nc = curC + stepX;
+        int nr = curR + stepY;
+
+        if (!m_tileMap.isWalkable(nc, nr)) break;
+        if (m_player && m_player->getCol() == nc && m_player->getRow() == nr) break;
+
+        bool blocked = false;
+        for (auto* other : m_enemies)
+        {
+            if (other == e || other->isDead()) continue;
+            if (other->getCol() == nc && other->getRow() == nr) { blocked = true; break; }
+        }
+        if (blocked) break;
+
+        curC = nc;
+        curR = nr;
+        pushed++;
+    }
+
+    if (pushed > 0)
+    {
+        e->setPos(curC, curR);
+        addLog("  " + e->getName() + " is knocked back!", sf::Color(150, 200, 255));
+    }
+}
+
 void Game::executeAoe(SkillInstance* sk)
 {
     if (!m_player || !sk) return;
@@ -466,6 +511,8 @@ void Game::executeAoe(SkillInstance* sk)
             addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
                    sf::Color(255,180,50));
             applyStatusOnHit(sk, e);
+            if (sk->data.effect.knockbackTiles > 0)
+                applyKnockback(e, pc, pr, sk->data.effect.knockbackTiles);
             hits++;
         }
     }
@@ -501,6 +548,8 @@ void Game::executeAoeAt(SkillInstance* sk, int col, int row)
             addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
                    sf::Color(255,180,50));
             applyStatusOnHit(sk, e);
+            if (sk->data.effect.knockbackTiles > 0)
+                applyKnockback(e, col, row, sk->data.effect.knockbackTiles);
             hits++;
         }
     }
@@ -847,6 +896,9 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                 }
             }
                         addLog(hitLog, sf::Color(180, 220, 255));  // ← log เดียว
+
+                if (!e->isDead() && sk->data.effect.knockbackTiles > 0)
+                    applyKnockback(e, pc, pr, sk->data.effect.knockbackTiles);
 
                 if (e->isDead())
                 {
