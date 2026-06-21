@@ -87,6 +87,13 @@ public:
         load("debuff_slow", "assets/textures/debuff_slow.png");
         //weapon
         load("weapon_mace", "assets/textures/weapon_mace.png");
+        load("greatHammer", "assets/textures/greatHammer.png");
+        load("greatSword",    "assets/textures/greatSword.png");
+        load("shield",    "assets/textures/shield.png");
+        load("sword", "assets/textures/sword.png");
+        load("bow", "assets/textures/bow.png");
+        load("itemArrow", "assets/textures/itemArrow.png");
+        
 
 
         
