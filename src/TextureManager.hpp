@@ -17,12 +17,13 @@ public:
 
     void load(const std::string& name, const std::string& path)
     {
-        if (m_textures.count(name)) return;  // โหลดแล้ว
+        if (m_textures.count(name)) return;
         sf::Texture tex;
-        if (!tex.loadFromFile(path))
-            std::cerr<<"[TextureManager] Failed: "<<path<<"\n";
-        else
-            m_textures[name] = std::move(tex);
+        if (!tex.loadFromFile(path)) {
+            std::cerr << "[TextureManager] Failed: " << path << "\n";
+            return;
+        }
+        m_textures.emplace(name, std::move(tex));
     }
 
     const sf::Texture* get(const std::string& name) const
@@ -103,5 +104,6 @@ public:
 
 private:
     TextureManager() = default;
-    std::map<std::string, sf::Texture> m_textures;
+    //std::map<std::string, sf::Texture> m_textures;
+    std::unordered_map<std::string, sf::Texture> m_textures;
 };
