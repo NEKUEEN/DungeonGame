@@ -14,7 +14,7 @@
     },
     {
     "id": "ground_slam",
-    "icon": "groundSlam",
+    "icon": "groundSlamm",
     "name": "Ground Slam",
     "desc": "Slam the ground, hitting all enemies in a 2-tile radius.",
     "type": "active_aoe_self",

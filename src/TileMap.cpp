@@ -7,6 +7,15 @@
 #include <fstream>
 #include "lib/json.hpp"
 
+static std::string basenameNoExt(const std::string& path)
+{
+    size_t slash = path.find_last_of("/\\");
+    std::string fname = (slash == std::string::npos) ? path : path.substr(slash + 1);
+    size_t dot = fname.find_last_of('.');
+    if (dot != std::string::npos) fname = fname.substr(0, dot);
+    return fname;
+}
+
 TileMap::TileMap(int cols, int rows, int tileSize)
     : m_cols(cols), m_rows(rows), m_tileSize(tileSize)
 {
@@ -331,11 +340,25 @@ void TileMap::processLayers(const nlohmann::json& layers)
         {
             for (const auto& obj : layer["objects"])
             {
-                std::string objName = obj["name"].get<std::string>();
-                int col = (int)(obj["x"].get<float>() / m_tileSize);
-                int row = (int)(obj["y"].get<float>() / m_tileSize);
-                if (objName == "gate_up")   setTile(col, row, TileType::GateUp);
-                if (objName == "gate_down") setTile(col, row, TileType::GateDown);
+                std::string objName = obj.contains("name") ? obj["name"].get<std::string>() : "";
+                float objX = obj["x"].get<float>();
+                float objY = obj["y"].get<float>();
+                // tile object (มี gid) ใน Tiled ใช้ y เป็นขอบล่าง ต้องลบ height ออกก่อน
+                if (obj.contains("gid") && obj.contains("height"))
+                    objY -= obj["height"].get<float>();
+                int col = (int)(objX / m_tileSize);
+                int row = (int)(objY / m_tileSize);
+
+                std::string tsName;
+                if (obj.contains("gid"))
+                    tsName = tilesetNameForGid((uint32_t)obj["gid"].get<int>());
+                std::string tsLower = tsName;
+                std::transform(tsLower.begin(), tsLower.end(), tsLower.begin(), ::tolower);
+
+                if (objName == "gate_up" || tsLower.find("gateup") != std::string::npos)
+                    setTile(col, row, TileType::GateUp);
+                else if (objName == "gate_down" || tsLower.find("gatedown") != std::string::npos)
+                    setTile(col, row, TileType::GateDown);
             }
             continue;
         }
@@ -377,7 +400,41 @@ void TileMap::processLayers(const nlohmann::json& layers)
             if (col >= m_cols || row >= m_rows) continue;
             if (tileId == 0) continue;
 
-            if (isFloor)
+            std::string tsName = tilesetNameForGid(tileId);
+            std::string tsLower = tsName;
+            std::transform(tsLower.begin(), tsLower.end(), tsLower.begin(), ::tolower);
+
+            bool determined = false;
+            TileType tType = TileType::Floor;
+            ZoneType tZone = zone;
+
+            if (tsLower.find("wall") != std::string::npos)
+            {
+                tType = TileType::Wall; determined = true;
+            }
+            else if (tsLower.find("gatedown") != std::string::npos)
+            {
+                tType = TileType::GateDown; determined = true;
+            }
+            else if (tsLower.find("gateup") != std::string::npos)
+            {
+                tType = TileType::GateUp; determined = true;
+            }
+            else if (tsLower.find("floor") != std::string::npos)
+            {
+                tType = TileType::Floor; determined = true;
+                if      (tsLower.find("deadman")      != std::string::npos) tZone = ZoneType::DeadMan;
+                else if (tsLower.find("darkness")      != std::string::npos) tZone = ZoneType::Darkness;
+                else if (tsLower.find("crystalbright") != std::string::npos) tZone = ZoneType::CrystalBright;
+                else if (tsLower.find("blackrock")     != std::string::npos) tZone = ZoneType::BlackRock;
+            }
+
+            if (determined)
+            {
+                setTile(col, row, tType);
+                if (tZone != ZoneType::None) m_zoneGrid[row][col] = tZone;
+            }
+            else if (isFloor)
             {
                 setTile(col, row, TileType::Floor);
                 if (zone != ZoneType::None) m_zoneGrid[row][col] = zone;
@@ -391,6 +448,13 @@ void TileMap::processLayers(const nlohmann::json& layers)
     }
 }
 
+std::string TileMap::tilesetNameForGid(uint32_t gid) const
+{
+    for (const auto& r : m_tilesetRanges)
+        if (gid >= (uint32_t)r.firstgid) return r.name;
+    return "";
+}
+
 bool TileMap::loadFromTiled(const std::string& path)
 {
     std::ifstream f(path);
@@ -401,6 +465,21 @@ bool TileMap::loadFromTiled(const std::string& path)
     m_rows = j["height"].get<int>();
     m_grid.assign(m_rows, std::vector<TileType>(m_cols, TileType::Wall));
     m_zoneGrid.assign(m_rows, std::vector<ZoneType>(m_cols, ZoneType::None));
+
+    m_tilesetRanges.clear();
+    if (j.contains("tilesets"))
+    {
+        for (const auto& ts : j["tilesets"])
+        {
+            int fg = (ts.contains("firstgid") && ts["firstgid"].is_number())
+                     ? ts["firstgid"].get<int>() : 1;
+            std::string src = (ts.contains("source") && ts["source"].is_string())
+                     ? ts["source"].get<std::string>() : "";
+            m_tilesetRanges.push_back({fg, basenameNoExt(src)});
+        }
+        std::sort(m_tilesetRanges.begin(), m_tilesetRanges.end(),
+            [](const TilesetRange& a, const TilesetRange& b){ return a.firstgid > b.firstgid; });
+    }
 
     processLayers(j["layers"]);
 

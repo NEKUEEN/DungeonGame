@@ -34,6 +34,7 @@ private:
     struct BSPNode { Rect area,room; int left=-1,right=-1; bool hasRoom=false; };
 
     void processLayers(const nlohmann::json& layers);
+    std::string tilesetNameForGid(uint32_t gid) const;
     void fillWalls();
     void bspSplit(int nodeIdx,int depth,int maxDepth);
     void bspCarveRooms(int nodeIdx);
@@ -50,6 +51,9 @@ private:
     std::vector<std::vector<ZoneType>> m_zoneGrid;
     std::vector<BSPNode> m_bspNodes;
     std::mt19937 m_rng{ std::random_device{}() };
+
+    struct TilesetRange { int firstgid; std::string name; };
+    std::vector<TilesetRange> m_tilesetRanges;
 
     // Textures — ดึงจาก TextureManager แทนเก็บเอง
     bool m_hasTextures = false;

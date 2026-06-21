@@ -55,6 +55,8 @@ public:
         load("crystalBright_floor", "assets/textures/crystalBright_floor_tile.png");
         load("deadMan_floor",       "assets/textures/deadMan_floor_tile.png");
         load("blackRock_floor",     "assets/textures/blackRock_floor_tile.png");
+        load("gate_down", "assets/textures/gate_down.png");
+        load("gate_up",   "assets/textures/gate_up.png");
         // zone wall textures
         load("crystalBright_wall",  "assets/textures/crystalBright_wall_tile.png");
         load("stairs_down",  "assets/textures/stairs_down.png");
@@ -78,7 +80,7 @@ public:
         load("ironSkin", "assets/textures/ironSkin.png");
         //skill
         load("arrow", "assets/textures/arrow.png");
-        load("goundSlam", "assets/textures/goundSlam.png");
+        load("groundSlam", "assets/textures/groundSlam.png");
         //Debuff icon
         load("debuff_bleed", "assets/textures/debuff_bleed.png");
         load("debuff_poison",    "assets/textures/debuff_poison.png");
