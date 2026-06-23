@@ -237,6 +237,30 @@ void Game::regenStamina()
     s.stamina = std::min(s.maxStamina, s.stamina + s.staminaRegen);
 }
 
+// ============================================================
+//  Vision / Fog — ลด radius ถ้า player อยู่ในโซนมืด (ยังไม่มีระบบไฟ)
+// ============================================================
+int Game::getCurrentVisionRadius() const
+{
+    if (!m_player) return VIEW_RADIUS;
+    ZoneType zone = m_tileMap.getZone(m_player->getCol(), m_player->getRow());
+    if (zone == ZoneType::Darkness) return DARK_ZONE_VIEW_RADIUS;
+    return VIEW_RADIUS;
+}
+
+void Game::recomputeFog()
+{
+    if (!m_player) return;
+    recomputeFog(m_player->getCol(), m_player->getRow());
+}
+
+void Game::recomputeFog(int col, int row)
+{
+    ZoneType zone = m_tileMap.getZone(col, row);
+    int radius = (zone == ZoneType::Darkness) ? DARK_ZONE_VIEW_RADIUS : VIEW_RADIUS;
+    m_fog.compute(col, row, radius, m_tileMap);
+}
+
 
 // ============================================================
 //  Skill Helpers
@@ -540,7 +564,7 @@ void Game::executeAoe(SkillInstance* sk)
     }
 
     processTurn(); tryRespawnEnemies();
-    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+    recomputeFog();
 }
 
 void Game::executeAoeAt(SkillInstance* sk, int col, int row)
@@ -575,7 +599,7 @@ void Game::executeAoeAt(SkillInstance* sk, int col, int row)
     if (ps.spdCounter > 300) ps.spdCounter = 300;
 
     processTurn(); tryRespawnEnemies();
-    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+    recomputeFog();
 }
 
 void Game::executeWarp(int col, int row)
@@ -594,7 +618,7 @@ void Game::executeWarp(int col, int row)
         m_player->getStats().stamina -= sk->data.effect.staminaCost;
     }
     addLog("  Warped!", sf::Color(100,200,255));
-    m_fog.compute(col, row, VIEW_RADIUS, m_tileMap);
+    recomputeFog(col, row);
     updateCamera();
 
     {
@@ -861,7 +885,7 @@ void Game::fireBow()
 
     processTurn();
     tryRespawnEnemies();
-    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+    recomputeFog();
 }
 
 void Game::fireRangedAt(int targetCol, int targetRow)
@@ -1033,7 +1057,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     m_player->onTurnPassed();
     processTurn();
     tryRespawnEnemies();
-    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+    recomputeFog();
 }
 
 // ============================================================
@@ -1122,7 +1146,7 @@ void Game::newDungeon(bool keepPlayer)
         recalcAllStats();
         recalcSpeed();
         m_coreSlots.setSlotCount(m_player->getStats().level);
-        m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+        recomputeFog();
     }
 
     updateCamera();
@@ -1708,7 +1732,7 @@ void Game::waitTurn()
 
     m_turnCount++; m_player->onTurnPassed();
     processTurn(); tryRespawnEnemies();
-    m_fog.compute(m_player->getCol(), m_player->getRow(), VIEW_RADIUS, m_tileMap);
+    recomputeFog();
     addLog("  You wait.", sf::Color(140,140,140));
 }
 
@@ -1881,7 +1905,7 @@ void Game::handlePlayerMove(int dc, int dr)
             if (ms.spdCounter > 300) ms.spdCounter = 300;
             processTurn(); tryRespawnEnemies(); recalcSpeed();
             auto t1 = std::chrono::high_resolution_clock::now();
-m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+recomputeFog();
 auto t2 = std::chrono::high_resolution_clock::now();
 auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
 //addLog("fog: " + std::to_string(ms2) + "ms", sf::Color(100,255,100));
@@ -1897,7 +1921,7 @@ auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
     if (ms.spdCounter > 300) ms.spdCounter = 300;
 
     m_turnCount++; m_player->onTurnPassed();
-    m_fog.compute(m_player->getCol(),m_player->getRow(),VIEW_RADIUS,m_tileMap);
+    recomputeFog();
 
     processTurn(); tryRespawnEnemies(); recalcSpeed();
     updateCamera();

@@ -21,8 +21,8 @@
 #include "StatBonus.hpp"
 #include "RaceDB.hpp"
 
-constexpr int WINDOW_W        = 800;
-constexpr int WINDOW_H        = 600;
+constexpr int WINDOW_W        = 1366;
+constexpr int WINDOW_H        = 768;
 constexpr int RIGHT_PANEL_W   = 250;
 constexpr int LOG_PANEL_H     = 170;
 constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;
@@ -41,8 +41,9 @@ constexpr int TILE_SIZE       = 64;
 constexpr int MAP_COLS        = 50;
 constexpr int MAP_ROWS        = 50;
 constexpr int VIEW_RADIUS     = 10;
-constexpr int MAX_ENEMIES     = 12;
-constexpr int RESPAWN_TURNS   = 15;
+constexpr int DARK_ZONE_VIEW_RADIUS = 2;  // ระยะมองเห็นในโซนมืด (เช่น Darkness) — ไม่มีไฟ
+constexpr int MAX_ENEMIES     = 100;
+constexpr int RESPAWN_TURNS   = 50;
 constexpr int BOSS_KILL_THRESHOLD = 50;
 
 // สร้างโครงสร้าง FinalStats รวม stat ที่คำนวณแล้วทั้งหมด
@@ -150,6 +151,11 @@ private:
     void enemyAttack(Enemy* enemy);
     void recalcSpeed();         // คำนวณ spd + stamina regen
     void regenStamina();        // ฟื้น stamina ต่อเทิร์น
+
+    // ── Vision / Fog ──
+    int  getCurrentVisionRadius() const;  // ลด radius ถ้า player อยู่ในโซนมืด (เช่น Darkness)
+    void recomputeFog();                  // wrapper: m_fog.compute() ด้วย radius ที่ถูกต้องตาม zone ปัจจุบัน
+    void recomputeFog(int col, int row);  // overload สำหรับกรณีคำนวณก่อน setPos เสร็จ (เช่น warp)
 
     std::string pickRandomMonster(int floor);
     std::set<std::string> m_firstKillDone;  // id ที่เคย first kill แล้ว
