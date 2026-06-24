@@ -19,7 +19,13 @@ struct Stats
     int maxDef   = 0;
     int maxDodge = 0;
     int maxSpd = 0;
-    int spd    = 0;
+
+    // ── Speed system (Aut-based) ──
+    int       moveSpd     = 0;    // bonus จาก equipment/race/skill → move
+    int       atkSpd      = 0;    // bonus จาก equipment/race/skill → attack
+    int       moveAut     = 100;  // Aut ต่อการเดิน 1 ก้าว (ต่ำ = เร็ว)
+    int       atkAut      = 100;  // Aut ต่อการโจมตี 1 ครั้ง (ต่ำ = เร็ว)
+    long long nextActTime = 0;    // Aut สะสมที่จะได้ขยับครั้งถัดไป
 
     // ── Computed by Game::computeBody() ──
     int body = 0;
@@ -60,29 +66,10 @@ struct Stats
     int hungerTimer = 0;
     int regenTimer  = 0;
 
-    // ── Action Points ──
-    int maxAP     = 1;   // ปกติ 1 AP/turn
-    int currentAP = 0;   // AP เหลือใน turn นี้
-
-    // ── Attack Speed ──
-    // AP cost ของการโจมตี x100 (100 = ปกติ = หัก 1 AP, 50 = หัก 0.5 AP)
-    int atkSpeedCost  = 100;
-    int atkAPAccum    = 0;   // accumulator สำหรับ fractional AP cost
-
-    // ── Move Speed ──
-    // AP cost ของการเดิน x100 (100=ปกติ, 50=เร็ว×2, 200=ช้า)
-    // ปรับได้จาก item/equipment/status
-    int moveSpeedCost = 100;
-    int moveAPAccum   = 0;
-
 
     int maxStamina = 100;
     int stamina = 100;
     int staminaRegen = 0;
-
-    // ── Speed system ──
-    int speedPerTurn = 100;  // threshold (100 = ปกติ)
-    int spdCounter   = 100;    // accumulator — เมื่อถึง speedPerTurn = ได้เทิร์น
 
     // ── Status Resist (0-100, หน่วยเป็น %) ──
     int resistBleed  = 0;

@@ -51,8 +51,8 @@
       "sprite": "barbarian",
       "statBonus": {
         "hp": 40, "atk": 8, "def": 3,
-        "mana": 1, "matk": 1, "mdef": 1,
-        "dodge": 1, "spd": 0
+        "mana": 20, "matk": 1, "mdef": 1,
+        "dodge": 1, "spd": -1
       },
       "passive": {
         "id": "soul_imprine",

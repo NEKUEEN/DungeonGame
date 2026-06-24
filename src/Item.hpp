@@ -70,6 +70,7 @@ struct Item
     int         onHitPower    = 0;
     int         onHitDuration = 0;
     int         onHitChance   = 0;
+    int baseAtkAut = 100;  // Aut พื้นฐานของอาวุธ (70=dagger, 100=sword, 140=axe)
     bool        stackable  = false;
     int         col        = -1;
     int         row        = -1;

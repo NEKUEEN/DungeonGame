@@ -204,27 +204,38 @@ void Game::refreshStats()
 //  spd=-2 → +33/turn  (ช้า 3x)
 //  spd=-3 → +25/turn  (ช้า 4x)
 // ============================================================
+// ── helper: แปลง spd bonus → Aut ──
+static int spdToAut(int spd)
+{
+    if (spd >= 0) return std::max(50,  100 * 6 / (6 + spd));
+    else          return std::min(200, 100 - spd * 20);
+}
+
 void Game::recalcSpeed()
 {
     if (!m_player) return;
     Stats& s = m_player->getStats();
 
-    // รวม spd จาก equipment + passive/active buff skills
-    int spd = m_finalStats.spd;
+    // รวม moveSpd จาก equipment + passive/active buff skills
+    int ms = m_finalStats.spd;
+    int as = 0;
     for (const auto& sk : m_player->getSkills())
     {
         if (!sk.buffActive && !sk.isPassive()) continue;
-        spd += sk.data.effect.speedBonus;
+        ms += sk.data.effect.speedBonus;
     }
-    s.spd = std::clamp(spd, -4, 4);  // cap ที่ -4 ถึง +4
+    s.moveSpd = std::clamp(ms, -4, 4);
+    s.atkSpd  = std::clamp(as, -4, 4);
+    s.moveAut = spdToAut(s.moveSpd);
 
-    // คำนวณ baseSpeed ต่อเทิร์น (เหมือนสูตรในมอน)
-    int baseSpeed = 100;
-    if (s.spd >= 0) baseSpeed = 100 + s.spd * 100;
-    else            baseSpeed = std::max(10, 100 / (1 - s.spd));
-    s.speedPerTurn = baseSpeed;
+    // atkAut = baseAtkAut ของอาวุธ scale ด้วย atkSpd
+    const Item* mainHand = m_equipment.getItem(EquipSlot::MainHand);
+    int weaponBaseAut = mainHand ? mainHand->baseAtkAut : 100;
+    if (s.atkSpd >= 0)
+        s.atkAut = std::max(50,  weaponBaseAut * 6 / (6 + s.atkSpd));
+    else
+        s.atkAut = std::min(300, weaponBaseAut - s.atkSpd * 20);
 
-    // Stamina regen จาก base + equipment bonus (ขยายได้ทีหลัง)
     s.staminaRegen = m_finalStats.staminaRegen;
     if (s.maxStamina == 0) s.maxStamina = m_finalStats.maxStamina;
     if (s.stamina > s.maxStamina) s.stamina = s.maxStamina;
@@ -558,9 +569,9 @@ void Game::executeAoe(SkillInstance* sk)
 
     {
         Stats& ps = m_player->getStats();
-        ps.spdCounter -= 100;
-        ps.spdCounter += ps.speedPerTurn;
-        if (ps.spdCounter > 300) ps.spdCounter = 300;
+        
+        m_globalTime = ps.nextActTime;
+        ps.nextActTime += ps.atkAut;
     }
 
     processTurn(); tryRespawnEnemies();
@@ -594,9 +605,9 @@ void Game::executeAoeAt(SkillInstance* sk, int col, int row)
         addLog("  "+sk->data.name+"  no targets in range.", sf::Color(140,140,140));
 
     Stats& ps = m_player->getStats();
-    ps.spdCounter -= 100;
-    ps.spdCounter += ps.speedPerTurn;
-    if (ps.spdCounter > 300) ps.spdCounter = 300;
+    
+    m_globalTime = ps.nextActTime;
+    ps.nextActTime += ps.atkAut;
 
     processTurn(); tryRespawnEnemies();
     recomputeFog();
@@ -623,9 +634,9 @@ void Game::executeWarp(int col, int row)
 
     {
         Stats& ps = m_player->getStats();
-        ps.spdCounter -= 100;
-        ps.spdCounter += ps.speedPerTurn;
-        if (ps.spdCounter > 300) ps.spdCounter = 300;
+        
+        m_globalTime = ps.nextActTime;
+        ps.nextActTime += ps.atkAut;
     }
 
     processTurn();
@@ -879,9 +890,9 @@ void Game::fireBow()
         addLog("  Arrow flies into the dark.", sf::Color(140, 140, 140));
 
     Stats& ps = m_player->getStats();
-    ps.spdCounter -= 100;
-    ps.spdCounter += ps.speedPerTurn;
-    if (ps.spdCounter > 300) ps.spdCounter = 300;
+    
+    m_globalTime = ps.nextActTime;
+    ps.nextActTime += ps.atkAut;
 
     processTurn();
     tryRespawnEnemies();
@@ -1048,9 +1059,9 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     // หัก spdCounter เหมือนขยับ
     {
         Stats& ps = m_player->getStats();
-        ps.spdCounter -= 100;
-        ps.spdCounter += ps.speedPerTurn;
-        if (ps.spdCounter > 300) ps.spdCounter = 300;
+        
+        m_globalTime = ps.nextActTime;
+        ps.nextActTime += ps.atkAut;
     }
 
     m_turnCount++;
@@ -1728,7 +1739,9 @@ void Game::waitTurn()
     }
     // เติม spdCounter เต็ม (100) เหมือนขยับ 1 เทิร์น
     Stats& ps = m_player->getStats();
-    ps.spdCounter = std::max(ps.spdCounter, 100);
+    m_globalTime = ps.nextActTime;
+    ps.nextActTime += ps.moveAut;
+    
 
     m_turnCount++; m_player->onTurnPassed();
     processTurn(); tryRespawnEnemies();
@@ -1886,13 +1899,8 @@ void Game::handlePlayerMove(int dc, int dr)
 {
     if (!m_player) return;
 
-    // เช็ค spdCounter: ต้องมี >= 100 จึงขยับได้
     Stats& ms = m_player->getStats();
-    if (ms.spdCounter < 100)
-    {
-        addLog("  Too slow to act! ("+std::to_string(ms.spdCounter)+"/100)", sf::Color(160,120,80));
-        return;
-    }
+    
 
     int tc=m_player->getCol()+dc, tr=m_player->getRow()+dr;
 
@@ -1900,9 +1908,9 @@ void Game::handlePlayerMove(int dc, int dr)
         if (!e->isDead()&&e->getCol()==tc&&e->getRow()==tr)
         {
             playerAttack(e);
-            ms.spdCounter -= 100;
-            ms.spdCounter += ms.speedPerTurn;
-            if (ms.spdCounter > 300) ms.spdCounter = 300;
+            
+            m_globalTime = ms.nextActTime;
+            ms.nextActTime += ms.atkAut;
             processTurn(); tryRespawnEnemies(); recalcSpeed();
             auto t1 = std::chrono::high_resolution_clock::now();
 recomputeFog();
@@ -1915,10 +1923,9 @@ auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
     if (!moved) return;
 
-    ms.spdCounter -= 100;
-    // สะสม counter สำหรับ action ถัดไป (spd=0 → +100, spd=-1 → +50 ฯลฯ)
-    ms.spdCounter += ms.speedPerTurn;
-    if (ms.spdCounter > 300) ms.spdCounter = 300;
+    
+    m_globalTime = ms.nextActTime;
+    ms.nextActTime += ms.moveAut;
 
     m_turnCount++; m_player->onTurnPassed();
     recomputeFog();
@@ -2192,43 +2199,44 @@ void Game::processTurn()
     if (!m_player) return;
 
     regenStamina();
+
     // ── Player DOT tick ──
-{
-    int hpDelta = 0;
-    std::string effectName;
-    m_player->tickStatusEffects(hpDelta, effectName);
-    if (hpDelta < 0)
     {
-        addLog("  You take " + std::to_string(-hpDelta) +
-               " " + effectName + " dmg!", sf::Color(200, 80, 180));
-        Stats& ps = m_player->getStats();
-        if (ps.hp <= 0)
+        int hpDelta = 0;
+        std::string effectName;
+        m_player->tickStatusEffects(hpDelta, effectName);
+        if (hpDelta < 0)
         {
-            ps.hp = 0;
-            m_playerDead = true;
-            addLog("  *** YOU DIED *** [R] restart", sf::Color(255, 50, 50));
+            addLog("  You take " + std::to_string(-hpDelta) +
+                   " " + effectName + " dmg!", sf::Color(200, 80, 180));
+            Stats& ps = m_player->getStats();
+            if (ps.hp <= 0)
+            {
+                ps.hp = 0;
+                m_playerDead = true;
+                addLog("  *** YOU DIED *** [R] restart", sf::Color(255, 50, 50));
+            }
         }
     }
-}
-    // tick cooldown + buff duration ของ player skills
 
-        int pc = m_player->getCol();
-        int pr = m_player->getRow();
+    long long playerTime = m_globalTime;
+    int pc = m_player->getCol();
+    int pr = m_player->getRow();
 
-        for (auto* e : m_enemies)
-        {
-        // 1. ตายแล้วข้ามเลย
+    for (auto* e : m_enemies)
+    {
         if (e->isDead()) continue;
 
-        // 2. Tick status effects (bleed/poison/burn ฯลฯ)
-        int hpDelta = 0;
-std::string effectName;
-e->tickStatusEffects(hpDelta, effectName);
+        // ── Tick status effects ──
+        {
+            int hpDelta = 0;
+            std::string effectName;
+            e->tickStatusEffects(hpDelta, effectName);
+            if (hpDelta < 0)
+                addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
+                       " " + effectName + " dmg", sf::Color(180, 80, 180));
+        }
 
-if (hpDelta < 0)
-    addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
-           " " + effectName + " dmg", sf::Color(180, 80, 180));
-        // 3. ตายจาก status ไหม?
         if (e->isDead())
         {
             onEnemyKilled(e);
@@ -2238,32 +2246,46 @@ if (hpDelta < 0)
                 const ItemData* idata = DropTable::instance().getItem(itemId);
                 if (!idata) continue;
                 Item drop;
-                drop.id    = idata->id;
-                drop.name  = idata->name;
-                drop.type  = idata->type == "Core" ? ItemType::Core :
-                     idata->type == "Ammo" ? ItemType::Ammo :
-                                             ItemType::Material;
-                drop.desc  = idata->desc;
-                drop.value = idata->value;
-                drop.spriteName = idata->sprite;   // ← ขาดตรงนี้
-                drop.col   = e->getCol();
-                drop.row   = e->getRow();
+                drop.id         = idata->id;
+                drop.name       = idata->name;
+                drop.type       = idata->type == "Core" ? ItemType::Core :
+                                  idata->type == "Ammo" ? ItemType::Ammo :
+                                                          ItemType::Material;
+                drop.desc       = idata->desc;
+                drop.value      = idata->value;
+                drop.spriteName = idata->sprite;
+                drop.col        = e->getCol();
+                drop.row        = e->getRow();
                 m_mapItems.push_back(drop);
                 addLog("  " + drop.name + " dropped!", sf::Color(220, 200, 80));
             }
             continue;
         }
 
-        // 4. Stun → ข้ามเทิร์น
-        if (e->hasStatus(StatusType::Stun)) continue;
+        // ── Stun → เสียเวลาแต่ไม่ขยับ ──
+        if (e->hasStatus(StatusType::Stun))
+        {
+            e->advanceActTime();
+            e->tickSkills();
+            continue;
+        }
 
-        // 5. Speed check → ถ้า counter ยังไม่ถึง 100 ข้ามเทิร์น
-        if (!e->tickSpeed()) continue;
+        // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง advance ──
+        if (e->getNextActTime() > playerTime)
+            continue;
 
-        // 6. อยู่นอก fog และยังไม่ alerted → ข้ามเทิร์น
-        if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted()) continue;
+        // ── ไม่เห็นและไม่ alerted → advance แล้วข้าม ──
+        if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted())
+        {
+            e->advanceActTime();
+            continue;
+        }
+        // debug — เพิ่มชั่วคราว
+        //if (e->getName() == "Orc")
+        //addLog("  [DBG] orc nextAct=" + std::to_string(e->getNextActTime()) +
+           //" playerTime=" + std::to_string(playerTime), sf::Color(100,255,100));
 
-        // 7. ติดกับ player → โจมตี
+        // ── ถึงเวลา + เห็น/alerted → ขยับจริง ──
         int dx = std::abs(e->getCol() - pc);
         int dy = std::abs(e->getRow() - pr);
 
@@ -2271,16 +2293,15 @@ if (hpDelta < 0)
         {
             enemyAttack(e);
         }
-            else
+        else
         {
-            // 8. AI เดิน + skill
             e->updateAI(pc, pr, m_tileMap, m_enemies);
 
             if (e->hasPendingSkill())
             {
                 auto ps = e->consumePendingSkill();
                 SkillInstance* sk = e->findSkill(ps.skillId);
-                if (!sk) continue;
+                if (!sk) { e->advanceActTime(); e->tickSkills(); continue; }
 
                 if (sk->data.type == SkillType::ActiveRanged)
                 {
@@ -2300,7 +2321,8 @@ if (hpDelta < 0)
                             addLog("  " + e->getName() + " uses " + sk->data.name +
                                    " -> " + std::to_string(actualDmg) + " dmg!",
                                    sf::Color(220, 100, 80));
-                            if (s.hp <= 0) { s.hp = 0; m_playerDead = true; addLog("  *** YOU DIED *** [R] restart", sf::Color(255,50,50)); }
+                            if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
+                                addLog("  *** YOU DIED *** [R] restart", sf::Color(255,50,50)); }
                             break;
                         }
                     }
@@ -2322,11 +2344,13 @@ if (hpDelta < 0)
                         addLog("  " + e->getName() + " uses " + sk->data.name +
                                " -> " + std::to_string(actualDmg) + " dmg!",
                                sf::Color(220, 100, 80));
-                        if (s.hp <= 0) { s.hp = 0; m_playerDead = true; addLog("  *** YOU DIED *** [R] restart", sf::Color(255,50,50)); }
+                        if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
+                            addLog("  *** YOU DIED *** [R] restart", sf::Color(255,50,50)); }
                     }
                 }
             }
         }
+        e->advanceActTime();
         e->tickSkills();
     }
 
@@ -2334,7 +2358,8 @@ if (hpDelta < 0)
         std::remove_if(m_enemies.begin(), m_enemies.end(),
             [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
         m_enemies.end());
-        recalcAllStats();
+
+    recalcAllStats();
 }
 
 // ============================================================
@@ -2873,16 +2898,6 @@ void Game::renderStatsOverlay()
     line("SloDurRed:   ", std::to_string(m_finalStats.slowDurReduce));
 
     
-
-    // Speed — แสดง modifier + counter
-    {
-        std::string spdStr = (m_finalStats.spd >= 0 ? "+" : "") + std::to_string(m_finalStats.spd);
-        spdStr += "  [" + std::to_string(s.spdCounter) + "/100]";
-        sf::Color spdCol = m_finalStats.spd > 0 ? sf::Color(100,255,150)
-                         : m_finalStats.spd < 0 ? sf::Color(255,100,100)
-                         : sf::Color(200,200,200);
-        line("Speed:       ", spdStr, spdCol);
-    }
 
     
 }

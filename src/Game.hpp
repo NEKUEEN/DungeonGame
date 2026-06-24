@@ -43,7 +43,7 @@ constexpr int MAP_ROWS        = 50;
 constexpr int VIEW_RADIUS     = 10;
 constexpr int DARK_ZONE_VIEW_RADIUS = 2;  // ระยะมองเห็นในโซนมืด (เช่น Darkness) — ไม่มีไฟ
 constexpr int MAX_ENEMIES     = 100;
-constexpr int RESPAWN_TURNS   = 50;
+constexpr int RESPAWN_TURNS   = 12;
 constexpr int BOSS_KILL_THRESHOLD = 50;
 
 // สร้างโครงสร้าง FinalStats รวม stat ที่คำนวณแล้วทั้งหมด
@@ -151,6 +151,7 @@ private:
     void enemyAttack(Enemy* enemy);
     void recalcSpeed();         // คำนวณ spd + stamina regen
     void regenStamina();        // ฟื้น stamina ต่อเทิร์น
+    long long m_globalTime = 0;  // Aut สะสมของเกม
 
     // ── Vision / Fog ──
     int  getCurrentVisionRadius() const;  // ลด radius ถ้า player อยู่ในโซนมืด (เช่น Darkness)

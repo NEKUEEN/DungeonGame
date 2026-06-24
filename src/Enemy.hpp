@@ -55,31 +55,15 @@ public:
     bool        isAlerted() const { return m_alerted; }
     int         getPreferredRange() const { return m_preferredRange; }
 
+    // ── Aut-based speed ──
+    long long getNextActTime() const { return m_nextActTime; }
+    void advanceActTime()            { m_nextActTime += m_moveAut; }
+    int  getMoveAut()          const { return m_moveAut; }
+
     void applyStatus(const StatusEffect& se);
     void tickStatusEffects(int& hpDelta, std::string& effectName);  // คืน hp ที่เปลี่ยน
     const std::vector<StatusEffect>& getStatusEffects() const { return m_statusEffects; }
     bool hasStatus(StatusType type) const;
-
-    // SPD system
-    int  getSpd()        const { return m_spd; }
-    int  getSpdCounter() const { return m_spdCounter; }
-    // เรียกทุก processTurn — คืน true ถ้าได้ขยับในรอบนี้
-    bool tickSpeed()
-    {
-        // baseSpeed: spd=0 → +100/turn (ขยับทุกเทิร์น)
-        //            spd=+2 → +300/turn (เร็ว 3x)
-        //            spd=-2 → +34/turn  (ช้า ~3x)
-        int baseSpeed = 100;
-        if (m_spd >= 0) baseSpeed = 100 + m_spd * 100;
-        else            baseSpeed = std::max(10, 100 / (1 - m_spd));  // spd=-1→50, -2→33, -3→25
-        m_spdCounter += baseSpeed;
-        if (m_spdCounter >= 100)
-        {
-            m_spdCounter -= 100;
-            return true;
-        }
-        return false;
-    }
 
     std::vector<SkillInstance>&       getSkills()       { return m_skills; }
     const std::vector<SkillInstance>& getSkills() const { return m_skills; }
@@ -118,8 +102,9 @@ private:
     int m_attackInterval = 1;
     int m_attackTimer    = 0;
 
-    int m_spd        = 0;    // ค่า speed ของมอน (บวก=เร็ว, ลบ=ช้า)
-    int m_spdCounter = 0;    // accumulator — เมื่อถึง 100 ได้ขยับ 1 ครั้ง
+    int       m_spd         = 0;    // เก็บไว้อ่านจาก JSON (ใช้แปลงเป็น moveAut)
+    int       m_moveAut     = 100;  // Aut ต่อการเดิน 1 ก้าว
+    long long m_nextActTime = 0;
 
     // ── Weapon damage-type resist ──
     int m_slashResist  = 0;

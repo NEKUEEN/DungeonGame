@@ -36,6 +36,10 @@ Enemy::Enemy(const std::string& monsterId, int col, int row,
         m_preferredRange = data->preferredRange;
         m_alertRange     = data->alertRange;
         m_spd            = data->spd;
+        // แปลง spd → moveAut
+        // spd=0→100, +1→83, +2→71, -1→120, -2→143
+        if (m_spd >= 0) m_moveAut = std::max(50,  100 * 6 / (6 + m_spd));
+        else            m_moveAut = std::min(200,  100 - m_spd * 20);
 
         m_slashResist  = data->slashResist;
         m_pierceResist = data->pierceResist;
@@ -205,11 +209,9 @@ bool Enemy::updateAI(int pc, int pr,
     // Stun → skip turn
     if (hasStatus(StatusType::Stun)) return false;
 
-// Slow → ทำให้ spdCounter ลดก่อน act
-    if (hasStatus(StatusType::Slow)) {
-        m_spdCounter -= 50;
-    if (m_spdCounter < 0) m_spdCounter = 0;
-    }
+    // Slow → เพิ่ม nextActTime (ช้าลง 1.5x)
+    if (hasStatus(StatusType::Slow))
+        m_nextActTime += m_moveAut / 2;
 
     float dist = std::hypot((float)(pc - m_col), (float)(pr - m_row));
 

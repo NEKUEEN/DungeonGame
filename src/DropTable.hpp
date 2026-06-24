@@ -52,6 +52,7 @@ struct ItemData
     int burnDurReduce   = 0;
     int stunDurReduce   = 0;
     int slowDurReduce   = 0;
+    int baseAtkAut = 100;
     bool stackable  = true;
 
     // core_stats (เฉพาะ Core items)
@@ -153,6 +154,7 @@ public:
             d.onHitPower    = it.contains("on_hit_power")     ? it["on_hit_power"].get<int>()    : 0;
             d.onHitDuration = it.contains("on_hit_duration")  ? it["on_hit_duration"].get<int>() : 0;
             d.onHitChance   = it.contains("on_hit_chance")    ? it["on_hit_chance"].get<int>()   : 0;
+            d.baseAtkAut = it.contains("base_atk_aut")  ? it["base_atk_aut"].get<int>()  : 100;
             // core_stats
             if (it.contains("core_stats"))
             {

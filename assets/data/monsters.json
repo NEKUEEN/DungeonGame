@@ -188,7 +188,7 @@
       "ai_type": "melee",
       "preferred_range": 1,
       "alert_range": 7,
-      "spd": 0,
+      "spd": -1,
       "skills": [
         "iron_skin"
       ],
