@@ -53,6 +53,7 @@ struct ItemData
     int stunDurReduce   = 0;
     int slowDurReduce   = 0;
     int baseAtkAut = 100;
+    int weight = 0;  // น้ำหนัก kg (0=light, 1-3=medium, 4-6=heavy)
     bool stackable  = true;
 
     // core_stats (เฉพาะ Core items)
@@ -155,6 +156,7 @@ public:
             d.onHitDuration = it.contains("on_hit_duration")  ? it["on_hit_duration"].get<int>() : 0;
             d.onHitChance   = it.contains("on_hit_chance")    ? it["on_hit_chance"].get<int>()   : 0;
             d.baseAtkAut = it.contains("base_atk_aut")  ? it["base_atk_aut"].get<int>()  : 100;
+            d.weight = it.contains("weight") ? it["weight"].get<int>() : 0;
             // core_stats
             if (it.contains("core_stats"))
             {

@@ -7,7 +7,8 @@
       "statBonus": {
         "hp": 20, "atk": 5, "def": 2,
         "mana": 20, "matk": 5, "mdef": 2,
-        "dodge": 1, "spd": 0
+        "dodge": 1, "spd": 0, "strength": 10,
+        "body_weight": 70
       },
       "passive": {
         "id": "exp_bonus",
@@ -22,7 +23,8 @@
       "statBonus": {
         "hp": 10, "atk": 3, "def": 20,
         "mana": 0, "matk": 0, "mdef": 5,
-        "dodge": 0, "spd": 1
+        "dodge": 0, "spd": 1, "strength": 14,
+        "body_weight": 80
       },
       "passive": {
         "id": "armor_mastery",
@@ -37,7 +39,8 @@
       "statBonus": {
         "hp": 25, "atk": 3, "def": 1,
         "mana": 25, "matk": 5, "mdef": 1,
-        "dodge": 20, "spd": 2
+        "dodge": 20, "spd": 2, "strength": 5,
+        "body_weight": 45
       },
       "passive": {
         "id": "mana_regen",
@@ -52,7 +55,8 @@
       "statBonus": {
         "hp": 40, "atk": 8, "def": 3,
         "mana": 20, "matk": 1, "mdef": 1,
-        "dodge": 1, "spd": -1
+        "dodge": 1, "spd": -1, "strength": 18,
+        "body_weight": 110
       },
       "passive": {
         "id": "soul_imprine",
@@ -67,7 +71,8 @@
       "statBonus": {
         "hp": 20, "atk": 4, "def": 3,
         "mana": 10, "matk": 1, "mdef": 1,
-        "dodge": 6, "spd": 2
+        "dodge": 6, "spd": 2, "strength": 9,
+        "body_weight": 50
       },
       "passive": {
         "id": "keen_senses",

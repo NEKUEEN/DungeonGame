@@ -35,6 +35,7 @@ struct StatBonus {
     int stunDurReduce   = 0;
     int slowDurReduce   = 0;
 
+
     StatBonus& operator+=(const StatBonus& other) {
         hp    += other.hp;
         atk   += other.atk;

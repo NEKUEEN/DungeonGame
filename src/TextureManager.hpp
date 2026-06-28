@@ -53,6 +53,7 @@ public:
         load("dummy",       "assets/textures/dummy.png");
         // zone floor textures
         load("darkness_floor",      "assets/textures/darkness_floor_tile.png");
+        load("darkness_wall",      "assets/textures/darkness_wall_tile.png");
         load("crystalBright_floor", "assets/textures/crystalBright_floor_tile.png");
         load("deadMan_floor",       "assets/textures/deadMan_floor_tile.png");
         load("blackRock_floor",     "assets/textures/blackRock_floor_tile.png");

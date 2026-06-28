@@ -9,6 +9,7 @@
       "cooldown": 20,
       "duration": 5,
       "effect": {
+        "stamina_cost": 50,
         "atk_pct": 50
       }
     },
@@ -18,13 +19,13 @@
     "name": "Ground Slam",
     "desc": "Slam the ground, hitting all enemies in a 2-tile radius.",
     "type": "active_aoe_self",
-    "hotbar_slot": 3,
+    "hotbar_slot": -1,
     "cooldown": 12,
     "duration": 0,
     "effect": {
       "damage_pct": 70,
       "scaling_stat": "atk",
-      "aoe_radius": 2,
+      "aoe_radius": -1,
       "range": 4,
       "stamina_cost": 15,
       "mana_cost": 0,
@@ -35,13 +36,13 @@
       }
     },
     {
-    "id": "leap_slam",
-    "name": "Leap Slam",
+    "id": "jump",
+    "name": "Jump",
     "type": "active_aoe_warp",
-    "desc": "Slam the ground, hitting all enemies in a 2-tile radius.",
+    "desc": "Jump and Slam the ground, hitting all enemies in a 2-tile radius.",
     "cooldown": 6,
     "duration": 0,
-    "hotbar_slot": 2,
+    "hotbar_slot": -1,
     "effect": {
       "scaling_stat": "atk",
       "range": 5,
@@ -64,6 +65,7 @@
       "cooldown": 20,
       "duration": 5,
       "effect": {
+        "mana_cost": 50,
         "matk_pct": 50
       }
     },
@@ -72,7 +74,7 @@
       "name": "Giant Body",
       "desc": "The body enlarges Buff  +50% for 5 turns.",
       "type": "active_buff",
-      "hotbar_slot": 1,
+      "hotbar_slot": -1,
       "cooldown": 20,
       "duration": 15,
       
@@ -118,6 +120,7 @@
       "duration": 0,
       "effect": {
         "damage_pct": 50,
+        "stamina_cost":5,
         "range": 6,
         "scaling_stat": "atk"
       }
@@ -142,7 +145,7 @@
       "name": "Fire Marble",
       "desc": "Fire a fire like marble. Range 10, dmg MAG/2.",
       "type": "active_ranged",
-      "hotbar_slot": 7,
+      "hotbar_slot": -1,
       "cooldown": 1,
       "duration": 0,
       "effect": {
@@ -161,12 +164,13 @@
     "name": "Arrow",
     "desc": "Arrow. Range 6, dmg ATK/2.",
     "type": "active_ranged",
-    "hotbar_slot": 0,
+    "hotbar_slot": -1,
     "cooldown": 1,
     "duration": 0,
-    "stamina_cost":5,
+    
     "effect": {
         "damage_pct": 80,
+        "stamina_cost":5,
         "range": 6,
         "scaling_stat": "atk",
         "apply_status": "bleed",
@@ -201,12 +205,32 @@
         "mana_cost": 5
       }
     },
+    {
+    "id": "slow_beam",
+    "icon": "Slow Beam",
+    "name": "Slow Beam",
+    "desc": "Arrow. Range 6, dmg ATK/2.",
+    "type": "active_ranged",
+    "hotbar_slot": 0,
+    "cooldown": 1,
+    "duration": 0,
+    
+    "effect": {
+        "damage_pct": 80,
+        "mana_cost":5,
+        "range": 6,
+        "scaling_stat": "matk",
+        "apply_status": "slow",
+        "status_power": 3,
+        "status_duration": 4
+      }
+    },
    {
       "id": "dash",
       "name": "Dash",
       "desc": "Dash to a tile within range 2.",
       "type": "active_warp",
-      "hotbar_slot": 8,
+      "hotbar_slot": -1,
       "cooldown": 15,
       "duration": 0,
       "effect": {

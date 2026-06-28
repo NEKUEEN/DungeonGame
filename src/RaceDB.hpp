@@ -14,6 +14,8 @@ struct RaceStatBonus {
     int hp=0, atk=0, def=0;
     int mana=0, matk=0, mdef=0;
     int dodge=0, spd=0;
+    int strength   = 10;  // ← เพิ่ม
+    int bodyWeight = 70;  // ← เพิ่ม (kg)
 };
 
 struct RaceData {
@@ -47,6 +49,9 @@ public:
             d.statBonus.mdef  = sb["mdef"].get<int>();
             d.statBonus.dodge = sb["dodge"].get<int>();
             d.statBonus.spd   = sb["spd"].get<int>();
+            d.statBonus.spd        = sb["spd"].get<int>();
+            d.statBonus.strength   = sb.contains("strength")    ? sb["strength"].get<int>()   : 10;
+            d.statBonus.bodyWeight = sb.contains("body_weight") ? sb["body_weight"].get<int>(): 70;
             d.passive.id   = r["passive"]["id"].get<std::string>();
             d.passive.desc = r["passive"]["desc"].get<std::string>();
             d.startSkill   = r["startSkill"].get<std::string>();

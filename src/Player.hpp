@@ -19,7 +19,12 @@ struct Stats
     int maxDef   = 0;
     int maxDodge = 0;
     int maxSpd = 0;
-
+    // ── Body & Carry Weight ──
+    int bodyWeight      = 70;
+    int strength        = 10;
+    int maxCarryWeight  = 50;
+    int equipWeight     = 0;
+    
     // ── Speed system (Aut-based) ──
     int       moveSpd     = 0;    // bonus จาก equipment/race/skill → move
     int       atkSpd      = 0;    // bonus จาก equipment/race/skill → attack

@@ -239,6 +239,34 @@ void Game::recalcSpeed()
     s.staminaRegen = m_finalStats.staminaRegen;
     if (s.maxStamina == 0) s.maxStamina = m_finalStats.maxStamina;
     if (s.stamina > s.maxStamina) s.stamina = s.maxStamina;
+
+    // ── Weight penalty ──
+    Stats& st = m_player->getStats();
+    const RaceData* race = RaceDB::instance().get(m_selectedRace);
+    st.strength       = race ? race->statBonus.strength   : 10;
+    st.bodyWeight     = race ? race->statBonus.bodyWeight  : 70;
+    st.maxCarryWeight = st.strength * 5;
+
+    // รวม equipment weight
+    int ew = 0;
+    for (auto slot : {EquipSlot::Head, EquipSlot::Body, EquipSlot::Arms,
+                      EquipSlot::Legs, EquipSlot::Feet, EquipSlot::MainHand,
+                      EquipSlot::OffHand})
+    {
+        const Item* it = m_equipment.getItem(slot);
+        if (it) ew += it->weight;
+    }
+    st.equipWeight = ew;
+
+    // penalty จาก (bodyWeight + equipWeight) / maxCarryWeight
+    float ratio = (float)(st.bodyWeight + st.equipWeight) / (float)st.maxCarryWeight;
+    int weightPenalty = ratio <= 1.0f ? 0 :
+                        ratio <= 1.3f ? -1 :
+                        ratio <= 1.6f ? -2 : -3;
+
+    // apply penalty เข้า moveSpd
+    s.moveSpd = std::clamp(ms + weightPenalty, -4, 4);
+    s.moveAut = spdToAut(s.moveSpd);
 }
 
 void Game::regenStamina()
@@ -2850,6 +2878,10 @@ void Game::renderStatsOverlay()
     line("Level:       ", std::to_string(s.level));
     line("EXP:         ", std::to_string(s.exp) + "/" + std::to_string(s.expToNext));
     line("HP:          ", std::to_string(s.hp) + "/" + std::to_string(m_finalStats.maxHp));
+    line("Strength:    ", std::to_string(s.strength));
+    line("Weight:      ", std::to_string(s.bodyWeight + s.equipWeight) + " kg");
+    line("Move Aut:    ", std::to_string(s.moveAut));
+    line("Atk Aut:     ", std::to_string(s.atkAut));
     line("ATK:         ", std::to_string(m_finalStats.atk));
     line("MATK:        ", std::to_string(m_finalStats.matk));
     line("DEF:         ", std::to_string(m_finalStats.def));
