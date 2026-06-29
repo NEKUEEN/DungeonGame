@@ -9,6 +9,63 @@
 #include <optional>
 #include <cmath>
 #include <chrono>
+#include <queue>
+#include <unordered_map>
+
+std::vector<std::pair<int,int>> Game::findPath(int sc, int sr, int ec, int er)
+{
+    int COLS = m_tileMap.getCols();
+    int ROWS = m_tileMap.getRows();
+
+    using P = std::pair<int,int>;
+    auto h   = [&](int c, int r){ return std::abs(c-ec)+std::abs(r-er); };
+    auto key = [&](int c, int r){ return r * COLS + c; };
+
+    std::priority_queue<std::tuple<int,int,int>, std::vector<std::tuple<int,int,int>>, std::greater<>> open;
+    std::unordered_map<int,int> cost;
+    std::unordered_map<int,int> came;
+
+    open.push({0, sc, sr});
+    cost[key(sc,sr)] = 0;
+
+    const int dx[] = {0,0,1,-1,1,1,-1,-1};
+    const int dy[] = {1,-1,0,0,1,-1,1,-1};
+
+    while (!open.empty())
+    {
+        auto [f, c, r] = open.top(); open.pop();
+        if (c==ec && r==er) break;
+
+        for (int i = 0; i < 8; ++i)
+        {
+            int nc = c+dx[i], nr = r+dy[i];
+            if (nc<0||nr<0||nc>=COLS||nr>=ROWS) continue;
+            if (!m_tileMap.isWalkable(nc, nr)) continue;
+
+            int newCost = cost[key(c,r)] + 1;
+            int nk = key(nc,nr);
+            if (!cost.count(nk) || newCost < cost[nk])
+            {
+                cost[nk] = newCost;
+                came[nk] = key(c,r);
+                open.push({newCost + h(nc,nr), nc, nr});
+            }
+        }
+    }
+
+    std::vector<P> path;
+    int cur   = key(ec,er);
+    int start = key(sc,sr);
+    if (!came.count(cur)) return {};
+
+    while (cur != start)
+    {
+        path.push_back({cur % COLS, cur / COLS});
+        cur = came[cur];
+    }
+    std::reverse(path.begin(), path.end());
+    return path;
+}
 
 // ============================================================
 //  Constructor / Destructor
@@ -1104,15 +1161,13 @@ void Game::fireRangedAt(int targetCol, int targetRow)
 // ============================================================
 void Game::newDungeon(bool keepPlayer)
 {
-    if (m_dungeonFloor == 1)
+    // Game.cpp บรรทัด 1107-1115 แก้เป็น:
+
     {
-        if (!m_tileMap.loadFromTiled("assets/data/map_floor1.tmj"))
-        {
+        std::string path = "assets/data/map_floor" + std::to_string(m_dungeonFloor) + ".tmj";
+        if (!m_tileMap.loadFromTiled(path))
             m_tileMap.generate();
-        }
     }
-    else
-        m_tileMap.generate();
 
     m_mapCols = m_tileMap.getCols();
     m_mapRows = m_tileMap.getRows();
@@ -1487,6 +1542,24 @@ void Game::update()
         if (m_ui.levelUpTimer <= 0) m_ui.levelUpFlash = false;
     }
     if (m_deltaTimer > 0) m_deltaTimer--;
+
+    // ✅ update hover ทุกเฟรมตาม mouse position จริง
+    if (!m_playerDead && !m_inRaceSelect)
+    {
+        sf::Vector2i mousePixel = sf::Mouse::getPosition(m_window);
+        sf::Vector2f uiPos  = m_window.mapPixelToCoords(mousePixel, m_uiView);
+        sf::Vector2f world  = m_window.mapPixelToCoords(mousePixel, m_gameView);
+        if (uiPos.x < GAME_VIEW_W && uiPos.y < GAME_VIEW_H)
+        {
+            m_hoverCol = std::clamp((int)(world.x / TILE_SIZE), 0, m_mapCols - 1);
+            m_hoverRow = std::clamp((int)(world.y / TILE_SIZE), 0, m_mapRows - 1);
+        }
+        else
+        {
+            m_hoverCol = -1;
+            m_hoverRow = -1;
+        }
+    }
 }
 
 // ============================================================
@@ -1592,6 +1665,8 @@ void Game::processEvents()
                 case sf::Keyboard::Key::B:  handlePlayerMove(-1, 1); break;
                 case sf::Keyboard::Key::N:  handlePlayerMove(1,  1); break;
 
+                
+
                 case sf::Keyboard::Key::Num1: executeSkill(0); break;
                 case sf::Keyboard::Key::Num2: executeSkill(1); break;
                 case sf::Keyboard::Key::Num3: executeSkill(2); break;
@@ -1693,7 +1768,45 @@ void Game::processEvents()
                     //m_ui.selectedInvSlot = (m_ui.selectedInvSlot + 1) % MAX_INVENTORY;
                     //break;
             }
+            
         }
+        if (const auto* click = event->getIf<sf::Event::MouseButtonPressed>())
+        {
+            if (click->button == sf::Mouse::Button::Left && !m_playerDead && !m_inRaceSelect)
+            {
+                sf::Vector2f uiPos = m_window.mapPixelToCoords(
+                    {click->position.x, click->position.y}, m_uiView);
+                sf::Vector2f world = m_window.mapPixelToCoords(
+                    {click->position.x, click->position.y}, m_gameView);
+                if (uiPos.x < GAME_VIEW_W && uiPos.y < GAME_VIEW_H)
+                {
+                    int col = std::clamp((int)(world.x / TILE_SIZE), 0, m_mapCols - 1);
+                    int row = std::clamp((int)(world.y / TILE_SIZE), 0, m_mapRows - 1);
+                    //m_hoverCol = col;  // ✅ update hover ด้วย
+                    //m_hoverRow = row;
+                    handleMouseMove(col, row);
+                }
+            }
+        }
+        if (const auto* moved = event->getIf<sf::Event::MouseMoved>())
+        {
+            sf::Vector2f uiPos = m_window.mapPixelToCoords(
+                {moved->position.x, moved->position.y}, m_uiView);
+            sf::Vector2f world = m_window.mapPixelToCoords(
+                {moved->position.x, moved->position.y}, m_gameView);
+
+            if (uiPos.x < GAME_VIEW_W && uiPos.y < GAME_VIEW_H)
+            {
+                //m_hoverCol = std::clamp((int)(world.x / TILE_SIZE), 0, m_mapCols - 1);
+                //m_hoverRow = std::clamp((int)(world.y / TILE_SIZE), 0, m_mapRows - 1);
+            }
+            else
+            {
+                //m_hoverCol = -1;
+                //m_hoverRow = -1;
+            }
+        }
+        
     }
 }
 
@@ -1723,6 +1836,7 @@ void Game::tryDescendStairs()
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
+        updateCamera();
     }
     addLog("  Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,220,50));
 }
@@ -1749,6 +1863,7 @@ void Game::tryAscendStairs()
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
+        updateCamera();
     }
     addLog("  Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(100,220,255));
 }
@@ -1792,7 +1907,7 @@ void Game::tryPickupItem()
 
             m_inventory.addItem(item);
             m_mapItems.erase(m_mapItems.begin()+i);
-            addLog("  Picked up: "+item.name,sf::Color(180,220,100));
+            addLog("  Picked up: "+item.name);
             return;
         }
     addLog("  Nothing here.");
@@ -1923,6 +2038,25 @@ void Game::dropSelectedItem()
 // ============================================================
 //  Movement & Combat
 // ============================================================
+void Game::handleMouseMove(int targetCol, int targetRow)
+{
+    if (!m_player) return;
+    
+    int pc = m_player->getCol();
+    int pr = m_player->getRow();
+    auto path = findPath(pc, pr, targetCol, targetRow);
+    
+    std::cerr << "[Mouse] path size=" << path.size() << "\n";
+    
+    if (!path.empty())
+    {
+        int dc = path[0].first  - pc;
+        int dr = path[0].second - pr;
+        std::cerr << "[Mouse] moving dc=" << dc << " dr=" << dr << "\n";
+        handlePlayerMove(dc, dr);
+    }
+}
+
 void Game::handlePlayerMove(int dc, int dr)
 {
     if (!m_player) return;
@@ -2407,6 +2541,17 @@ void Game::render()
     if (m_player) m_player->render(m_window);
     m_fog.render(m_window,TILE_SIZE);
 
+    if (m_hoverCol >= 0 && m_hoverRow >= 0)
+    {
+        sf::RectangleShape highlight({(float)TILE_SIZE, (float)TILE_SIZE});
+        highlight.setPosition({(float)(m_hoverCol * TILE_SIZE), 
+                                (float)(m_hoverRow * TILE_SIZE)});
+        highlight.setFillColor(sf::Color(255, 255, 255, 40));
+        highlight.setOutlineColor(sf::Color(255, 255, 255, 150));
+        highlight.setOutlineThickness(2.f);
+        m_window.draw(highlight);
+    }
+
     if (m_ui.targeting.active) renderTargeting();
 
     m_window.setView(m_uiView);
@@ -2705,7 +2850,10 @@ void Game::renderItems()
         {
             sf::Sprite spr(*tex);
             sf::Vector2u sz=tex->getSize();
-            float scale=ts*0.6f/std::max((float)sz.x,(float)sz.y);
+            //float rawScale = ts * 0.6f / std::max((float)sz.x, (float)sz.y);
+            //float scale = std::max(1.f, std::floor(rawScale)); // snap เป็น 1, 2, 3...
+            //spr.setScale({scale, scale});
+            float scale=ts * 0.8f /std::max((float)sz.x,(float)sz.y);
             spr.setScale({scale,scale});
             spr.setPosition({px+ts*0.2f,py+ts*0.2f});
             m_window.draw(spr);

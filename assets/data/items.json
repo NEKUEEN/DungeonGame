@@ -157,6 +157,25 @@
     "stackable": false
     },
     {
+    "id": "axe",
+    "name": "Axe",
+    "type": "Weapon",
+    "desc": "A Axe. 25% chance to bleed.",
+    "value": 3,
+    "weight": 2,
+    "baseAtkAut": 90,
+    "atk": 0,
+    "def": 0,
+    "damage_type": "cleave",
+    "cleave_dmg": 5,
+    "on_hit_status": "bleed",
+    "on_hit_power": 1,
+    "on_hit_duration": 10,
+    "on_hit_chance": 25,
+    "sprite": "Axe.png",
+    "stackable": false
+    },
+    {
       "id": "wand",
       "name": "Wand",
       "type": "Weapon",

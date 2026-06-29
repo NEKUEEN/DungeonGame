@@ -41,7 +41,7 @@ constexpr int TILE_SIZE       = 64;
 constexpr int MAP_COLS        = 50;
 constexpr int MAP_ROWS        = 50;
 constexpr int VIEW_RADIUS     = 10;
-constexpr int DARK_ZONE_VIEW_RADIUS = 2;  // ระยะมองเห็นในโซนมืด (เช่น Darkness) — ไม่มีไฟ
+constexpr int DARK_ZONE_VIEW_RADIUS = 1;  // ระยะมองเห็นในโซนมืด (เช่น Darkness) — ไม่มีไฟ
 constexpr int MAX_ENEMIES     = 100;
 constexpr int RESPAWN_TURNS   = 12;
 constexpr int BOSS_KILL_THRESHOLD = 50;
@@ -114,6 +114,8 @@ private:
 
     // player actions
     void handlePlayerMove(int dc, int dr);
+    std::vector<std::pair<int,int>> findPath(int sc, int sr, int ec, int er);
+    void handleMouseMove(int col, int row);
     void handleInventoryInput(sf::Keyboard::Key key);
     void tryPickupItem();
     void useOrEquipSelected();
@@ -162,8 +164,10 @@ private:
     std::set<std::string> m_firstKillDone;  // id ที่เคย first kill แล้ว
     void onEnemyKilled(Enemy* enemy);
     void spawnBoss(const std::string& family);
-
-
+    
+    //tileMousse sel
+    int m_hoverCol = -1;
+    int m_hoverRow = -1;
 
     // ตัวช่วยคำนวณ FinalStats
     void recalcAllStats();      // เรียกทุกครั้งที่ equipment / core / skill เปลี่ยน
@@ -193,6 +197,7 @@ private:
     void newDungeon(bool keepPlayer = false);
     void updateCamera();
     void applyLetterbox();
+
 
     // สมาชิก
     sf::RenderWindow m_window;

@@ -23,6 +23,7 @@ public:
             std::cerr << "[TextureManager] Failed: " << path << "\n";
             return;
         }
+        tex.setSmooth(false);
         m_textures.emplace(name, std::move(tex));
     }
 
@@ -96,6 +97,7 @@ public:
         load("shield",    "assets/textures/shield.png");
         load("sword", "assets/textures/sword.png");
         load("bow", "assets/textures/bow.png");
+        load("Axe", "assets/textures/Axe.png");
         load("itemArrow", "assets/textures/itemArrow.png");
         
 

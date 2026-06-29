@@ -25,6 +25,14 @@
         {
           "item": "rat_core",
           "chance": 0.99
+        },
+        {
+          "item": "axe",
+          "chance": 1.0
+        },
+        {
+          "item": "mace1",
+          "chance": 1.0
         }
       ]
     },
