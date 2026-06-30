@@ -21,8 +21,8 @@
 #include "StatBonus.hpp"
 #include "RaceDB.hpp"
 
-constexpr int WINDOW_W        = 800;
-constexpr int WINDOW_H        = 600;
+constexpr int WINDOW_W        = 1366;
+constexpr int WINDOW_H        = 768;
 constexpr int RIGHT_PANEL_W   = 250;
 constexpr int LOG_PANEL_H     = 170;
 constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;
@@ -111,6 +111,7 @@ private:
     //Race
     std::string m_selectedRace = "";
     bool m_inRaceSelect = true;  // เริ่มที่หน้าเลือกเผ่า
+    int m_hoverRaceIdx = -1;
 
     // player actions
     void handlePlayerMove(int dc, int dr);
@@ -168,6 +169,9 @@ private:
     //tileMousse sel
     int m_hoverCol = -1;
     int m_hoverRow = -1;
+    std::vector<std::pair<int,int>> m_travelPath;
+    int m_travelStep = 0;
+    bool m_travelMode = false; // true = travel, false = single step
 
     // ตัวช่วยคำนวณ FinalStats
     void recalcAllStats();      // เรียกทุกครั้งที่ equipment / core / skill เปลี่ยน

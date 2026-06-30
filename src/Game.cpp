@@ -1560,6 +1560,53 @@ void Game::update()
             m_hoverRow = -1;
         }
     }
+    if (m_inRaceSelect)
+    {
+        sf::Vector2i mousePixel = sf::Mouse::getPosition(m_window);
+        sf::Vector2f uiPos = m_window.mapPixelToCoords(mousePixel, m_uiView);
+
+        const float CARD_W = 180.f;
+        const float CARD_H = 205.f;
+        const float GAP    = 12.f;
+        const int   COLS   = 3;
+        const int   TOTAL  = 6;
+
+        float gridW = COLS * CARD_W + (COLS - 1) * GAP;
+        float startX = (float)WINDOW_W/2.f - gridW/2.f;
+        float startY = 80.f;
+
+        for (int i = 0; i < TOTAL; ++i)
+        {
+            int col = i % COLS;
+            int row = i / COLS;
+            float cx = startX + col * (CARD_W + GAP);
+            float cy = startY + row * (CARD_H + GAP);
+            if (uiPos.x >= cx && uiPos.x <= cx + CARD_W &&
+                uiPos.y >= cy && uiPos.y <= cy + CARD_H)
+            { m_ui.selectedRace = i; break; }  // ✅ sync ไปที่ keyboard selection เลย
+        }
+        return;
+    }
+    // travel — เดินทีละ step ต่อเฟรมที่ player พร้อม
+    if (!m_travelPath.empty() && m_player && !m_playerDead)
+    {
+        // หยุดถ้าเจอศัตรูระหว่าง travel
+        for (auto* e : m_enemies)
+            if (!e->isDead() && m_fog.isVisible(e->getCol(), e->getRow()))
+            { m_travelPath.clear(); break; }
+
+        if (!m_travelPath.empty() && m_travelStep < (int)m_travelPath.size())
+        {
+            int pc = m_player->getCol();
+            int pr = m_player->getRow();
+            int dc = m_travelPath[m_travelStep].first  - pc;
+            int dr = m_travelPath[m_travelStep].second - pr;
+            handlePlayerMove(dc, dr);
+            m_travelStep++;
+            if (m_travelStep >= (int)m_travelPath.size())
+                m_travelPath.clear();
+        }
+    }
 }
 
 // ============================================================
@@ -1595,6 +1642,45 @@ void Game::processEvents()
             m_window.close();
                 return;
         }
+        if (const auto* click = event->getIf<sf::Event::MouseButtonPressed>())
+        {
+            if (click->button == sf::Mouse::Button::Left)
+            {
+                sf::Vector2f uiPos = m_window.mapPixelToCoords(
+                    {click->position.x, click->position.y}, m_uiView);
+
+                const float CARD_W = 180.f;
+                const float CARD_H = 205.f;
+                const float GAP    = 12.f;
+                const int   COLS   = 3;
+                const int   TOTAL  = 6;
+
+                float gridW = COLS * CARD_W + (COLS - 1) * GAP;
+                float startX = (float)WINDOW_W/2.f - gridW/2.f;
+                float startY = 80.f;
+
+                for (int i = 0; i < TOTAL; ++i)
+                {
+                    int col = i % COLS;
+                    int row = i / COLS;
+                    float cx = startX + col * (CARD_W + GAP);
+                    float cy = startY + row * (CARD_H + GAP);
+
+                    if (uiPos.x >= cx && uiPos.x <= cx + CARD_W &&
+                        uiPos.y >= cy && uiPos.y <= cy + CARD_H)
+                    {
+                        auto& races = RaceDB::instance().getAll();
+                        if (i < (int)races.size())
+                        {
+                            m_selectedRace = races[i].id;
+                            m_inRaceSelect = false;
+                            newDungeon(false);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
         return;
     }
         if (const auto* key = event->getIf<sf::Event::KeyPressed>())
@@ -1602,6 +1688,7 @@ void Game::processEvents()
             // F11 toggle fullscreen
             if (key->code == sf::Keyboard::Key::F11)
             {
+                m_travelPath.clear();
                 m_isFullscreen = !m_isFullscreen;
                 if (m_isFullscreen)
                     m_window.create(sf::VideoMode::getDesktopMode(), "Dungeon and Stone", sf::Style::None);
@@ -2041,19 +2128,33 @@ void Game::dropSelectedItem()
 void Game::handleMouseMove(int targetCol, int targetRow)
 {
     if (!m_player) return;
-    
+    if (!m_tileMap.isWalkable(targetCol, targetRow)) return;
+
     int pc = m_player->getCol();
     int pr = m_player->getRow();
+
+    // เช็คศัตรูในสายตา
+    bool enemyVisible = false;
+    for (auto* e : m_enemies)
+        if (!e->isDead() && m_fog.isVisible(e->getCol(), e->getRow()))
+        { enemyVisible = true; break; }
+
     auto path = findPath(pc, pr, targetCol, targetRow);
-    
-    std::cerr << "[Mouse] path size=" << path.size() << "\n";
-    
-    if (!path.empty())
+    if (path.empty()) return;
+
+    if (enemyVisible)
     {
+        // single step — เดินแค่ก้าวเดียว
         int dc = path[0].first  - pc;
         int dr = path[0].second - pr;
-        std::cerr << "[Mouse] moving dc=" << dc << " dr=" << dr << "\n";
         handlePlayerMove(dc, dr);
+        m_travelPath.clear();
+    }
+    else
+    {
+        // travel — เดินต่อเนื่อง
+        m_travelPath = path;
+        m_travelStep = 0;
     }
 }
 
@@ -2855,7 +2956,8 @@ void Game::renderItems()
             //spr.setScale({scale, scale});
             float scale=ts * 0.8f /std::max((float)sz.x,(float)sz.y);
             spr.setScale({scale,scale});
-            spr.setPosition({px+ts*0.2f,py+ts*0.2f});
+            spr.setPosition({px+ts*0.1f ,py+ts*0.1f});
+            //spr.setPosition({px+ts*0.2f,py+ts*0.2f});
             m_window.draw(spr);
         }
         else
@@ -3414,7 +3516,7 @@ void Game::renderRaceSelect()
         float cx = startX + col * (CARD_W + GAP);
         float cy = startY + row * (CARD_H + GAP);
 
-        bool sel     = (i == m_ui.selectedRace);
+        bool sel = (i == m_ui.selectedRace);
         bool isEmpty = (i >= (int)races.size()); // slot ???
 
         // card bg
