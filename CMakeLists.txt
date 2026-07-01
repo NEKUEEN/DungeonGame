@@ -19,10 +19,16 @@ set(SOURCES
     src/Equipment.cpp
     src/CoreSlots.cpp
     src/Skill.cpp
+    src/NPC.cpp
+    src/Party.cpp
+    src/NPCDB.cpp
+    src/NPCManager.cpp
+    src/PartyUI.cpp
 )
 
 add_executable(DungeonGame ${SOURCES}
-    src/StatusEffect.hpp)
+    src/StatusEffect.hpp
+    src/PartyUI.hpp)
 target_include_directories(DungeonGame PRIVATE src src/lib)
 target_link_libraries(DungeonGame PRIVATE SFML::Graphics SFML::Window SFML::System)
 

@@ -1,0 +1,52 @@
+=== PATCH 1: handlePlayerMove — บันทึก trail หลังผู้เล่นขยับ ===
+
+หาบรรทัดนี้ใน handlePlayerMove():
+    bool moved=m_player->tryMove(dc,dr,m_tileMap);
+    if (!moved) return;
+
+เพิ่มหลัง "if (!moved) return;":
+    // บันทึกตำแหน่งให้ trail ของ party ทุกครั้งที่ player ขยับ
+    Party::instance().recordLeaderStep(m_player->getCol(), m_player->getRow(), m_player->getFacingLeft());
+
+=== PATCH 2: updatePartyFollowPositions — ใช้ trail แทน simple follow ===
+
+แทนที่ฟังก์ชัน updatePartyFollowPositions() ทั้งหมดด้วย:
+
+void Game::updatePartyFollowPositions()
+{
+    auto& party = Party::instance();
+    if (party.size() == 0 || !m_player) return;
+
+    for (int i = 0; i < party.size(); i++)
+    {
+        auto companion = party.getMember(i);
+        if (!companion) continue;
+
+        // companion i ดูตำแหน่ง trail[(i+1) * TRAIL_SPACING]
+        int trailIdx = (i + 1) * Party::TRAIL_SPACING;
+        const TrailPoint* tp = party.getTrailPoint(trailIdx);
+        if (!tp) continue;
+
+        companion->setPos(tp->col, tp->row);
+        companion->setFacing(tp->facingLeft);
+    }
+}
+
+=== PATCH 3: render() — วาด companion ใน world view ===
+
+หาบรรทัดนี้ใน render():
+    m_npcManager.render(m_window);
+    if (m_player) m_player->render(m_window);
+
+เพิ่มระหว่างสองบรรทัดนั้น:
+    // วาด party companions ใน world (ลบออกจาก npcManager ตอน recruit แล้ว ต้องวาดแยก)
+    for (auto& companion : Party::instance().getMembers())
+        if (companion) m_npcManager.renderNPC(m_window, companion);
+
+=== PATCH 4: renderPartyUI() — ส่ง player เข้าไปด้วย ===
+
+แทนที่:
+    m_partyUI.render(m_window, Party::instance());
+ด้วย:
+    m_partyUI.render(m_window, Party::instance(), m_player);
+

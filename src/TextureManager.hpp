@@ -99,6 +99,13 @@ public:
         load("bow", "assets/textures/bow.png");
         load("Axe", "assets/textures/Axe.png");
         load("itemArrow", "assets/textures/itemArrow.png");
+        //NpC
+        load("npc_healer",   "assets/textures/npc_healer.png");
+        load("npc_warrior",  "assets/textures/npc_warrior.png");
+        load("npc_mage",     "assets/textures/npc_mage.png");
+        load("npc_rogue",    "assets/textures/npc_rogue.png");
+        load("npc_merchant", "assets/textures/npc_merchant.png");
+        load("npc_elder",    "assets/textures/npc_elder.png");
         
 
 

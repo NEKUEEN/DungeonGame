@@ -21,7 +21,9 @@ private:
                     int cx, int cy, int rx, int ry,
                     int radius, const class TileMap& map);
     void markVisible(int col, int row);
-
+    
+    sf::VertexArray m_va;  // ← เพิ่มตรงนี้
+    
     int m_cols, m_rows;
     std::vector<std::vector<FogState>> m_grid;
 };

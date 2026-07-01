@@ -192,6 +192,9 @@ public:
                 [&](const SkillInstance& sk){ return sk.data.id == skillId; }),
             m_skills.end());
     }
+    void setFacing(bool left)   { m_facingLeft = left; }
+    bool getFacingLeft()  const { return m_facingLeft; }
+
 
 private:
     void drawHPBar(sf::RenderWindow& window);
@@ -201,7 +204,8 @@ private:
     sf::Texture m_texture;
     sf::Sprite* m_sprite    = nullptr;
     bool        m_hasSprite = false;
-
+    bool m_facingLeft = false;
+    
     std::vector<SkillInstance> m_skills;
 
     // Hotbar — เก็บ skill id ที่ assign ไว้ใน slot 0-8

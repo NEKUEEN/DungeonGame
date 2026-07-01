@@ -20,6 +20,9 @@
 #include "UIState.hpp"
 #include "StatBonus.hpp"
 #include "RaceDB.hpp"
+#include "NPCManager.hpp"
+#include "NPCDB.hpp"
+#include "PartyUI.hpp"
 
 constexpr int WINDOW_W        = 1366;
 constexpr int WINDOW_H        = 768;
@@ -107,6 +110,7 @@ private:
     void renderTargeting();
     void renderStatsOverlay();
     void renderDeathScreen();
+    void renderPartyUI();
 
     //Race
     std::string m_selectedRace = "";
@@ -149,6 +153,10 @@ private:
     void spawnEnemy(int floor);
     void spawnEnemies(int count);
     void spawnItems();
+    void spawnNPCs(int count = 3);  // Spawn random NPCs
+    void recruitNPC(const std::string& npcId);  // Add NPC to party
+    void tryInteractNPC();  // Try to interact with adjacent NPC
+    void updatePartyFollowPositions();  // Update companion positions (follow player)
     void clearEnemies();
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
@@ -172,6 +180,9 @@ private:
     std::vector<std::pair<int,int>> m_travelPath;
     int m_travelStep = 0;
     bool m_travelMode = false; // true = travel, false = single step
+    sf::Clock m_hoverLockClock;
+    bool m_hoverLocked = false;
+    int m_lockedHoverCol = -1, m_lockedHoverRow = -1;
 
     // ตัวช่วยคำนวณ FinalStats
     void recalcAllStats();      // เรียกทุกครั้งที่ equipment / core / skill เปลี่ยน
@@ -221,6 +232,7 @@ private:
     Inventory            m_inventory;
     Equipment            m_equipment;
     CoreSlots            m_coreSlots;
+    NPCManager           m_npcManager{TILE_SIZE};
 
     UIState m_ui;
     FinalStats m_finalStats;   // รวม stat ที่คำนวณแล้ว
@@ -278,4 +290,8 @@ private:
     std::vector<StatusIconCache> m_passiveCache;
     std::vector<StatusIconCache> m_buffCache;
     std::vector<StatusIconCache> m_statusEffectCache;
+    
+    // Party UI and follow system
+    PartyUI m_partyUI;
+    std::vector<std::pair<int, int>> m_partyFollowPath;  // For smooth party movement
 };

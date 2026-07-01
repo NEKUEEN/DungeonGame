@@ -69,6 +69,14 @@ void Player::render(sf::RenderWindow& window)
 
     if (m_hasSprite && m_sprite)
     {
+        auto bounds = m_sprite->getLocalBounds();
+        float scaleX = m_facingLeft ? -1.f : 1.f;
+        m_sprite->setScale({scaleX * std::abs(m_sprite->getScale().x), m_sprite->getScale().y});
+
+        // ปรับ origin ให้ flip ไม่หลุดตำแหน่ง
+        float originX = m_facingLeft ? (bounds.position.x + bounds.size.x) : bounds.position.x;
+        m_sprite->setOrigin({originX, bounds.position.y});
+        //m_sprite->setPosition({px + (m_facingLeft ? ts : 0.f), py});
         m_sprite->setPosition({px, py});
         window.draw(*m_sprite);
     }

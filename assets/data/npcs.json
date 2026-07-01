@@ -1,0 +1,59 @@
+{
+  "npcs": [
+    {
+      "id": "sarah_healer",
+      "name": "Sarah",
+      "type": "Companion",
+      "role": "Healer",
+      "level": 1,
+      "desc": "A skilled healer who can restore your party's health.",
+      "sprite": "npc_healer.png",
+      "recruitCost": 0
+    },
+    {
+      "id": "kratos_warrior",
+      "name": "Kratos",
+      "type": "Companion",
+      "role": "Warrior",
+      "level": 1,
+      "desc": "A strong warrior ready to fight at your side.",
+      "sprite": "npc_warrior.png",
+      "recruitCost": 0
+    },
+    {
+      "id": "mage_apprentice",
+      "name": "Lydia",
+      "type": "Companion",
+      "role": "Mage",
+      "level": 1,
+      "desc": "A young mage with powerful spells.",
+      "sprite": "npc_mage.png",
+      "recruitCost": 0
+    },
+    {
+      "id": "rogue_scout",
+      "name": "Shadow",
+      "type": "Companion",
+      "role": "Rogue",
+      "level": 1,
+      "desc": "A quick and agile rogue scout.",
+      "sprite": "npc_rogue.png",
+      "recruitCost": 0
+    },
+    {
+      "id": "merchant_bob",
+      "name": "Bob the Merchant",
+      "type": "Merchant",
+      "desc": "Sells various items and equipment.",
+      "sprite": "npc_merchant.png",
+      "items": ["health_potion", "bread", "apple", "dagger", "shield"]
+    },
+    {
+      "id": "questgiver_elder",
+      "name": "Elder Wise",
+      "type": "QuestGiver",
+      "desc": "Offers quests and wisdom.",
+      "sprite": "npc_elder.png"
+    }
+  ]
+}

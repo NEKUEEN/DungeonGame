@@ -4,6 +4,7 @@
 #include "StatusEffect.hpp"
 #include "StatusEffectDB.hpp"
 #include "DropTable.hpp"
+#include "Party.hpp"
 #include <iostream>
 #include <algorithm>
 #include <optional>
@@ -87,6 +88,7 @@ Game::Game()
     SkillDB::instance().load("assets/data/skills.json");
     RaceDB::instance().load("assets/data/races.json");
     StatusEffectDB::instance().load("assets/data/status_effects.json");
+    NPCDB::instance().load("assets/data/npcs.json");
     std::cerr << "[RaceDB] loaded: " << RaceDB::instance().getAll().size() << " races\n";
 
     m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
@@ -1233,6 +1235,7 @@ void Game::newDungeon(bool keepPlayer)
 
     clearEnemies(); spawnEnemies(8+m_dungeonFloor);
     m_mapItems.clear(); spawnItems();
+    m_npcManager.clear(); spawnNPCs(3);
     m_respawnTimer=0;
 
     if (m_player)
@@ -1527,6 +1530,60 @@ void Game::spawnItems()
     }
 }
 
+void Game::spawnNPCs(int count)
+{
+    std::uniform_int_distribution<int> colDist(1, m_mapCols - 2);
+    std::uniform_int_distribution<int> rowDist(1, m_mapRows - 2);
+
+    auto& npcDB = NPCDB::instance();
+    auto& allNPCs = npcDB.getAll();
+
+    if (allNPCs.empty()) return;
+
+    // เลือก NPC บางตัวไปวาง
+    std::vector<std::string> npcIds;
+    for (const auto& pair : allNPCs)
+        npcIds.push_back(pair.first);
+
+    int spawnCount = std::min(count, (int)npcIds.size());
+    std::shuffle(npcIds.begin(), npcIds.end(), m_rng);
+
+    for (int i = 0; i < spawnCount; ++i)
+    {
+        std::string id = npcIds[i];
+        for (int att = 0; att < 50; ++att)
+        {
+            int col = colDist(m_rng);
+            int row = rowDist(m_rng);
+            if (!m_tileMap.isWalkable(col, row)) continue;
+
+            // ห่างจาก player
+            if (m_player)
+            {
+                int dx = col - m_player->getCol();
+                int dy = row - m_player->getRow();
+                if (dx*dx + dy*dy < 49) continue;
+            }
+
+            // ห่างจาก NPC อื่น
+            bool blocked = false;
+            for (const auto& npc : m_npcManager.getAll())
+            {
+                if (npc->getCol() == col && npc->getRow() == row)
+                { blocked = true; break; }
+            }
+            if (blocked) continue;
+
+            auto npc = npcDB.createNPC(id);
+            if (!npc) break;
+
+            npc->setPos(col, row);
+            m_npcManager.add(npc);
+            break;
+        }
+    }
+}
+
 void Game::clearEnemies(){for(auto*e:m_enemies)delete e;m_enemies.clear();}
 
 // ============================================================
@@ -1546,18 +1603,28 @@ void Game::update()
     // ✅ update hover ทุกเฟรมตาม mouse position จริง
     if (!m_playerDead && !m_inRaceSelect)
     {
-        sf::Vector2i mousePixel = sf::Mouse::getPosition(m_window);
-        sf::Vector2f uiPos  = m_window.mapPixelToCoords(mousePixel, m_uiView);
-        sf::Vector2f world  = m_window.mapPixelToCoords(mousePixel, m_gameView);
-        if (uiPos.x < GAME_VIEW_W && uiPos.y < GAME_VIEW_H)
+        if (m_hoverLocked)
         {
-            m_hoverCol = std::clamp((int)(world.x / TILE_SIZE), 0, m_mapCols - 1);
-            m_hoverRow = std::clamp((int)(world.y / TILE_SIZE), 0, m_mapRows - 1);
+            if (m_hoverLockClock.getElapsedTime().asSeconds() >= 0.5f)
+                m_hoverLocked = false;
+            else
+            {
+                m_hoverCol = m_lockedHoverCol;
+                m_hoverRow = m_lockedHoverRow;
+            }
         }
-        else
+
+        if (!m_hoverLocked)
         {
-            m_hoverCol = -1;
-            m_hoverRow = -1;
+            sf::Vector2i mousePixel = sf::Mouse::getPosition(m_window);
+            sf::Vector2f uiPos  = m_window.mapPixelToCoords(mousePixel, m_uiView);
+            sf::Vector2f world  = m_window.mapPixelToCoords(mousePixel, m_gameView);
+            if (uiPos.x < GAME_VIEW_W && uiPos.y < GAME_VIEW_H)
+            {
+                m_hoverCol = std::clamp((int)(world.x / TILE_SIZE), 0, m_mapCols - 1);
+                m_hoverRow = std::clamp((int)(world.y / TILE_SIZE), 0, m_mapRows - 1);
+            }
+            else { m_hoverCol = -1; m_hoverRow = -1; }
         }
     }
     if (m_inRaceSelect)
@@ -1604,9 +1671,16 @@ void Game::update()
             handlePlayerMove(dc, dr);
             m_travelStep++;
             if (m_travelStep >= (int)m_travelPath.size())
+            {
+                m_lockedHoverCol = m_player->getCol();
+                m_lockedHoverRow = m_player->getRow();
+                m_hoverLocked = true;
+                m_hoverLockClock.restart();
                 m_travelPath.clear();
+            }
         }
     }
+    
 }
 
 // ============================================================
@@ -1811,7 +1885,7 @@ void Game::processEvents()
                     //break;
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
-                case sf::Keyboard::Key::Space:  waitTurn();         break;
+                case sf::Keyboard::Key::Space:  tryInteractNPC();   break;  // Try to recruit NPC, otherwise wait
                 case sf::Keyboard::Key::F: enterBowTargeting(); break;
                 case sf::Keyboard::Key::X:
                     if (m_ui.isPanelOpen(UIState::Panel::Cores))
@@ -2176,16 +2250,19 @@ void Game::handlePlayerMove(int dc, int dr)
             ms.nextActTime += ms.atkAut;
             processTurn(); tryRespawnEnemies(); recalcSpeed();
             auto t1 = std::chrono::high_resolution_clock::now();
-recomputeFog();
-auto t2 = std::chrono::high_resolution_clock::now();
-auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
-//addLog("fog: " + std::to_string(ms2) + "ms", sf::Color(100,255,100));
+            recomputeFog();
+            auto t2 = std::chrono::high_resolution_clock::now();
+            auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
+            //addLog("fog: " + std::to_string(ms2) + "ms", sf::Color(100,255,100));
             updateCamera(); return;
+            
         }
-
+    if (dc < 0) m_player->setFacing(false);
+    else if (dc > 0) m_player->setFacing(true);
     bool moved=m_player->tryMove(dc,dr,m_tileMap);
     if (!moved) return;
-
+        // บันทึกตำแหน่งให้ trail ของ party ทุกครั้งที่ player ขยับ
+    Party::instance().recordLeaderStep(m_player->getCol(), m_player->getRow(), m_player->getFacingLeft());
     
     m_globalTime = ms.nextActTime;
     ms.nextActTime += ms.moveAut;
@@ -2622,6 +2699,7 @@ void Game::processTurn()
             [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
         m_enemies.end());
 
+    updatePartyFollowPositions();  // Update companion positions after turn
     recalcAllStats();
 }
 
@@ -2639,6 +2717,11 @@ void Game::render()
     renderItems();
     for (auto*e:m_enemies)
         if (m_fog.isVisible(e->getCol(),e->getRow())) e->render(m_window);
+    m_npcManager.render(m_window);
+    // วาด party companions ใน world (ลบออกจาก npcManager ตอน recruit แล้ว ต้องวาดแยก)
+    for (auto& companion : Party::instance().getMembers())
+    if (companion) m_npcManager.renderNPC(m_window, companion);
+
     if (m_player) m_player->render(m_window);
     m_fog.render(m_window,TILE_SIZE);
 
@@ -2662,6 +2745,7 @@ void Game::render()
     if (m_ui.activePanel == UIState::Panel::Stats) renderStatsOverlay();
     renderHotbar();
     renderStatusEffects();  // ← เพิ่ม
+    renderPartyUI();        // ← Party UI overlay
     if (m_ui.levelUpFlash) renderLevelUpEffect();
     if (m_playerDead) renderDeathScreen();
 
@@ -3782,5 +3866,105 @@ void Game::renderStatusEffects()
         }
         c.durTxt->setPosition({sx + 2.f, Y + SZ - 11.f});
         m_window.draw(*c.durTxt);
+    }
+}
+
+void Game::renderPartyUI()
+{
+    m_partyUI.render(m_window, Party::instance(), m_player);
+}
+
+void Game::recruitNPC(const std::string& npcId)
+{
+    // Get NPC template from database
+    auto npcData = NPCDB::instance().get(npcId);
+    if (!npcData)
+    {
+        addLog("Could not recruit: NPC not found");
+        return;
+    }
+    
+    // Create NPC instance
+    auto npc = NPCDB::instance().createNPC(npcId);
+    if (!npc)
+    {
+        addLog("Could not create NPC instance");
+        return;
+    }
+    
+    // Try to add to party
+    auto& party = Party::instance();
+    if (party.isFull())
+    {
+        addLog("Party is full!");
+        return;
+    }
+    
+    if (party.hasMember(npc->getId()))
+    {
+        addLog(npc->getName() + " is already in your party");
+        return;
+    }
+    
+    party.addMember(npc);
+    addLog("Recruited " + npc->getName() + "!");
+    
+    // Remove from map and NPC manager
+    m_npcManager.remove(npcId);
+}
+
+void Game::tryInteractNPC()
+{
+    if (!m_player) return;
+    
+    int playerCol = m_player->getCol();
+    int playerRow = m_player->getRow();
+    
+    // Check all 8 adjacent tiles for NPCs
+    int dx[] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    int dy[] = {-1, -1, -1, 0, 0, 1, 1, 1};
+    
+    for (int i = 0; i < 8; i++)
+    {
+        int checkCol = playerCol + dx[i];
+        int checkRow = playerRow + dy[i];
+        
+        // Bounds check
+        if (checkCol < 0 || checkCol >= m_mapCols || checkRow < 0 || checkRow >= m_mapRows)
+        continue;
+        
+        auto npc = m_npcManager.getNPCAt(checkCol, checkRow);
+        if (npc && npc->getType() == NPCType::Companion)
+        {
+            // Found a companion NPC, recruit them
+            std::string npcId = npc->getId();
+            recruitNPC(npcId);
+            processTurn();  // Count as action
+            return;
+        }
+    }
+    // ก่อน waitTurn() ที่ท้ายฟังก์ชัน
+addLog("No adjacent NPC found", sf::Color(200,200,50));
+    // No adjacent NPC found, just wait
+    waitTurn();
+}
+
+void Game::updatePartyFollowPositions()
+{
+    auto& party = Party::instance();
+    if (party.size() == 0 || !m_player) return;
+
+    for (int i = 0; i < party.size(); i++)
+    {
+        auto companion = party.getMember(i);
+        if (!companion) continue;
+
+        // companion i ดูตำแหน่ง trail[(i+1) * TRAIL_SPACING]
+        int trailIdx = (i + 1) * Party::TRAIL_SPACING;
+        const TrailPoint* tp = party.getTrailPoint(trailIdx);
+        if (!tp) continue;
+
+        companion->setPos(tp->col, tp->row);
+        companion->setFacing(tp->facingLeft);
     }
 }
