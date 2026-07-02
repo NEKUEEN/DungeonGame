@@ -2,6 +2,7 @@
 #include "NPC.hpp"
 #include <vector>
 #include <memory>
+#include <unordered_map>
 #include <SFML/Graphics.hpp>
 
 // ============================================================
@@ -34,6 +35,7 @@ public:
 private:
     std::vector<std::shared_ptr<NPC>> m_npcs;
     int m_tileSize;
-
+    // cache sprite ต่อ NPC id — สร้างครั้งเดียว
+    std::unordered_map<std::string, sf::Sprite> m_spriteCache;
     void renderHPBar(sf::RenderWindow& window, std::shared_ptr<NPC> npc);
 };

@@ -1759,6 +1759,8 @@ void Game::processEvents()
     }
         if (const auto* key = event->getIf<sf::Event::KeyPressed>())
         {
+            if (key->code == sf::Keyboard::Key::Tab)
+            m_partyUI.toggle();   // เปลี่ยนชื่อ instance ตามที่ประกาศไว้จริงใน Game.hpp
             // F11 toggle fullscreen
             if (key->code == sf::Keyboard::Key::F11)
             {
@@ -1871,6 +1873,7 @@ void Game::processEvents()
                 case sf::Keyboard::Key::C:
                     m_ui.togglePanel(UIState::Panel::Cores);
                     break;
+                    
                 //case sf::Keyboard::Key::LBracket:
                     //if (m_ui.isPanelOpen(UIState::Panel::Cores) && m_ui.selectedCoreSlot > 0)
                         //m_ui.selectedCoreSlot--;

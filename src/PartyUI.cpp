@@ -9,11 +9,18 @@ PartyUI::PartyUI()
 {
     if (!m_font.openFromFile("assets/fonts/font.ttf"))
         std::cerr << "[PartyUI] Warning: Could not load font\n";
+
+    // สร้าง slot ทั้งหมดครั้งเดียวตอน startup — จะได้ไม่ต้อง alloc ตอน runtime
+    m_slots.reserve(MAX_SLOTS);
+    for (int i = 0; i < MAX_SLOTS; i++)
+        m_slots.push_back(std::make_unique<SlotUI>(m_font));
 }
 
 void PartyUI::render(sf::RenderWindow& window, const Party& party, const Player* leader)
 {
-    // ไม่มีปาร์ตี้ และไม่มี leader → ไม่วาดอะไร
+    // ปิดอยู่ → ไม่วาดอะไรเลย ไม่เสีย perf แม้แต่นิดเดียว
+    if (!m_visible) return;
+
     if (!leader && party.size() == 0) return;
 
     // slot 0 = player (leader)
@@ -25,132 +32,115 @@ void PartyUI::render(sf::RenderWindow& window, const Party& party, const Player*
     {
         auto member = party.getMember(i);
         if (member)
-            renderMember(window, member, i + 1, false);
+            renderMember(window, member, i + 1);
     }
+}
+
+void PartyUI::updateSlotVisuals(SlotUI& slot, int y, const std::string& name,
+                                 int hp, int maxHp, int level, const sf::Color& bgColor)
+{
+    // ตำแหน่ง/สีกล่อง — set ทุกเฟรมได้ ราคาถูก ไม่เกี่ยวกับ glyph rebuild
+    slot.box.setPosition({(float)START_X, (float)y});
+    slot.box.setFillColor(bgColor);
+    slot.box.setOutlineThickness(2.f);
+    slot.box.setOutlineColor(sf::Color::White);
+
+    // ── ชื่อ: setString ใหม่เฉพาะตอนชื่อเปลี่ยนจริง ──
+    if (!slot.initialized || slot.lastName != name)
+    {
+        slot.nameText.setCharacterSize(14);
+        slot.nameText.setFillColor(sf::Color::White);
+        slot.nameText.setString(name);
+        slot.lastName = name;
+    }
+    slot.nameText.setPosition({(float)(START_X + 8), (float)(y + 5)});
+
+    // ── HP text: setString ใหม่เฉพาะตอน hp/maxHp เปลี่ยน ──
+    if (!slot.initialized || slot.lastHp != hp || slot.lastMaxHp != maxHp)
+    {
+        std::ostringstream oss;
+        oss << "HP: " << hp << "/" << maxHp;
+        slot.hpText.setCharacterSize(12);
+        slot.hpText.setFillColor(sf::Color::White);
+        slot.hpText.setString(oss.str());
+        slot.lastHp = hp;
+        slot.lastMaxHp = maxHp;
+    }
+    slot.hpText.setPosition({(float)(START_X + 8), (float)(y + 25)});
+
+    // ── Level text: setString ใหม่เฉพาะตอน level เปลี่ยน ──
+    if (!slot.initialized || slot.lastLevel != level)
+    {
+        slot.lvText.setCharacterSize(11);
+        slot.lvText.setFillColor(sf::Color::Yellow);
+        slot.lvText.setString("Lv." + std::to_string(level));
+        slot.lastLevel = level;
+    }
+    slot.lvText.setPosition({(float)(START_X + BOX_WIDTH - 45), (float)(y + 25)});
+
+    // HP bar — เป็น RectangleShape ไม่มี glyph ต้อง rebuild อะไร set ทุกเฟรมได้สบาย
+    float barWidth = BOX_WIDTH - 16;
+    float hpPct = maxHp > 0 ? (float)hp / maxHp : 0.f;
+
+    slot.hpBg.setSize({barWidth, 8});
+    slot.hpBg.setPosition({(float)(START_X + 8), (float)(y + 40)});
+    slot.hpBg.setFillColor(sf::Color(50, 50, 50));
+
+    slot.hpFill.setSize({barWidth * hpPct, 8});
+    slot.hpFill.setPosition({(float)(START_X + 8), (float)(y + 40)});
+    slot.hpFill.setFillColor(hpPct > 0.3f ? sf::Color::Green : sf::Color::Red);
+
+    slot.initialized = true;
 }
 
 void PartyUI::renderLeader(sf::RenderWindow& window, const Player* player)
 {
     if (!player) return;
 
-    int y = START_Y;
     const Stats& s = player->getStats();
+    SlotUI& slot = *m_slots[0];
 
-    sf::RectangleShape box({(float)BOX_WIDTH, (float)BOX_HEIGHT});
-    box.setPosition({(float)START_X, (float)y});
-    box.setFillColor(sf::Color(60, 80, 120));
-    box.setOutlineThickness(2.f);
-    box.setOutlineColor(sf::Color::White);
-    window.draw(box);
+    updateSlotVisuals(slot, START_Y, "You (Leader)", s.hp, s.maxHp, s.level,
+                       sf::Color(60, 80, 120));
 
-    sf::Text nameText(m_font);
-    nameText.setCharacterSize(14);
-    nameText.setFillColor(sf::Color::White);
-    nameText.setString("You (Leader)");
-    nameText.setPosition({(float)(START_X + 8), (float)(y + 5)});
-    window.draw(nameText);
-
-    sf::Text hpText(m_font);
-    hpText.setCharacterSize(12);
-    hpText.setFillColor(sf::Color::White);
-    std::ostringstream oss;
-    oss << "HP: " << s.hp << "/" << s.maxHp;
-    hpText.setString(oss.str());
-    hpText.setPosition({(float)(START_X + 8), (float)(y + 25)});
-    window.draw(hpText);
-
-    float barWidth = BOX_WIDTH - 16;
-    float hpPct = s.maxHp > 0 ? (float)s.hp / s.maxHp : 0.f;
-
-    sf::RectangleShape bg({barWidth, 8});
-    bg.setPosition({(float)(START_X + 8), (float)(y + 40)});
-    bg.setFillColor(sf::Color(50, 50, 50));
-    window.draw(bg);
-
-    sf::RectangleShape fill({barWidth * hpPct, 8});
-    fill.setPosition({(float)(START_X + 8), (float)(y + 40)});
-    fill.setFillColor(hpPct > 0.3f ? sf::Color::Green : sf::Color::Red);
-    window.draw(fill);
-
-    sf::Text lvText(m_font);
-    lvText.setCharacterSize(11);
-    lvText.setFillColor(sf::Color::Yellow);
-    lvText.setString("Lv." + std::to_string(s.level));
-    lvText.setPosition({(float)(START_X + BOX_WIDTH - 45), (float)(y + 25)});
-    window.draw(lvText);
+    window.draw(slot.box);
+    window.draw(slot.nameText);
+    window.draw(slot.hpText);
+    window.draw(slot.hpBg);
+    window.draw(slot.hpFill);
+    window.draw(slot.lvText);
 }
 
-void PartyUI::renderMember(sf::RenderWindow& window, const std::shared_ptr<NPC>& npc,
-                            int slotIndex, bool isLeader)
+void PartyUI::renderMember(sf::RenderWindow& window, const std::shared_ptr<NPC>& npc, int slotIndex)
 {
-    int y = START_Y + slotIndex * SLOT_HEIGHT;
-
-    sf::RectangleShape box({(float)BOX_WIDTH, (float)BOX_HEIGHT});
-    box.setPosition({(float)START_X, (float)y});
+    if (slotIndex < 0 || slotIndex >= MAX_SLOTS) return; // กันเกิน (party เต็มที่ 6 คน)
+    if (!npc) return;
 
     sf::Color bgColor = sf::Color(40, 40, 50);
-    if (npc->getType() == NPCType::Companion)
-    {
-        auto role = npc->getRole();
-        if      (role == NPCRole::Warrior) bgColor = sf::Color(100, 50, 50);
-        else if (role == NPCRole::Healer)  bgColor = sf::Color(50, 100, 50);
-        else if (role == NPCRole::Mage)    bgColor = sf::Color(50, 50, 100);
-        else if (role == NPCRole::Rogue)   bgColor = sf::Color(80, 40, 80);
-    }
-    box.setFillColor(bgColor);
-    box.setOutlineThickness(2.f);
-    box.setOutlineColor(sf::Color::White);
-    window.draw(box);
-
-    // ชื่อ + role
     std::string roleStr;
     if (npc->getType() == NPCType::Companion)
     {
-        auto role = npc->getRole();
-        if      (role == NPCRole::Warrior) roleStr = "Warrior";
-        else if (role == NPCRole::Healer)  roleStr = "Healer";
-        else if (role == NPCRole::Mage)    roleStr = "Mage";
-        else if (role == NPCRole::Rogue)   roleStr = "Rogue";
+        switch (npc->getRole())
+        {
+            case NPCRole::Warrior: bgColor = sf::Color(100, 50, 50); roleStr = "Warrior"; break;
+            case NPCRole::Healer:  bgColor = sf::Color(50, 100, 50); roleStr = "Healer";  break;
+            case NPCRole::Mage:    bgColor = sf::Color(50, 50, 100); roleStr = "Mage";    break;
+            case NPCRole::Rogue:   bgColor = sf::Color(80, 40, 80);  roleStr = "Rogue";   break;
+        }
     }
+
     std::string displayName = npc->getName();
     if (!roleStr.empty()) displayName += " (" + roleStr + ")";
 
-    sf::Text nameText(m_font);
-    nameText.setCharacterSize(14);
-    nameText.setFillColor(sf::Color::White);
-    nameText.setString(displayName);
-    nameText.setPosition({(float)(START_X + 8), (float)(y + 5)});
-    window.draw(nameText);
+    int y = START_Y + slotIndex * SLOT_HEIGHT;
+    SlotUI& slot = *m_slots[slotIndex];
 
-    // HP text
-    sf::Text hpText(m_font);
-    hpText.setCharacterSize(12);
-    hpText.setFillColor(sf::Color::White);
-    std::ostringstream oss;
-    oss << "HP: " << npc->getHP() << "/" << npc->getMaxHP();
-    hpText.setString(oss.str());
-    hpText.setPosition({(float)(START_X + 8), (float)(y + 25)});
-    window.draw(hpText);
+    updateSlotVisuals(slot, y, displayName, npc->getHP(), npc->getMaxHP(), npc->getLevel(), bgColor);
 
-    // HP bar
-    float barWidth = BOX_WIDTH - 16;
-    float hpPct = npc->getMaxHP() > 0 ? (float)npc->getHP() / npc->getMaxHP() : 0.f;
-
-    sf::RectangleShape bg({barWidth, 8});
-    bg.setPosition({(float)(START_X + 8), (float)(y + 40)});
-    bg.setFillColor(sf::Color(50, 50, 50));
-    window.draw(bg);
-
-    sf::RectangleShape fill({barWidth * hpPct, 8});
-    fill.setPosition({(float)(START_X + 8), (float)(y + 40)});
-    fill.setFillColor(hpPct > 0.3f ? sf::Color::Green : sf::Color::Red);
-    window.draw(fill);
-
-    // Level
-    sf::Text lvText(m_font);
-    lvText.setCharacterSize(11);
-    lvText.setFillColor(sf::Color::Yellow);
-    lvText.setString("Lv." + std::to_string(npc->getLevel()));
-    lvText.setPosition({(float)(START_X + BOX_WIDTH - 45), (float)(y + 25)});
-    window.draw(lvText);
+    window.draw(slot.box);
+    window.draw(slot.nameText);
+    window.draw(slot.hpText);
+    window.draw(slot.hpBg);
+    window.draw(slot.hpFill);
+    window.draw(slot.lvText);
 }

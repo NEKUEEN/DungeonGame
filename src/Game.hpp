@@ -24,8 +24,8 @@
 #include "NPCDB.hpp"
 #include "PartyUI.hpp"
 
-constexpr int WINDOW_W        = 1366;
-constexpr int WINDOW_H        = 768;
+constexpr int WINDOW_W        = 800;
+constexpr int WINDOW_H        = 600;
 constexpr int RIGHT_PANEL_W   = 250;
 constexpr int LOG_PANEL_H     = 170;
 constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;

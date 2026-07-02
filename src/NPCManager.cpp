@@ -53,63 +53,41 @@ void NPCManager::render(sf::RenderWindow& window)
 void NPCManager::renderNPC(sf::RenderWindow& window, std::shared_ptr<NPC> npc)
 {
     if (!npc) return;
-    // ถ้าอยากกรอง fog ด้วยก็เพิ่มตรงนี้ได้
-    int col = npc->getCol();
-    int row = npc->getRow();
-    float px = (float)(col * m_tileSize);
-    float py = (float)(row * m_tileSize);
+
+    float px = (float)(npc->getCol() * m_tileSize);
+    float py = (float)(npc->getRow() * m_tileSize);
     float ts = (float)m_tileSize;
 
-    // Try to load sprite from TextureManager
-    // ตัด .png ออกจาก sprite name
     std::string key = npc->getSprite();
     if (key.size() > 4) key = key.substr(0, key.size() - 4);
-    const sf::Texture* tex = TextureManager::instance().get(key);
-    if (tex)
+
+    // ดึง/สร้าง sprite จาก cache
+    auto it = m_spriteCache.find(key);
+    if (it == m_spriteCache.end())
     {
-        sf::Sprite sprite(*tex);
-        auto texSz = tex->getSize();
-        float scale = ts / std::max(1.f, (float)texSz.x);
+        const sf::Texture* tex = TextureManager::instance().get(key);
+        if (!tex) { /* fallback เหมือนเดิม */ return; }
 
-        bool facingLeft = npc->getFacingLeft();
-        float scaleX = facingLeft ? -scale : scale;
-        sprite.setScale({scaleX, scale});
-
-        // ปรับ origin ให้ flip ไม่หลุดตำแหน่ง (เหมือน Player)
-        auto bounds = sprite.getLocalBounds();
-        float originX = facingLeft
-            ? (bounds.position.x + bounds.size.x)
-            : bounds.position.x;
-        sprite.setOrigin({originX, bounds.position.y});
-        sprite.setPosition({px, py});
-        window.draw(sprite);
-    }
-    else
-    {
-        // Fallback shape with color based on type
-        sf::Color color = sf::Color::White;
-        switch (npc->getType())
-        {
-            case NPCType::Companion: color = sf::Color(100, 200, 100); break;
-            case NPCType::Merchant:  color = sf::Color(200, 180, 80);  break;
-            case NPCType::QuestGiver: color = sf::Color(150, 100, 200); break;
-        }
-
-        float sz = 0.7f;
-        sf::RectangleShape body({ts * sz, ts * (sz + 0.05f)});
-        body.setFillColor(color);
-        body.setOutlineColor(sf::Color::White);
-        body.setOutlineThickness(1.f);
-        body.setPosition({px + ts * (1.f - sz) / 2.f, py + ts * 0.08f});
-        window.draw(body);
+        sf::Sprite spr(*tex);
+        float scale = ts / std::max(1.f, (float)tex->getSize().x);
+        spr.setScale({scale, scale});
+        auto result = m_spriteCache.emplace(key, std::move(spr));
+        it = result.first;
     }
 
-    // Render HP bar for Companions
+    sf::Sprite& sprite = it->second;
+
+    bool facingLeft = npc->getFacingLeft();
+    auto bounds = sprite.getLocalBounds();
+    float baseScale = ts / std::max(1.f, (float)bounds.size.x);
+    sprite.setScale({facingLeft ? -baseScale : baseScale, baseScale});
+    float originX = facingLeft ? (bounds.position.x + bounds.size.x) : bounds.position.x;
+    sprite.setOrigin({originX, bounds.position.y});
+    sprite.setPosition({px, py});
+    window.draw(sprite);
+
     if (npc->getType() == NPCType::Companion && npc->getMaxHP() > 0)
         renderHPBar(window, npc);
-
-    // Render name label
-    // (would need font reference - skip for now)
 }
 
 void NPCManager::renderHPBar(sf::RenderWindow& window, std::shared_ptr<NPC> npc)
