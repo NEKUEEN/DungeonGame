@@ -64,6 +64,13 @@ public:
     bool getFacingLeft() const { return m_facingLeft; }
     void setFacing(bool left)  { m_facingLeft = left; }
 
+    // ── Aut-based speed (ข้อ 3: ผูก companion เข้าระบบ turn/speed) ──
+    // ตอนนี้ทุก role เท่ากันหมด (atkAut = 100 เหมือน player เริ่มต้น)
+    // ถ้าอยากแยก speed ต่อ role ทีหลัง ปรับ m_atkAut ใน computeStats() ได้เลย
+    long long getNextActTime() const { return m_nextActTime; }
+    void      advanceActTime()       { m_nextActTime += m_atkAut; }
+    int       getAtkAut()      const { return m_atkAut; }
+
 private:
     std::string m_id;
     std::string m_name;
@@ -85,6 +92,10 @@ private:
     int  m_col        = 0;
     int  m_row        = 0;
     bool m_facingLeft = false;
+
+    // ── Aut-based speed (ข้อ 3) ──
+    int       m_atkAut      = 100;  // Aut ต่อการโจมตี 1 ครั้ง (เท่ากันทุก role ตอนนี้)
+    long long m_nextActTime = 0;
 
     // Merchant
     std::vector<std::string> m_merchantItems;
