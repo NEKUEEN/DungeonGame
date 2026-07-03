@@ -2556,6 +2556,72 @@ void Game::enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc)
     }
 }
 // ============================================================
+//  companionAttack – companion ฟันมอนกลับ (passive combat, ข้อ 2)
+//  ไม่มี weapon damage-type / on-hit status เหมือน player เพราะ
+//  NPC ยังไม่มีระบบ equipment (ยกไปทำทีหลังถ้าต้องการ)
+//  เรียกจาก processTurn() เท่านั้น → enemy ตายและถูกลบใน
+//  processTurn() รอบเดียวกัน (remove_if ท้าย loop) จึงไม่ซ้ำ
+//  กับปัญหา double-onEnemyKilled ที่ playerAttack/fireBow เจอ
+// ============================================================
+void Game::companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy)
+{
+    if (!npc || !enemy || npc->isDead() || enemy->isDead()) return;
+
+    int dmg = std::max(1, npc->getAttack() - enemy->getDefense());
+    enemy->takeDamage(dmg);
+
+    addLog("  " + npc->getName() + " hits " + enemy->getName() +
+           " for " + std::to_string(dmg) + "!", sf::Color(120, 220, 255));
+
+    if (!enemy->isDead()) return;
+
+    // ── EXP เข้า player คนเดียวก่อน (party-wide sharing ค่อยทำข้อ 6) ──
+    const std::string& eid = enemy->getId();
+    bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
+    int expGain = isFirstKill ? enemy->getExp() : 0;
+
+    if (isFirstKill)
+    {
+        m_firstKillDone.insert(eid);
+        addLog("  [FIRST KILL] " + enemy->getName() + "! +" + std::to_string(expGain) + " EXP",
+               sf::Color(255, 220, 50));
+    }
+
+    if (expGain > 0 && m_player && m_player->addExp(expGain))
+    {
+        m_ui.levelUpFlash = true;
+        m_ui.levelUpTimer = 120;
+        int lv = m_player->getStats().level;
+        m_coreSlots.setSlotCount(lv);
+        refreshStats();
+        recalcSpeed();
+        addLog("  *** LEVEL UP! Level " + std::to_string(lv) + " ***", sf::Color(255, 255, 50));
+    }
+
+    // ── Loot drop (path เดียวกับ playerAttack/fireBow) ──
+    auto dropped = DropTable::instance().roll(enemy->getId());
+    for (const auto& itemId : dropped)
+    {
+        const ItemData* idata = DropTable::instance().getItem(itemId);
+        if (!idata) continue;
+        Item drop;
+        drop.id         = idata->id;
+        drop.name       = idata->name;
+        drop.type       = idata->type == "Core" ? ItemType::Core :
+                          idata->type == "Ammo" ? ItemType::Ammo :
+                                                  ItemType::Material;
+        drop.desc       = idata->desc;
+        drop.value      = idata->value;
+        drop.spriteName = idata->sprite;
+        drop.col        = enemy->getCol();
+        drop.row        = enemy->getRow();
+        m_mapItems.push_back(drop);
+        addLog("  " + drop.name + " dropped!", sf::Color(220, 200, 80));
+    }
+
+    onEnemyKilled(enemy);
+}
+// ============================================================
 //  processTurn – จัดการเทิร์นของศัตรู
 // ============================================================
 void Game::processTurn()
@@ -2680,6 +2746,9 @@ void Game::processTurn()
             if (adjacentCompanion)
             {
                 enemyAttackCompanion(e, adjacentCompanion);
+                // ── แลกหมัดกลับ: companion ฟันมอนคืน ถ้ายังไม่ตายจากการโดนตี ──
+                if (!adjacentCompanion->isDead())
+                    companionAttack(adjacentCompanion, e);
             }
             else if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
             {

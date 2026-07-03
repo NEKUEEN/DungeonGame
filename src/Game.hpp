@@ -161,6 +161,7 @@ private:
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
     void enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc);  // ← เพิ่มบรรทัดนี้
+    void companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy);       // ← companion ฟันมอนกลับ (ข้อ 2: passive exchange)
     void recalcSpeed();         // คำนวณ spd + stamina regen
     void regenStamina();        // ฟื้น stamina ต่อเทิร์น
     long long m_globalTime = 0;  // Aut สะสมของเกม
