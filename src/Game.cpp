@@ -2746,9 +2746,6 @@ void Game::processTurn()
             if (adjacentCompanion)
             {
                 enemyAttackCompanion(e, adjacentCompanion);
-                // ── แลกหมัดกลับ: companion ฟันมอนคืน ถ้ายังไม่ตายจากการโดนตี ──
-                if (!adjacentCompanion->isDead())
-                    companionAttack(adjacentCompanion, e);
             }
             else if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
             {
@@ -2813,6 +2810,41 @@ void Game::processTurn()
         }
         e->advanceActTime();
         e->tickSkills();
+    }
+
+    // ============================================================
+    //  Companion actions – ผูกเข้าระบบ Aut/turn ของตัวเอง (ข้อ 3)
+    //  แยก loop จาก enemy: companion ตีตามจังหวะของตัวเอง
+    //  (nextActTime <= playerTime) ไม่ใช่ตีแถมตอน enemy โจมตี
+    //  ยังเป็น passive เหมือนข้อ 2 (ไม่มี AI เดินไล่ — ข้อ 4 ค่อยทำ)
+    // ============================================================
+    {
+        auto& party = Party::instance();
+        for (int pi = 0; pi < party.size(); pi++)
+        {
+            auto npc = party.getMember(pi);
+            if (!npc || npc->isDead()) continue;
+
+            // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง advance ──
+            if (npc->getNextActTime() > playerTime) continue;
+
+            // ── หามอนที่ยืนติด (adjacent) เพื่อฟัน ──
+            Enemy* target = nullptr;
+            for (auto* e : m_enemies)
+            {
+                if (e->isDead()) continue;
+                int dx = std::abs(e->getCol() - npc->getCol());
+                int dy = std::abs(e->getRow() - npc->getRow());
+                if (dx <= 1 && dy <= 1 && (dx + dy) > 0) { target = e; break; }
+            }
+
+            if (target)
+            {
+                companionAttack(npc, target);
+                npc->advanceActTime();
+            }
+            // ไม่มีเป้าหมาย → ไม่ advance เวลา (รอเฉยๆ จนกว่าจะมีมอนมาติด)
+        }
     }
 
     m_enemies.erase(
