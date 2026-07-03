@@ -21,7 +21,8 @@ public:
 
     bool updateAI(int playerCol, int playerRow,
                   const class TileMap& map,
-                  const std::vector<Enemy*>& others);
+                  const std::vector<Enemy*>& others,
+                  const std::vector<std::pair<int,int>>& blockedTiles = {});  // ← เพิ่ม param + default
 
     void render(sf::RenderWindow& window);
 
@@ -83,9 +84,11 @@ private:
                               const TileMap& map) const;
 
     bool stepToward(int toC, int toR, const TileMap& map,
-                    const std::vector<Enemy*>& others);
+                    const std::vector<Enemy*>& others,
+                const std::vector<std::pair<int,int>>& blockedTiles);  // ← เพิ่ม);
 
-    bool isTileOccupied(int c, int r, const std::vector<Enemy*>& others) const;
+    bool isTileOccupied(int c, int r, const std::vector<Enemy*>& others,
+                const std::vector<std::pair<int,int>>& blockedTiles) const;
 
     bool hasLineOfSight(int x0, int y0, int x1, int y1,
                     const TileMap& map) const;

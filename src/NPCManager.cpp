@@ -107,9 +107,13 @@ void NPCManager::renderHPBar(sf::RenderWindow& window, std::shared_ptr<NPC> npc)
     window.draw(bg);
 
     // HP bar
-    float ratio = (float)npc->getHP() / npc->getMaxHP();
+    float ratio = std::clamp((float)npc->getHP() / npc->getMaxHP(), 0.f, 1.f);
+    sf::Color n = ratio > 0.5f ? sf::Color(50, 200, 50) :
+                  ratio > 0.25f ? sf::Color(220, 180, 0) : sf::Color(220, 50, 50);
+
     sf::RectangleShape bar({bw * ratio, bh});
-    bar.setFillColor(sf::Color(100, 200, 100));
+    //bar.setFillColor(sf::Color(100, 200, 100));
+    bar.setFillColor(n);
     bar.setPosition({bx, by});
     window.draw(bar);
 }

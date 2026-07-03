@@ -45,7 +45,7 @@ constexpr int MAP_COLS        = 50;
 constexpr int MAP_ROWS        = 50;
 constexpr int VIEW_RADIUS     = 10;
 constexpr int DARK_ZONE_VIEW_RADIUS = 1;  // ระยะมองเห็นในโซนมืด (เช่น Darkness) — ไม่มีไฟ
-constexpr int MAX_ENEMIES     = 100;
+constexpr int MAX_ENEMIES     = 1;
 constexpr int RESPAWN_TURNS   = 12;
 constexpr int BOSS_KILL_THRESHOLD = 50;
 
@@ -160,6 +160,7 @@ private:
     void clearEnemies();
     void playerAttack(Enemy* enemy);
     void enemyAttack(Enemy* enemy);
+    void enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc);  // ← เพิ่มบรรทัดนี้
     void recalcSpeed();         // คำนวณ spd + stamina regen
     void regenStamina();        // ฟื้น stamina ต่อเทิร์น
     long long m_globalTime = 0;  // Aut สะสมของเกม

@@ -87,10 +87,14 @@ SkillInstance* Enemy::findSkill(const std::string& id)
     return nullptr;
 }
 
-bool Enemy::isTileOccupied(int c, int r, const std::vector<Enemy*>& others) const
+bool Enemy::isTileOccupied(int c, int r, const std::vector<Enemy*>& others,
+                            const std::vector<std::pair<int,int>>& blockedTiles) const
 {
     for (auto* o : others)
         if (o != this && !o->isDead() && o->m_col == c && o->m_row == r)
+            return true;
+    for (auto& bt : blockedTiles)          // ← เพิ่ม: เช็คตำแหน่ง companion ด้วย
+        if (bt.first == c && bt.second == r)
             return true;
     return false;
 }
@@ -188,11 +192,12 @@ std::pair<int,int> Enemy::astar(int fc, int fr, int tc, int tr,
 }
 
 bool Enemy::stepToward(int toC, int toR, const TileMap& map,
-                        const std::vector<Enemy*>& others)
+                        const std::vector<Enemy*>& others,
+                        const std::vector<std::pair<int,int>>& blockedTiles)
 {
     auto [nc, nr] = astar(m_col, m_row, toC, toR, map);
     if (nc == -1) return false;
-    if (isTileOccupied(nc, nr, others)) return false;
+    if (isTileOccupied(nc, nr, others, blockedTiles)) return false;  // ← ส่งต่อ
     m_col = nc; m_row = nr;
     return true;
 }
@@ -202,7 +207,8 @@ bool Enemy::stepToward(int toC, int toR, const TileMap& map,
 // ============================================================
 bool Enemy::updateAI(int pc, int pr,
                      const TileMap& map,
-                     const std::vector<Enemy*>& others)
+                     const std::vector<Enemy*>& others,
+                    const std::vector<std::pair<int,int>>& blockedTiles)
 {
     if (isDead()) return false;
 
@@ -240,12 +246,13 @@ bool Enemy::updateAI(int pc, int pr,
 
     // ── 3. Skill check (Ranged/Caster) ──
     if (m_aiType == EnemyAIType::Ranged || m_aiType == EnemyAIType::Caster)
+
 {
     bool hasLOS = hasLineOfSight(m_col, m_row, pc, pr, map);
 
     // ไม่มี LOS → ตามหาก่อนเลย ไม่ต้องเช็คอย่างอื่น
     if (!hasLOS)
-        return stepToward(m_lastKnownCol, m_lastKnownRow, map, others);
+        return stepToward(m_lastKnownCol, m_lastKnownRow, map, others, blockedTiles);
 
     // มี LOS → ลองยิง
     m_attackTimer++;
@@ -268,7 +275,7 @@ bool Enemy::updateAI(int pc, int pr,
 
     // มี LOS แต่ไกลเกิน range → เข้าใกล้
     if (dist > (float)(m_preferredRange + 2))
-        return stepToward(m_lastKnownCol, m_lastKnownRow, map, others);
+        return stepToward(m_lastKnownCol, m_lastKnownRow, map, others, blockedTiles);
 
     // มี LOS อยู่ใน range แต่ skill cooldown → รอ/strafe
     return false;
@@ -280,7 +287,7 @@ bool Enemy::updateAI(int pc, int pr,
         // หนีออกจาก player โดย A* ไปทิศตรงข้าม
         int fleeC = m_col + (m_col - pc);
         int fleeR = m_row + (m_row - pr);
-        return stepToward(fleeC, fleeR, map, others);
+        return stepToward(fleeC, fleeR, map, others, blockedTiles);
     }
 
     // ── 5. Melee — ถ้าอยู่ติดกันแล้ว Game จัดการ combat ──
@@ -320,7 +327,7 @@ bool Enemy::updateAI(int pc, int pr,
                 int idx = (start + i) % 8;
                 int nc = m_col + sdx[idx];
                 int nr = m_row + sdy[idx];
-                if (map.isWalkable(nc, nr) && !isTileOccupied(nc, nr, others))
+                if (map.isWalkable(nc, nr) && !isTileOccupied(nc, nr, others, blockedTiles))
                 {
                     m_col = nc; m_row = nr;
                     return true;
@@ -329,7 +336,7 @@ bool Enemy::updateAI(int pc, int pr,
             return false;
         }
 
-        return stepToward(m_lastKnownCol, m_lastKnownRow, map, others);
+        return stepToward(m_lastKnownCol, m_lastKnownRow, map, others, blockedTiles);
     }
 
     return false;

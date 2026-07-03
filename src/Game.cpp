@@ -2535,6 +2535,27 @@ addLog("  "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(
     }
 }
 // ============================================================
+//  enemyAttackCompanion – มอนฟัน companion (formula เรียบง่าย
+//  ไม่มี dodge/status เหมือนฝั่ง player เพราะ NPC ไม่มีระบบนั้น)
+// ============================================================
+void Game::enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc)
+{
+    if (!enemy || !npc) return;
+
+    int dmg = std::max(1, enemy->getAttack() - npc->getDefense());
+    npc->takeDamage(dmg);
+
+    addLog("  " + enemy->getName() + " hits " + npc->getName() +
+           " for " + std::to_string(dmg) + "!", sf::Color(220, 100, 80));
+
+    if (npc->isDead())
+    {
+        addLog("  " + npc->getName() + " has fallen!", sf::Color(255, 60, 60));
+        Party::instance().removeMember(npc->getId());
+        // ← ลบบรรทัด m_companionTargets.erase(...) ทิ้ง — ยังไม่มี member ตัวนี้
+    }
+}
+// ============================================================
 //  processTurn – จัดการเทิร์นของศัตรู
 // ============================================================
 void Game::processTurn()
@@ -2565,6 +2586,17 @@ void Game::processTurn()
     long long playerTime = m_globalTime;
     int pc = m_player->getCol();
     int pr = m_player->getRow();
+
+    // ── เพิ่มบรรทัดนี้: ตำแหน่ง companion ทั้งหมด ใช้เป็น blocked tile ให้ enemy เดินอ้อม ──
+    std::vector<std::pair<int,int>> partyBlockedTiles;
+    {
+        auto& party = Party::instance();
+        for (int pi = 0; pi < party.size(); pi++)
+        {
+            auto member = party.getMember(pi);
+            if (member) partyBlockedTiles.emplace_back(member->getCol(), member->getRow());
+        }
+    }
 
     for (auto* e : m_enemies)
     {
@@ -2628,17 +2660,34 @@ void Game::processTurn()
         //addLog("  [DBG] orc nextAct=" + std::to_string(e->getNextActTime()) +
            //" playerTime=" + std::to_string(playerTime), sf::Color(100,255,100));
 
-        // ── ถึงเวลา + เห็น/alerted → ขยับจริง ──
-        int dx = std::abs(e->getCol() - pc);
-        int dy = std::abs(e->getRow() - pr);
+        // ── หาว่ามี companion ยืนติดตัวมอนไหม ก่อนเช็คระยะ player ──
+            std::shared_ptr<NPC> adjacentCompanion = nullptr;
+            {
+                auto& party = Party::instance();
+                for (int pi = 0; pi < party.size(); pi++)
+                {
+                    auto member = party.getMember(pi);
+                    if (!member || member->isDead()) continue;
+                    int mdx = std::abs(e->getCol() - member->getCol());
+                    int mdy = std::abs(e->getRow() - member->getRow());
+                    if (mdx <= 1 && mdy <= 1) { adjacentCompanion = member; break; }
+                }
+            }
 
-        if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
-        {
-            enemyAttack(e);
-        }
-        else
-        {
-            e->updateAI(pc, pr, m_tileMap, m_enemies);
+            int dx = std::abs(e->getCol() - pc);
+            int dy = std::abs(e->getRow() - pr);
+
+            if (adjacentCompanion)
+            {
+                enemyAttackCompanion(e, adjacentCompanion);
+            }
+            else if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
+            {
+                enemyAttack(e);
+            }
+            else
+            {
+                e->updateAI(pc, pr, m_tileMap, m_enemies, partyBlockedTiles);
 
             if (e->hasPendingSkill())
             {
@@ -3947,7 +3996,7 @@ void Game::tryInteractNPC()
         }
     }
     // ก่อน waitTurn() ที่ท้ายฟังก์ชัน
-addLog("No adjacent NPC found", sf::Color(200,200,50));
+    //addLog("No adjacent NPC found", sf::Color(200,200,50));
     // No adjacent NPC found, just wait
     waitTurn();
 }
