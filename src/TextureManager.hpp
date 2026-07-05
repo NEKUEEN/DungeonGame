@@ -60,6 +60,8 @@ public:
         load("blackRock_floor",     "assets/textures/blackRock_floor_tile.png");
         load("gate_down", "assets/textures/gate_down.png");
         load("gate_up",   "assets/textures/gate_up.png");
+        load("brick1",     "assets/textures/brick1.png");
+        load("brick2",     "assets/textures/brick2.png");   
         // zone wall textures
         load("crystalBright_wall",  "assets/textures/crystalBright_wall_tile.png");
         load("stairs_down",  "assets/textures/stairs_down.png");

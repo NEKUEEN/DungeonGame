@@ -208,6 +208,9 @@ void TileMap::render(sf::RenderWindow& window, const sf::View& gameView)
             case TileType::Wall:
                 if (zone == ZoneType::CrystalBright) return "crystalBright_wall";
                 if (zone == ZoneType::Darkness) return "darkness_wall";
+                if (zone == ZoneType::DeadMan) return "brick1";
+                if (zone == ZoneType::DeadMan) return "brick2";
+                if (zone == ZoneType::DeadMan) return "WALL1";
                 return "tile_wall";
             case TileType::GateDown: return "gate_down";
             case TileType::GateUp:   return "gate_up";

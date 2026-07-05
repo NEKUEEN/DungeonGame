@@ -2622,6 +2622,37 @@ void Game::companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy)
     onEnemyKilled(enemy);
 }
 // ============================================================
+//  tryMoveCompanion – เดินทีละก้าว (ข้อ 4: active AI ไล่มอน)
+//  greedy step ธรรมดา ไม่ใช้ A* เต็มรูปแบบเหมือน Enemy::astar
+//  (เอาไว้ทีหลังถ้าทางตันบ่อยเกินไปค่อยอัพเกรด)
+//  เช็คชน: wall, player, enemy, companion อื่นในปาร์ตี้
+// ============================================================
+bool Game::tryMoveCompanion(std::shared_ptr<NPC> npc, int dc, int dr)
+{
+    if (!npc || (dc == 0 && dr == 0)) return false;
+
+    int nc = npc->getCol() + dc;
+    int nr = npc->getRow() + dr;
+
+    if (!m_tileMap.isWalkable(nc, nr)) return false;
+    if (m_player && m_player->getCol() == nc && m_player->getRow() == nr) return false;
+
+    for (auto* e : m_enemies)
+        if (!e->isDead() && e->getCol() == nc && e->getRow() == nr) return false;
+
+    auto& party = Party::instance();
+    for (int i = 0; i < party.size(); i++)
+    {
+        auto other = party.getMember(i);
+        if (other && other != npc && other->getCol() == nc && other->getRow() == nr)
+            return false;
+    }
+
+    npc->setPos(nc, nr);
+    if (dc != 0) npc->setFacing(dc < 0);
+    return true;
+}
+// ============================================================
 //  processTurn – จัดการเทิร์นของศัตรู
 // ============================================================
 void Game::processTurn()
@@ -2814,36 +2845,151 @@ void Game::processTurn()
 
     // ============================================================
     //  Companion actions – ผูกเข้าระบบ Aut/turn ของตัวเอง (ข้อ 3)
-    //  แยก loop จาก enemy: companion ตีตามจังหวะของตัวเอง
-    //  (nextActTime <= playerTime) ไม่ใช่ตีแถมตอน enemy โจมตี
-    //  ยังเป็น passive เหมือนข้อ 2 (ไม่มี AI เดินไล่ — ข้อ 4 ค่อยทำ)
+    //  + Active AI: เลือกเป้าหมายใกล้สุดที่เห็นได้แล้วเดินเข้าไปฟัน (ข้อ 4)
+    //  ── ทำ 2 pass ──
+    //  Pass 1: เช็คก่อนว่า companion ตัวไหน "engaged" กับมอนอยู่
+    //          (adjacent หรือเห็นมอนในระยะ) โดยใช้ตำแหน่งปัจจุบัน
+    //          (ก่อน follow snap ของเทิร์นนี้)
+    //  Follow: snap เข้า trail เฉพาะตัวที่ "ไม่" engaged เท่านั้น
+    //  Pass 2: ตัว engaged ลงมือตี/เดินไล่ ตาม nextActTime ของตัวเอง
+    //  แก้บั๊ก: เดิมเรียก follow ก่อนเสมอ ทำให้ตำแหน่งที่เพิ่งไล่มอน
+    //  ไปเมื่อเทิร์นก่อนถูก snap กลับ formation ทุกเทิร์น (yo-yo,
+    //  ตีบ้างไม่ตีบ้าง)
     // ============================================================
     {
         auto& party = Party::instance();
-        for (int pi = 0; pi < party.size(); pi++)
+        int n = party.size();
+
+        std::vector<bool>   engaged(n, false);
+        std::vector<Enemy*> adjTargets(n, nullptr);
+        std::vector<Enemy*> chaseTargets(n, nullptr);
+
+        // ── Pass 1: หา target ของแต่ละ companion ──
+        for (int pi = 0; pi < n; pi++)
         {
             auto npc = party.getMember(pi);
             if (!npc || npc->isDead()) continue;
 
-            // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง advance ──
-            if (npc->getNextActTime() > playerTime) continue;
-
-            // ── หามอนที่ยืนติด (adjacent) เพื่อฟัน ──
-            Enemy* target = nullptr;
             for (auto* e : m_enemies)
             {
                 if (e->isDead()) continue;
                 int dx = std::abs(e->getCol() - npc->getCol());
                 int dy = std::abs(e->getRow() - npc->getRow());
-                if (dx <= 1 && dy <= 1 && (dx + dy) > 0) { target = e; break; }
+                if (dx <= 1 && dy <= 1 && (dx + dy) > 0) { adjTargets[pi] = e; break; }
+            }
+            if (adjTargets[pi]) { engaged[pi] = true; continue; }
+
+            Enemy* nearest  = nullptr;
+            int    bestDist = COMPANION_DETECT_RANGE * COMPANION_DETECT_RANGE + 1;
+            for (auto* e : m_enemies)
+            {
+                if (e->isDead()) continue;
+                if (!m_fog.isVisible(e->getCol(), e->getRow())) continue;
+                int dx = e->getCol() - npc->getCol();
+                int dy = e->getRow() - npc->getRow();
+                int d2 = dx*dx + dy*dy;
+                if (d2 <= COMPANION_DETECT_RANGE * COMPANION_DETECT_RANGE && d2 < bestDist)
+                { bestDist = d2; nearest = e; }
+            }
+            if (nearest) { chaseTargets[pi] = nearest; engaged[pi] = true; }
+        }
+
+        // ── Follow trail เฉพาะตัวที่ไม่ engaged (ตัว engaged ตำแหน่งค้างไว้) ──
+        updatePartyFollowPositions(engaged);
+
+        // ── Pass 1.5: แจกช่องล้อมมอน (surround) คนละช่อง ──
+        //    ไม่งั้น companion ทุกตัวจะพุ่งไปทิศเดียวกันแล้วต่อแถวชนกันเอง
+        //    (ตัวที่ adjacent อยู่แล้ว "จอง" ช่องตัวเองไว้ก่อน กันตัวไล่หลัง
+        //    เลือกช่องเดียวกัน)
+        std::set<std::pair<int,int>> claimedTiles;
+        for (int pi = 0; pi < n; pi++)
+        {
+            if (!adjTargets[pi]) continue;
+            auto npc = party.getMember(pi);
+            if (npc) claimedTiles.insert({npc->getCol(), npc->getRow()});
+        }
+
+        std::vector<std::pair<int,int>> moveTarget(n, {-1, -1});  // ช่องที่แต่ละตัวจะเดินไปหา
+        for (int pi = 0; pi < n; pi++)
+        {
+            if (!chaseTargets[pi]) continue;
+            auto npc = party.getMember(pi);
+            if (!npc) continue;
+
+            Enemy* e  = chaseTargets[pi];
+            int    ec = e->getCol(), er = e->getRow();
+
+            static const int offs[8][2] = {
+                {-1,-1}, {0,-1}, {1,-1},
+                {-1, 0},         {1, 0},
+                {-1, 1}, {0, 1}, {1, 1}
+            };
+
+            std::pair<int,int> best = {-1, -1};
+            int bestD = 1 << 30;
+            for (auto& o : offs)
+            {
+                int tc = ec + o[0], tr = er + o[1];
+                if (!m_tileMap.isWalkable(tc, tr)) continue;
+                if (claimedTiles.count({tc, tr})) continue;
+                if (m_player && m_player->getCol() == tc && m_player->getRow() == tr) continue;
+
+                bool occByEnemy = false;
+                for (auto* e2 : m_enemies)
+                    if (!e2->isDead() && e2->getCol() == tc && e2->getRow() == tr) { occByEnemy = true; break; }
+                if (occByEnemy) continue;
+
+                int dx = tc - npc->getCol(), dy = tr - npc->getRow();
+                int d  = dx * dx + dy * dy;
+                if (d < bestD) { bestD = d; best = {tc, tr}; }
             }
 
-            if (target)
+            if (best.first != -1)
             {
-                companionAttack(npc, target);
-                npc->advanceActTime();
+                claimedTiles.insert(best);
+                moveTarget[pi] = best;
             }
-            // ไม่มีเป้าหมาย → ไม่ advance เวลา (รอเฉยๆ จนกว่าจะมีมอนมาติด)
+            else
+            {
+                moveTarget[pi] = {ec, er};  // ช่องรอบมอนเต็มหมด (ล้อมเกินคนแล้ว) → เดินตรงเข้าหาไปก่อน
+            }
+        }
+
+        // ── Pass 2: ตัว engaged ลงมือ ──
+        for (int pi = 0; pi < n; pi++)
+        {
+            if (!engaged[pi]) continue;
+            auto npc = party.getMember(pi);
+            if (!npc || npc->isDead()) continue;
+
+            // ── ยังไม่ถึงเวลา → รอ ตำแหน่งค้างไว้เหมือนกัน (ไม่ snap follow) ──
+            if (npc->getNextActTime() > playerTime) continue;
+
+            if (adjTargets[pi])
+            {
+                companionAttack(npc, adjTargets[pi]);
+                npc->advanceActTime();
+                continue;
+            }
+
+            if (!chaseTargets[pi]) continue;
+            auto [tc, tr] = moveTarget[pi];
+            if (tc < 0) continue;
+
+            int dc = 0, dr = 0;
+            if (tc > npc->getCol()) dc = 1;
+            else if (tc < npc->getCol()) dc = -1;
+            if (tr > npc->getRow()) dr = 1;
+            else if (tr < npc->getRow()) dr = -1;
+
+            // ลองเดินทแยงก่อน ถ้าไม่ได้ลองแกนเดียว (แบบ greedy ธรรมดา)
+            bool moved = tryMoveCompanion(npc, dc, dr);
+            if (!moved && dc != 0 && dr != 0)
+                moved = tryMoveCompanion(npc, dc, 0) || tryMoveCompanion(npc, 0, dr);
+
+            if (moved)
+                npc->advanceActTime();
+            // เดินไม่ได้เลย (ทางตัน) → ไม่ advance รอเทิร์นหน้าลองใหม่
         }
     }
 
@@ -2852,7 +2998,6 @@ void Game::processTurn()
             [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
         m_enemies.end());
 
-    updatePartyFollowPositions();  // Update companion positions after turn
     recalcAllStats();
 }
 
@@ -4102,13 +4247,17 @@ void Game::tryInteractNPC()
     waitTurn();
 }
 
-void Game::updatePartyFollowPositions()
+void Game::updatePartyFollowPositions(const std::vector<bool>& skip)
 {
     auto& party = Party::instance();
     if (party.size() == 0 || !m_player) return;
 
     for (int i = 0; i < party.size(); i++)
     {
+        // ── ข้าม companion ที่กำลัง engaged กับมอนอยู่ (ข้อ 4) ──
+        //    ไม่งั้น follow trail จะ snap ทับตำแหน่งที่เพิ่งไล่/ยืนตีมอนไป
+        if (i < (int)skip.size() && skip[i]) continue;
+
         auto companion = party.getMember(i);
         if (!companion) continue;
 
