@@ -1783,6 +1783,44 @@ void Game::processEvents()
                 break;
             }
 
+            // ── ข้อ 5: PartyUI เปิดอยู่ → สกัด input ไปเป็นคำสั่งปาร์ตี้ ไม่ให้ตกไปขยับตัวละคร ──
+            if (m_partyUI.isVisible() && !m_ui.targeting.active)
+            {
+                auto& party = Party::instance();
+                bool shift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                             sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+
+                switch (key->code)
+                {
+                    case sf::Keyboard::Key::J:
+                        if (shift) reorderSelectedCompanion(+1);
+                        else       m_partyUI.moveSelection(+1, party.size());
+                        return;
+                    case sf::Keyboard::Key::K:
+                        if (shift) reorderSelectedCompanion(-1);
+                        else       m_partyUI.moveSelection(-1, party.size());
+                        return;
+                    case sf::Keyboard::Key::Enter:
+                        m_partyUI.toggleDetails();
+                        return;
+                    case sf::Keyboard::Key::X:
+                        dismissSelectedCompanion();
+                        return;
+                    case sf::Keyboard::Key::Escape:
+                        m_partyUI.setVisible(false);
+                        return;
+                    // กัน movement key อื่นๆ ไม่ให้หลุดไปขยับตัวละครขณะเลือกเมนูปาร์ตี้
+                    case sf::Keyboard::Key::H:
+                    case sf::Keyboard::Key::L:
+                    case sf::Keyboard::Key::Y:
+                    case sf::Keyboard::Key::U:
+                    case sf::Keyboard::Key::B:
+                    case sf::Keyboard::Key::N:
+                        return;
+                    default: break;  // ปล่อย Tab/F11/ฯลฯ ให้ทำงานตามปกติต่อไปข้างล่าง
+                }
+            }
+
             if (m_ui.targeting.active)
             {
                 switch(key->code)
@@ -4170,6 +4208,51 @@ void Game::renderStatusEffects()
 void Game::renderPartyUI()
 {
     m_partyUI.render(m_window, Party::instance(), m_player);
+}
+
+// ============================================================
+//  dismissSelectedCompanion – ไล่ companion ที่ cursor เลือกอยู่ใน
+//  PartyUI ออกจากปาร์ตี้ (ข้อ 5)
+//  ดีไซน์: คืนกลับไปยืนบนแมพที่ตำแหน่งผู้เล่นปัจจุบัน แล้ว add เข้า
+//  NPCManager ใหม่ → ไม่หายไปถาวร คุยแล้ว recruit กลับเข้าปาร์ตี้ได้อีก
+//  เหมือน spawn ปกติ (pattern เดียวกับ spawnNPCs: setPos แล้ว add)
+// ============================================================
+void Game::dismissSelectedCompanion()
+{
+    auto& party = Party::instance();
+    int idx = m_partyUI.getSelectedIndex();
+    auto npc = party.getMember(idx);
+    if (!npc) return;
+
+    if (m_player)
+    {
+        npc->setPos(m_player->getCol(), m_player->getRow());
+        npc->setFacing(m_player->getFacingLeft());
+    }
+
+    std::string name = npc->getName();
+    party.removeMember(npc->getId());   // เอาออกจากปาร์ตี้ก่อน (ล้าง trail-follow/combat state ของตัวนี้)
+    m_npcManager.add(npc);              // แล้วโผล่กลับบนแมพ ให้คุยแล้ว recruitNPC() ซ้ำได้
+
+    addLog("  " + name + " leaves the party.", sf::Color(220, 200, 100));
+    m_partyUI.resetSelection(party.size());
+}
+
+// ============================================================
+//  reorderSelectedCompanion – สลับตำแหน่ง companion ที่เลือกกับคนที่
+//  อยู่ติดกัน (ข้อ 5). trail-follow index และ surround-slot ของข้อ 3-4
+//  อ่านตำแหน่งจาก Party::getMembers() ตรงๆ อยู่แล้ว จึงแค่ swap ก็พอ
+//  ไม่ต้องแก้ระบบ follow/combat ใดๆ เพิ่ม
+// ============================================================
+void Game::reorderSelectedCompanion(int dir)
+{
+    auto& party = Party::instance();
+    int idx    = m_partyUI.getSelectedIndex();
+    int target = idx + dir;
+    if (target < 0 || target >= party.size()) return;  // ชนขอบแถวแล้ว ไม่ต้องทำอะไร
+
+    if (party.swapMembers(idx, target))
+        m_partyUI.setSelectedIndex(target);  // cursor เกาะไปกับตัวที่ย้าย
 }
 
 void Game::recruitNPC(const std::string& npcId)

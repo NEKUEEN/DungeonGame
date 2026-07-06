@@ -4,6 +4,7 @@
 #include "NPC.hpp"
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 
 PartyUI::PartyUI()
 {
@@ -32,18 +33,40 @@ void PartyUI::render(sf::RenderWindow& window, const Party& party, const Player*
     {
         auto member = party.getMember(i);
         if (member)
-            renderMember(window, member, i + 1);
+            renderMember(window, member, i + 1, i == m_selectedIndex);
+    }
+
+    // ── Detail panel (ข้อ 5) ── วาดของตัวที่เลือกอยู่ ถ้าเปิด details ไว้และมีตัวนั้นจริง
+    if (m_showDetails)
+    {
+        auto selected = party.getMember(m_selectedIndex);
+        if (selected)
+            renderDetails(window, selected, m_selectedIndex + 1);
     }
 }
 
+void PartyUI::moveSelection(int dir, int partySize)
+{
+    if (partySize <= 0) { m_selectedIndex = 0; return; }
+    m_selectedIndex = std::clamp(m_selectedIndex + dir, 0, partySize - 1);
+}
+
+void PartyUI::resetSelection(int partySize)
+{
+    m_showDetails = false;
+    if (partySize <= 0) { m_selectedIndex = 0; return; }
+    m_selectedIndex = std::clamp(m_selectedIndex, 0, partySize - 1);
+}
+
 void PartyUI::updateSlotVisuals(SlotUI& slot, int y, const std::string& name,
-                                 int hp, int maxHp, int level, const sf::Color& bgColor)
+                                 int hp, int maxHp, int level, const sf::Color& bgColor,
+                                 const sf::Color& outlineColor, float outlineThickness)
 {
     // ตำแหน่ง/สีกล่อง — set ทุกเฟรมได้ ราคาถูก ไม่เกี่ยวกับ glyph rebuild
     slot.box.setPosition({(float)START_X, (float)y});
     slot.box.setFillColor(bgColor);
-    slot.box.setOutlineThickness(2.f);
-    slot.box.setOutlineColor(sf::Color::White);
+    slot.box.setOutlineThickness(outlineThickness);
+    slot.box.setOutlineColor(outlineColor);
 
     // ── ชื่อ: setString ใหม่เฉพาะตอนชื่อเปลี่ยนจริง ──
     if (!slot.initialized || slot.lastName != name)
@@ -93,6 +116,61 @@ void PartyUI::updateSlotVisuals(SlotUI& slot, int y, const std::string& name,
     slot.initialized = true;
 }
 
+void PartyUI::renderDetails(sf::RenderWindow& window, const std::shared_ptr<NPC>& npc, int slotIndex)
+{
+    if (!npc) return;
+    if (!m_detail) m_detail = std::make_unique<DetailUI>(m_font);
+
+    std::string roleStr = "-";
+    if (npc->getType() == NPCType::Companion)
+    {
+        switch (npc->getRole())
+        {
+            case NPCRole::Warrior: roleStr = "Warrior"; break;
+            case NPCRole::Healer:  roleStr = "Healer";  break;
+            case NPCRole::Mage:    roleStr = "Mage";    break;
+            case NPCRole::Rogue:   roleStr = "Rogue";   break;
+        }
+    }
+
+    // วางถัดจากคอลัมน์ slot ทางขวา ในระดับความสูงเดียวกับตัวที่เลือก
+    float bx = (float)(START_X + BOX_WIDTH + 10);
+    float by = (float)(START_Y + slotIndex * SLOT_HEIGHT);
+
+    m_detail->box.setPosition({bx, by});
+    m_detail->box.setFillColor(sf::Color(20, 20, 25, 235));
+    m_detail->box.setOutlineColor(sf::Color(255, 220, 60));
+    m_detail->box.setOutlineThickness(2.f);
+    window.draw(m_detail->box);
+
+    std::ostringstream role, atk, def, exp;
+    role << "Role: " << roleStr;
+    atk  << "ATK: "  << npc->getAttack();
+    def  << "DEF: "  << npc->getDefense();
+    exp  << "EXP: "  << npc->getExp() << "/" << npc->getExpToLevel();
+
+    m_detail->roleText.setCharacterSize(12); m_detail->roleText.setFillColor(sf::Color::White);
+    m_detail->roleText.setString(role.str());
+    m_detail->roleText.setPosition({bx + 10, by + 8});
+
+    m_detail->atkText.setCharacterSize(12); m_detail->atkText.setFillColor(sf::Color(255, 140, 140));
+    m_detail->atkText.setString(atk.str());
+    m_detail->atkText.setPosition({bx + 10, by + 30});
+
+    m_detail->defText.setCharacterSize(12); m_detail->defText.setFillColor(sf::Color(140, 200, 255));
+    m_detail->defText.setString(def.str());
+    m_detail->defText.setPosition({bx + 10, by + 50});
+
+    m_detail->expText.setCharacterSize(12); m_detail->expText.setFillColor(sf::Color(200, 200, 120));
+    m_detail->expText.setString(exp.str());
+    m_detail->expText.setPosition({bx + 10, by + 70});
+
+    window.draw(m_detail->roleText);
+    window.draw(m_detail->atkText);
+    window.draw(m_detail->defText);
+    window.draw(m_detail->expText);
+}
+
 void PartyUI::renderLeader(sf::RenderWindow& window, const Player* player)
 {
     if (!player) return;
@@ -111,7 +189,7 @@ void PartyUI::renderLeader(sf::RenderWindow& window, const Player* player)
     window.draw(slot.lvText);
 }
 
-void PartyUI::renderMember(sf::RenderWindow& window, const std::shared_ptr<NPC>& npc, int slotIndex)
+void PartyUI::renderMember(sf::RenderWindow& window, const std::shared_ptr<NPC>& npc, int slotIndex, bool isSelected)
 {
     if (slotIndex < 0 || slotIndex >= MAX_SLOTS) return; // กันเกิน (party เต็มที่ 6 คน)
     if (!npc) return;
@@ -135,7 +213,12 @@ void PartyUI::renderMember(sf::RenderWindow& window, const std::shared_ptr<NPC>&
     int y = START_Y + slotIndex * SLOT_HEIGHT;
     SlotUI& slot = *m_slots[slotIndex];
 
-    updateSlotVisuals(slot, y, displayName, npc->getHP(), npc->getMaxHP(), npc->getLevel(), bgColor);
+    // ── ไฮไลท์ slot ที่ cursor อยู่ (ข้อ 5) ──
+    sf::Color outlineCol = isSelected ? sf::Color(255, 220, 60) : sf::Color::White;
+    float     outlineTh  = isSelected ? 3.f : 2.f;
+
+    updateSlotVisuals(slot, y, displayName, npc->getHP(), npc->getMaxHP(), npc->getLevel(),
+                       bgColor, outlineCol, outlineTh);
 
     window.draw(slot.box);
     window.draw(slot.nameText);

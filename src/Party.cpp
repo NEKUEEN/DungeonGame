@@ -50,6 +50,16 @@ std::shared_ptr<NPC> Party::getMemberById(const std::string& id) const
     return (it != m_members.end()) ? *it : nullptr;
 }
 
+bool Party::swapMembers(int idxA, int idxB)
+{
+    if (idxA < 0 || idxA >= (int)m_members.size()) return false;
+    if (idxB < 0 || idxB >= (int)m_members.size()) return false;
+    if (idxA == idxB) return false;
+
+    std::swap(m_members[idxA], m_members[idxB]);
+    return true;
+}
+
 void Party::recordLeaderStep(int col, int row, bool facingLeft)
 {
     m_trail.push_front({col, row, facingLeft});

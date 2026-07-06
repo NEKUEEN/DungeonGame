@@ -36,6 +36,12 @@ public:
     std::shared_ptr<NPC> getMember(int idx) const;
     std::shared_ptr<NPC> getMemberById(const std::string& id) const;
 
+    // ── Reorder (ข้อ 5) ──
+    // สลับตำแหน่งสองคนใน m_members ตรงๆ — เพราะ trail-follow index (i+1)*TRAIL_SPACING
+    // และ surround-slot ของข้อ 4 ผูกกับตำแหน่งใน m_members อยู่แล้ว การสลับที่นี่
+    // จึงพอสำหรับ "ย้ายลำดับแถว" โดยไม่ต้องแก้ระบบ follow/combat ใดๆ เพิ่ม
+    bool swapMembers(int idxA, int idxB);
+
     // Getters
     int  getSize()       const { return m_members.size(); }
     int  size()          const { return m_members.size(); }  // Alias for STL-like interface

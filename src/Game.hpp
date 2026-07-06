@@ -157,6 +157,9 @@ private:
     void spawnNPCs(int count = 3);  // Spawn random NPCs
     void recruitNPC(const std::string& npcId);  // Add NPC to party
     void tryInteractNPC();  // Try to interact with adjacent NPC
+    // ── PartyUI commands (ข้อ 5) ──
+    void dismissSelectedCompanion();        // ไล่ companion ที่เลือกใน PartyUI ออก กลับไปยืนบนแมพที่ตำแหน่งผู้เล่น
+    void reorderSelectedCompanion(int dir);  // สลับลำดับแถวของ companion ที่เลือก (dir = -1 ขึ้น / +1 ลง)
     void updatePartyFollowPositions(const std::vector<bool>& skip = {});  // Update companion positions (follow player); skip[i]=true → engaged, ข้าม
     void clearEnemies();
     void playerAttack(Enemy* enemy);
