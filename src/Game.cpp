@@ -2104,10 +2104,12 @@ void Game::tryPickupItem()
     for (int i=0;i<(int)m_mapItems.size();++i)
         if (m_mapItems[i].col==pc&&m_mapItems[i].row==pr)
         {
-            if (m_inventory.isFull()){addLog("  Inventory full!",sf::Color(220,120,50));return;}
             Item item=m_mapItems[i]; item.col=-1; item.row=-1;
 
-            m_inventory.addItem(item);
+            if (!m_inventory.addItem(item)) {
+                addLog("  Inventory full!",sf::Color(220,120,50));
+                return;
+            }
             m_mapItems.erase(m_mapItems.begin()+i);
             addLog("  Picked up: "+item.name);
             return;
