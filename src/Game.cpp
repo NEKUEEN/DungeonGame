@@ -3636,6 +3636,7 @@ void Game::renderRightPanel()
             const float SZ = 35.f, GAP = 4.f;
             float sx0 = panelX + (RIGHT_PANEL_W - (COLS * (SZ + GAP) - GAP)) / 2.f;
             float sy0 = panelY + 10.f;
+            std::vector<sf::Text> pendingCounts;
 
             for (int row = 0; row < ROWS; ++row)
                 for (int col = 0; col < COLS; ++col)
@@ -3676,11 +3677,13 @@ void Game::renderRightPanel()
                         if (cnt > 1) {
                             sf::Text ct(m_font, "x"+std::to_string(cnt), 7);
                             ct.setFillColor(sf::Color(255,220,100));
-                            ct.setPosition({sx+SZ-14.f, sy+SZ-10.f});
-                            m_window.draw(ct);
+                            auto tb = ct.getLocalBounds();
+                            ct.setPosition({sx + SZ - tb.size.x - 3.f, sy + SZ - 11.f});
+                            pendingCounts.push_back(ct);
                         }
                     }
                 }
+            for (auto& ct : pendingCounts) m_window.draw(ct);
 
             Item* selItem = m_inventory.getItem(m_ui.selectedInvSlot);
             std::string info = "(empty)";
