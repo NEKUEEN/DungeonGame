@@ -160,23 +160,37 @@ bool FogOfWar::isExplored(int col, int row) const
     return s == FogState::Explored || s == FogState::Visible;
 }
 
-void FogOfWar::render(sf::RenderWindow& window, int tileSize)
+// ============================================================
+//  render – cull ตาม gameView เหมือน TileMap::render() (ก่อนหน้านี้
+//  loop ทั้ง m_rows*m_cols ทุกเฟรมไม่ว่าแมพจะใหญ่แค่ไหน → ที่แมพ 500x500
+//  คือ 250,000 เซลล์ x 6 vertex ทุกเฟรม ทั้งที่มองเห็นจริงแค่ ~21x21 ไทล์
+//  รอบ player นี่คือสาเหตุหลักที่ fps ร่วงเวลาแมพใหญ่ ไม่ใช่ TileMap
+//  ซึ่ง cull ถูกอยู่แล้ว
+// ============================================================
+void FogOfWar::render(sf::RenderWindow& window, int tileSize, const sf::View& gameView)
 {
-    // ไม่ resize ทุกเฟรม — ทำครั้งเดียวตอนแรก
-    if (m_va.getVertexCount() == 0)
-    {
-        m_va.setPrimitiveType(sf::PrimitiveType::Triangles);
-        m_va.resize(m_rows * m_cols * 6);
-    }
-    // ใช้ VertexArray วาดครั้งเดียว แทน draw call ทีละ tile
-    //sf::VertexArray va(sf::PrimitiveType::Triangles);
-    //va.resize(m_rows * m_cols * 6);
-
-    int idx = 0;
     float ts = (float)tileSize;
 
-    for (int row = 0; row < m_rows; ++row)
-    for (int col = 0; col < m_cols; ++col)
+    sf::Vector2f center = gameView.getCenter();
+    sf::Vector2f size   = gameView.getSize();
+
+    int minCol = std::max(0, (int)((center.x - size.x/2) / ts) - 1);
+    int maxCol = std::min(m_cols-1, (int)((center.x + size.x/2) / ts) + 1);
+    int minRow = std::max(0, (int)((center.y - size.y/2) / ts) - 1);
+    int maxRow = std::min(m_rows-1, (int)((center.y + size.y/2) / ts) + 1);
+
+    if (minCol > maxCol || minRow > maxRow) return;  // view นอกแมพทั้งหมด (กันไว้เฉยๆ)
+
+    int visCols = maxCol - minCol + 1;
+    int visRows = maxRow - minRow + 1;
+
+    m_va.setPrimitiveType(sf::PrimitiveType::Triangles);
+    m_va.resize((size_t)visCols * visRows * 6);  // ขนาดตาม viewport ไม่ใช่ทั้งแมพ
+
+    int idx = 0;
+
+    for (int row = minRow; row <= maxRow; ++row)
+    for (int col = minCol; col <= maxCol; ++col)
     {
         sf::Color color;
         switch (m_grid[row][col])
@@ -185,16 +199,6 @@ void FogOfWar::render(sf::RenderWindow& window, int tileSize)
             case FogState::Explored: color = sf::Color(0, 0, 0, 160); break;
             case FogState::Visible:  color = sf::Color(0, 0, 0, 0);   break;
         }
-
-        //if (color.a == 0) { idx += 6; continue; } // Visible ไม่ต้องวาด
-        if (color.a == 0)
-{
-    // ต้อง clear vertices เก่าออก ไม่งั้นค้าง
-    for (int i = 0; i < 6; i++)
-        m_va[idx+i].color = sf::Color(0,0,0,0);
-    idx += 6;
-    continue;
-}
 
         float x = (float)(col * tileSize);
         float y = (float)(row * tileSize);

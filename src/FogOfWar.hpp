@@ -14,7 +14,7 @@ public:
     FogState getState(int col, int row) const;
     bool isVisible(int col, int row) const;
     bool isExplored(int col, int row) const;
-    void render(sf::RenderWindow& window, int tileSize);
+    void render(sf::RenderWindow& window, int tileSize, const sf::View& gameView);
 
 private:
     void castOctant(int px, int py,

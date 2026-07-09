@@ -3076,7 +3076,7 @@ void Game::render()
     if (companion) m_npcManager.renderNPC(m_window, companion);
 
     if (m_player) m_player->render(m_window);
-    m_fog.render(m_window,TILE_SIZE);
+    m_fog.render(m_window, TILE_SIZE, m_gameView);
 
     if (m_hoverCol >= 0 && m_hoverRow >= 0)
     {
