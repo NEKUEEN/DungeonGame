@@ -179,6 +179,7 @@ private:
     std::string pickRandomMonster(int floor);
     std::set<std::string> m_firstKillDone;  // id ที่เคย first kill แล้ว
     void onEnemyKilled(Enemy* enemy);
+    void grantPartyExp(int expGain);  // ข้อ 6: แจก EXP ให้ player + companion ทุกคนที่ยังไม่ตายเท่ากัน
     void spawnBoss(const std::string& family);
     
     //tileMousse sel

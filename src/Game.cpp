@@ -1124,16 +1124,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                         sf::Color(255,255,255));
                     }
 
-                    if (expGain > 0 && m_player->addExp(expGain))
-                    {
-                        m_ui.levelUpFlash = true;
-                        m_ui.levelUpTimer = 120;
-                        int lv = m_player->getStats().level;
-                        m_coreSlots.setSlotCount(lv);
-                        refreshStats();
-                        recalcSpeed();
-                        addLog("  *** LEVEL UP! Level "+std::to_string(lv)+" ***", sf::Color(255,255,255));
-                    }
+                    grantPartyExp(expGain);
                     onEnemyKilled(e);
                 }
                 hit = true;
@@ -1384,6 +1375,38 @@ void Game::spawnBoss(const std::string& family)
         addLog("  *** " + family + " BOSS APPEARS! ***", sf::Color(255,255,255));
         addLog("  The slaughter has summoned a guardian!", sf::Color(255,255,255));
         return;
+    }
+}
+
+// ============================================================
+//  grantPartyExp – แจก EXP ให้ player + companion ทุกคนที่ยังไม่ตาย
+//  เท่ากันทุกครั้ง ไม่ว่าใครเป็นคนฟันตาย (ข้อ 6: party-wide sharing)
+//  เรียกแทนที่โค้ด "expGain > 0 && m_player->addExp(expGain)" เดิม
+//  ที่เคยซ้ำกัน 3 จุด (AOE, melee/bow, companion)
+// ============================================================
+void Game::grantPartyExp(int expGain)
+{
+    if (expGain <= 0) return;
+
+    if (m_player && m_player->addExp(expGain))
+    {
+        m_ui.levelUpFlash = true;
+        m_ui.levelUpTimer = 120;
+        int lv = m_player->getStats().level;
+        m_coreSlots.setSlotCount(lv);
+        refreshStats();
+        recalcSpeed();
+        addLog("  *** LEVEL UP! Level " + std::to_string(lv) + " ***", sf::Color(255,255,255));
+    }
+
+    for (auto& member : Party::instance().getMembers())
+    {
+        if (!member || member->isDead()) continue;
+        int lvBefore = member->getLevel();
+        member->addExp(expGain);
+        if (member->getLevel() > lvBefore)
+            addLog("  " + member->getName() + " leveled up to Lv." +
+                   std::to_string(member->getLevel()) + "!", sf::Color(255,255,255));
     }
 }
 
@@ -2460,16 +2483,7 @@ if (mainHand && !mainHand->onHitStatus.empty() &&
                    sf::Color(255, 255, 255));
         }
 
-            if (expGain > 0 && m_player->addExp(expGain))
-        {
-            m_ui.levelUpFlash = true;
-            m_ui.levelUpTimer = 120;
-            int lv=m_player->getStats().level;
-            m_coreSlots.setSlotCount(lv);
-            refreshStats();
-            recalcSpeed();
-            addLog("  *** LEVEL UP! Level "+std::to_string(lv)+" ***",sf::Color(255,255,255));
-        }
+            grantPartyExp(expGain);
         onEnemyKilled(enemy);
     }
 }
@@ -2621,7 +2635,7 @@ void Game::companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy)
 
     if (!enemy->isDead()) return;
 
-    // ── EXP เข้า player คนเดียวก่อน (party-wide sharing ค่อยทำข้อ 6) ──
+    // ── EXP แบ่งทั้งปาร์ตี้เท่ากัน (ข้อ 6: party-wide sharing) ──
     const std::string& eid = enemy->getId();
     bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
     int expGain = isFirstKill ? enemy->getExp() : 0;
@@ -2629,20 +2643,11 @@ void Game::companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy)
     if (isFirstKill)
     {
         m_firstKillDone.insert(eid);
-        addLog("  You killed " + enemy->getName() + "! +" + std::to_string(expGain) + " EXP",
-               sf::Color(255,255,255));
+        addLog("  " + npc->getName() + " killed " + enemy->getName() + "! +" +
+               std::to_string(expGain) + " EXP", sf::Color(255,255,255));
     }
 
-    if (expGain > 0 && m_player && m_player->addExp(expGain))
-    {
-        m_ui.levelUpFlash = true;
-        m_ui.levelUpTimer = 120;
-        int lv = m_player->getStats().level;
-        m_coreSlots.setSlotCount(lv);
-        refreshStats();
-        recalcSpeed();
-        addLog("  *** LEVEL UP! Level " + std::to_string(lv) + " ***", sf::Color(255,255,255));
-    }
+    grantPartyExp(expGain);
 
     // ── Loot drop (path เดียวกับ playerAttack/fireBow) ──
     auto dropped = DropTable::instance().roll(enemy->getId());
