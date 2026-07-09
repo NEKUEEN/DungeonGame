@@ -236,11 +236,14 @@ private:
     FogOfWar             m_fog;
     Player*              m_player   = nullptr;
     std::vector<Enemy*>  m_enemies;
+    std::map<int, std::vector<Enemy*>> m_floorEnemiesSaved;  // ← enemies ที่เหลือรอดต่อชั้น (ไม่ delete ตอนย้ายชั้น)
     std::vector<Item>    m_mapItems;
+    std::map<int, std::vector<Item>> m_floorItemsSaved;  // ← เก็บของที่ตกพื้นแยกตามชั้น กันหายตอนย้ายชั้นแบบ DCSS
     Inventory            m_inventory;
     Equipment            m_equipment;
     CoreSlots            m_coreSlots;
     NPCManager           m_npcManager{TILE_SIZE};
+    std::map<int, std::vector<std::shared_ptr<NPC>>> m_floorNPCsSaved;  // ← NPC (ที่ยังไม่ recruit) ต่อชั้น
 
     UIState m_ui;
     FinalStats m_finalStats;   // รวม stat ที่คำนวณแล้ว

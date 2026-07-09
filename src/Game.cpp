@@ -1182,6 +1182,12 @@ void Game::newDungeon(bool keepPlayer)
         m_familyKillCount.clear();
         m_bossActive.clear();
         m_firstKillDone.clear();
+        m_floorItemsSaved.clear();  // เกมใหม่/restart → ของเก่าที่วางไว้ไม่ควรข้ามมา
+        clearEnemies();  // ล้าง enemies ของ run เดิมที่ยังไม่ตาย
+        for (auto& kv : m_floorEnemiesSaved)
+            for (auto* e : kv.second) delete e;
+        m_floorEnemiesSaved.clear();
+        m_floorNPCsSaved.clear();  // shared_ptr เอง ไม่ต้อง delete มือ
         m_log.clear();   // เคลียร์ log ทุกครั้งที่เริ่ม dungeon ใหม่ (รวมถึงตอน restart หลังตาย)
     }
 
@@ -1227,9 +1233,41 @@ void Game::newDungeon(bool keepPlayer)
         //m_player->getStats().statusEffects.push_back(test);
     }
 
-    clearEnemies(); spawnEnemies(8+m_dungeonFloor);
-    m_mapItems.clear(); spawnItems();
-    m_npcManager.clear(); spawnNPCs(3);
+    // ── Enemies: ถ้าเคยมาชั้นนี้แล้วในรอบนี้ คืนตัวที่เหลือรอดกลับมาแทน spawn ใหม่ ──
+    auto savedEnemiesIt = m_floorEnemiesSaved.find(m_dungeonFloor);
+    if (savedEnemiesIt != m_floorEnemiesSaved.end())
+    {
+        m_enemies = savedEnemiesIt->second;
+        m_floorEnemiesSaved.erase(savedEnemiesIt);
+    }
+    else
+    {
+        clearEnemies();  // เผื่อ m_enemies ยังไม่ว่าง (ปกติจะว่างจากตอนเซฟก่อนย้ายแล้ว)
+        spawnEnemies(8+m_dungeonFloor);
+    }
+
+    // ── ของบนพื้น: ถ้าเคยมาชั้นนี้มาก่อน คืนของที่วางไว้กลับมาแทน spawn ใหม่ ──
+    auto savedItemsIt = m_floorItemsSaved.find(m_dungeonFloor);
+    if (savedItemsIt != m_floorItemsSaved.end())
+        m_mapItems = savedItemsIt->second;
+    else
+    {
+        m_mapItems.clear();
+        spawnItems();
+    }
+
+    // ── NPC (ที่ยังไม่ recruit): เหมือนกัน คืนตัวเดิมที่ยืนอยู่กลับมา ──
+    auto savedNPCsIt = m_floorNPCsSaved.find(m_dungeonFloor);
+    m_npcManager.clear();
+    if (savedNPCsIt != m_floorNPCsSaved.end())
+    {
+        for (auto& npc : savedNPCsIt->second) m_npcManager.add(npc);
+        m_floorNPCsSaved.erase(savedNPCsIt);
+    }
+    else
+    {
+        spawnNPCs(3);
+    }
     m_respawnTimer=0;
 
     if (m_player)
@@ -2048,6 +2086,11 @@ void Game::tryDescendStairs()
     if (!m_player) return;
     if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::GateDown)
     {addLog("  No gate here.");return;}
+    std::string gateId = m_tileMap.getGateId(m_player->getCol(), m_player->getRow());  // ← เพิ่ม
+    m_floorItemsSaved[m_dungeonFloor] = m_mapItems;
+    m_floorEnemiesSaved[m_dungeonFloor] = m_enemies; // เซฟ enemies ที่เหลือรอด (ย้าย ownership ไม่ delete)
+    m_enemies.clear();
+    m_floorNPCsSaved[m_dungeonFloor] = m_npcManager.getAll();  // เซฟ NPC ที่ยังไม่ recruit
     m_dungeonFloor++;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
@@ -2056,15 +2099,22 @@ void Game::tryDescendStairs()
     newDungeon(true);
     if (m_player)
     {
+        int foundCol=-1, foundRow=-1, fallbackCol=-1, fallbackRow=-1;
         for (int row=1;row<m_mapRows-1;++row)
             for (int col=1;col<m_mapCols-1;++col)
                 if (m_tileMap.getTile(col,row)==TileType::GateUp)
-                { m_player->setPos(col,row); goto descend_placed; }
-        descend_placed:
+                {
+                    if (fallbackCol==-1) { fallbackCol=col; fallbackRow=row; }
+                    if (!gateId.empty() && m_tileMap.getGateId(col,row)==gateId)
+                        { foundCol=col; foundRow=row; }
+                }
+        if (foundCol==-1) { foundCol=fallbackCol; foundRow=fallbackRow; }
+        if (foundCol!=-1) m_player->setPos(foundCol,foundRow);
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
         updateCamera();
+        recomputeFog();
     }
     addLog("  Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,255,255));
 }
@@ -2075,6 +2125,10 @@ void Game::tryAscendStairs()
     if (m_tileMap.getTile(m_player->getCol(),m_player->getRow())!=TileType::GateUp)
     {addLog("  No gate here.");return;}
     if (m_dungeonFloor<=1){addLog("  Already on floor 1.");return;}
+    m_floorItemsSaved[m_dungeonFloor] = m_mapItems;  // เซฟของที่วางไว้บนชั้นนี้ก่อนย้าย
+    m_floorEnemiesSaved[m_dungeonFloor] = m_enemies; // เซฟ enemies ที่เหลือรอด (ย้าย ownership ไม่ delete)
+    m_enemies.clear();
+    m_floorNPCsSaved[m_dungeonFloor] = m_npcManager.getAll();  // เซฟ NPC ที่ยังไม่ recruit
     m_dungeonFloor--;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
@@ -2092,6 +2146,7 @@ void Game::tryAscendStairs()
         m_player->getSkills()=savedSkills;
         for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
         updateCamera();
+        recomputeFog();
     }
     addLog("  Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,255,255));
 }

@@ -197,7 +197,7 @@ void TileMap::render(sf::RenderWindow& window, const sf::View& gameView)
     // build vertex array เฉพาะ tile ที่เห็น
     std::map<const sf::Texture*, sf::VertexArray> frameCache;
 
-    auto getTexKey = [&](TileType type, ZoneType zone) -> const char* {
+    auto getTexKey = [&](TileType type, ZoneType zone, int col, int row) -> const char* {
         switch(type) {
             case TileType::Floor:
                 if (zone == ZoneType::Darkness)      return "darkness_floor";
@@ -206,12 +206,13 @@ void TileMap::render(sf::RenderWindow& window, const sf::View& gameView)
                 if (zone == ZoneType::BlackRock)     return "blackRock_floor";
                 return "tile_floor";
             case TileType::Wall:
-                if (zone == ZoneType::CrystalBright) return "crystalBright_wall";
-                if (zone == ZoneType::Darkness) return "darkness_wall";
-                if (zone == ZoneType::DeadMan) return "brick1";
-                if (zone == ZoneType::DeadMan) return "brick2";
-                if (zone == ZoneType::DeadMan) return "WALL1";
-                return "tile_wall";
+            {
+                auto it = m_wallVariant.find({col, row});
+                if (it != m_wallVariant.end()) return it->second.c_str();
+            }
+            if (zone == ZoneType::CrystalBright) return "crystalBright_wall";
+            if (zone == ZoneType::Darkness)      return "darkness_wall";
+                return "tile_wall";   // fallback เผื่อ DeadMan tile ไหนไม่มี variant ระบุ
             case TileType::GateDown: return "gate_down";
             case TileType::GateUp:   return "gate_up";
         }
@@ -221,7 +222,7 @@ void TileMap::render(sf::RenderWindow& window, const sf::View& gameView)
     for (int row = minRow; row <= maxRow; ++row)
     for (int col = minCol; col <= maxCol; ++col)
     {
-        const char* key = getTexKey(m_grid[row][col], m_zoneGrid[row][col]);
+        const char* key = getTexKey(m_grid[row][col], m_zoneGrid[row][col], col, row);
         if (!key) continue;
         const sf::Texture* tex = tm.get(key);
         if (!tex) continue;
@@ -272,6 +273,11 @@ ZoneType TileMap::getZone(int col, int row) const
 {
     if (col<0||col>=m_cols||row<0||row>=m_rows) return ZoneType::None;
     return m_zoneGrid[row][col];
+}
+std::string TileMap::getGateId(int col, int row) const
+{
+    auto it = m_gateIds.find({col, row});
+    return (it != m_gateIds.end()) ? it->second : "";
 }
 
 sf::Color TileMap::tileColor(TileType type) const
@@ -363,6 +369,19 @@ void TileMap::processLayers(const nlohmann::json& layers)
                     setTile(col, row, TileType::GateUp);
                 else if (objName == "gate_down" || tsLower.find("gatedown") != std::string::npos)
                     setTile(col, row, TileType::GateDown);
+
+                // อ่าน custom property "gateId" (ถ้ามี) เพื่อผูกคู่ประตูข้ามชั้น
+                if (obj.contains("properties"))
+                {
+                    for (const auto& prop : obj["properties"])
+                    {
+                        if (prop.contains("name") && prop["name"].get<std::string>() == "gateId" && prop.contains("value"))
+                        {
+                            m_gateIds[{col, row}] = prop["value"].get<std::string>();
+                            break;
+                        }
+                    }
+                }
             }
             continue;
         }
@@ -415,6 +434,10 @@ void TileMap::processLayers(const nlohmann::json& layers)
             if (tsLower.find("wall") != std::string::npos)
             {
                 tType = TileType::Wall; determined = true;
+
+                if (tsLower.find("brick1") != std::string::npos) m_wallVariant[{col, row}] = "brick1";
+                else if (tsLower.find("brick2") != std::string::npos) m_wallVariant[{col, row}] = "brick2";
+                else if (tsLower.find("WALL1") != std::string::npos) m_wallVariant[{col, row}] = "WALL1";
             }
             else if (tsLower.find("gatedown") != std::string::npos)
             {
@@ -469,6 +492,7 @@ bool TileMap::loadFromTiled(const std::string& path)
     m_rows = j["height"].get<int>();
     m_grid.assign(m_rows, std::vector<TileType>(m_cols, TileType::Wall));
     m_zoneGrid.assign(m_rows, std::vector<ZoneType>(m_cols, ZoneType::None));
+    m_gateIds.clear();
 
     m_tilesetRanges.clear();
     if (j.contains("tilesets"))

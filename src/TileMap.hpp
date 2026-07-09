@@ -28,6 +28,7 @@ public:
     int      getCols() const { return m_cols; }
     int      getRows() const { return m_rows; }
     ZoneType getZone(int col, int row) const;
+    std::string getGateId(int col, int row) const;
 
 private:
     struct Rect { int x,y,w,h; };
@@ -49,6 +50,8 @@ private:
     int m_cols,m_rows,m_tileSize;
     std::vector<std::vector<TileType>> m_grid;
     std::vector<std::vector<ZoneType>> m_zoneGrid;
+    std::map<std::pair<int,int>, std::string> m_gateIds;
+    std::map<std::pair<int,int>, std::string> m_wallVariant;
     std::vector<BSPNode> m_bspNodes;
     std::mt19937 m_rng{ std::random_device{}() };
 
