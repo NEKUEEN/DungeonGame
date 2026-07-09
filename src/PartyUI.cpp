@@ -82,9 +82,10 @@ void PartyUI::updateSlotVisuals(SlotUI& slot, int y, const std::string& name,
     if (!slot.initialized || slot.lastHp != hp || slot.lastMaxHp != maxHp)
     {
         std::ostringstream oss;
-        oss << "HP: " << hp << "/" << maxHp;
+        if (hp <= 0) oss << "DOWNED";                 // ← ข้อ 7: downed แทนเลข HP 0/x
+        else         oss << "HP: " << hp << "/" << maxHp;
         slot.hpText.setCharacterSize(12);
-        slot.hpText.setFillColor(sf::Color::White);
+        slot.hpText.setFillColor(hp <= 0 ? sf::Color(255, 90, 90) : sf::Color::White);
         slot.hpText.setString(oss.str());
         slot.lastHp = hp;
         slot.lastMaxHp = maxHp;

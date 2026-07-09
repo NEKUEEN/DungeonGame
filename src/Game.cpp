@@ -2610,9 +2610,13 @@ void Game::enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc)
 
     if (npc->isDead())
     {
-        addLog("  " + npc->getName() + " has fallen!", sf::Color(255,255,255));
-        Party::instance().removeMember(npc->getId());
-        // ← ลบบรรทัด m_companionTargets.erase(...) ทิ้ง — ยังไม่มี member ตัวนี้
+        // ── ข้อ 7: downed ไม่ใช่ตายถาวร ──
+        // ไม่ removeMember แล้ว: companion ที่ hp<=0 ยัง "อยู่" ใน party
+        // (isDead() ทำให้ combat loop / movement loop ข้ามมันไปเองอยู่แล้ว
+        // ที่ทุกจุดมี guard "if (!npc || npc->isDead()) continue;")
+        // ตำแหน่งยังโดนลาก follow trail ต่อไปเหมือนถูกหามเดิน
+        // ปลุกคืนได้ด้วยการเดินไปยืนติดแล้วกด interact → tryInteractNPC()
+        addLog("  " + npc->getName() + " is downed!", sf::Color(255,255,255));
     }
 }
 // ============================================================
@@ -4316,6 +4320,23 @@ void Game::tryInteractNPC()
     
     int playerCol = m_player->getCol();
     int playerRow = m_player->getRow();
+
+    // ── ข้อ 7: ปลุก companion ที่ downed อยู่ก่อน ถ้ามีตัวใดยืนติดอยู่ ──
+    // (เช็คก่อน recruit เพราะ downed companion ก็ยืนติด player อยู่แล้วเสมอ
+    // จาก follow trail ตำแหน่งจะใกล้กว่าตัว NPC บนแมพทั่วไป)
+    for (auto& member : Party::instance().getMembers())
+    {
+        if (!member || !member->isDead()) continue;
+        int dc = std::abs(member->getCol() - playerCol);
+        int dr = std::abs(member->getRow() - playerRow);
+        if (dc <= 1 && dr <= 1)
+        {
+            member->revive();
+            addLog("  " + member->getName() + " is back on their feet!", sf::Color(255,255,255));
+            processTurn();  // Count as action
+            return;
+        }
+    }
     
     // Check all 8 adjacent tiles for NPCs
     int dx[] = {-1, 0, 1, -1, 1, -1, 0, 1};

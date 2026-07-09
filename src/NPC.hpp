@@ -46,6 +46,7 @@ public:
     void takeDamage(int dmg) { m_hp = std::max(0, m_hp - dmg); }
     void heal(int amt)       { m_hp = std::min(m_maxHp, m_hp + amt); }
     bool isDead()      const { return m_hp <= 0; }
+    void revive(float hpPct = 0.3f) { m_hp = std::max(1, (int)(m_maxHp * hpPct)); }  // ← ปลุกจาก downed (ข้อ 7)
 
     // Experience & Leveling
     void addExp(int exp);
