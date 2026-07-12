@@ -65,7 +65,7 @@ struct Stats
 
     // ── EXP ──
     int exp       = 0;
-    int expToNext = 100;
+    int expToNext = 10;
 
     // ── Timers ──
     int hungerTimer = 0;
@@ -126,6 +126,7 @@ public:
     {
         for (const auto& sk : m_skills)
             if (sk.data.id == id) return &sk;
+            
         return nullptr;
     }
 

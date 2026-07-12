@@ -13,6 +13,15 @@
 #include <queue>
 #include <unordered_map>
 
+// ── ขนาดหน้าต่าง/เลย์เอาต์จริง (ปรับได้ตอนรันไทม์ ดู Game::refreshWindowMetrics) ──
+// ค่าเริ่มต้นนี้ถูกแทนที่ทันทีใน constructor ด้วยความละเอียดจอจริงของเครื่อง
+// (เกมเป็นฟูลสกรีนเสมอ ไม่มี F11 toggle แล้ว — ปรับอัตโนมัติแบบ DCSS)
+int WINDOW_W    = BASE_WINDOW_W;
+int WINDOW_H    = BASE_WINDOW_H;
+int GAME_VIEW_W = BASE_WINDOW_W - RIGHT_PANEL_W;
+int GAME_VIEW_H = BASE_WINDOW_H - LOG_PANEL_H;
+int STATUS_PANEL_H = (BASE_WINDOW_H - LOG_PANEL_H) - INV_GRID_H;
+
 std::vector<std::pair<int,int>> Game::findPath(int sc, int sr, int ec, int er)
 {
     int COLS = m_tileMap.getCols();
@@ -72,7 +81,7 @@ std::vector<std::pair<int,int>> Game::findPath(int sc, int sr, int ec, int er)
 //  Constructor / Destructor
 // ============================================================
 Game::Game()
-    : m_window(sf::VideoMode({WINDOW_W, WINDOW_H}), "Dungeon and Stone",
+    : m_window(sf::VideoMode::getDesktopMode(), "Dungeon and Stone",
                sf::Style::None)
     , m_tileMap(MAP_COLS, MAP_ROWS, TILE_SIZE)
     , m_fog(MAP_COLS, MAP_ROWS)
@@ -81,6 +90,10 @@ Game::Game()
     m_window.setFramerateLimit(60);
     m_fontLoaded = m_font.openFromFile("assets/fonts/font.ttf");
     if (!m_fontLoaded) std::cerr << "[Game] Warning: font not loaded\n";
+
+    // เต็มจอเสมอ ปรับตามความละเอียดจอจริงของแต่ละเครื่องอัตโนมัติ (แบบ DCSS)
+    auto desktop = sf::VideoMode::getDesktopMode();
+    refreshWindowMetrics((int)desktop.size.x, (int)desktop.size.y);
 
     TextureManager::instance().loadAll();
     MonsterDB::instance().load("assets/data/monsters.json");
@@ -91,14 +104,8 @@ Game::Game()
     NPCDB::instance().load("assets/data/npcs.json");
     std::cerr << "[RaceDB] loaded: " << RaceDB::instance().getAll().size() << " races\n";
 
-    m_gameView.setSize({(float)GAME_VIEW_W*1.5f,(float)GAME_VIEW_H*1.5f});
-    m_uiView.setSize({(float)WINDOW_W,(float)WINDOW_H});
-    m_uiView.setCenter({(float)WINDOW_W/2.f,(float)WINDOW_H/2.f});
-    applyLetterbox();
-
     newDungeon(false);
 }
-
 Game::~Game() { delete m_player; clearEnemies(); }
 
 // ============================================================
@@ -1160,7 +1167,7 @@ void Game::newDungeon(bool keepPlayer)
     // Game.cpp บรรทัด 1107-1115 แก้เป็น:
 
     {
-        std::string path = "assets/data/1000map_floor" + std::to_string(m_dungeonFloor) + ".tmj";
+        std::string path = "assets/data/50map_floor" + std::to_string(m_dungeonFloor) + ".tmj";
         if (!m_tileMap.loadFromTiled(path))
             m_tileMap.generate();
     }
@@ -1297,6 +1304,8 @@ void Game::applyLetterbox()
     auto winSize = m_window.getSize();
     float winW = (float)winSize.x;
     float winH = (float)winSize.y;
+    // Fit/Letterbox: ใช้ min เพื่อให้เห็นภาพเกมครบทุกส่วน ไม่ตัดขอบ UI
+    // (เหมือนตอนขยายหน้าต่างจาก title bar) — จะมีแถบดำถ้าสัดส่วนจอไม่ตรงกับเกม
     float scale = std::min(winW / (float)WINDOW_W, winH / (float)WINDOW_H);
     float viewW = WINDOW_W * scale;
     float viewH = WINDOW_H * scale;
@@ -1312,6 +1321,24 @@ void Game::applyLetterbox()
         {offX/winW, offY/winH},
         {viewW/winW, viewH/winH}
     ));
+}
+
+// ── อัปเดต WINDOW_W/H และค่าที่คำนวณต่อ (GAME_VIEW_W/H, STATUS_PANEL_H) ──
+// เรียกครั้งเดียวตอนเปิดเกม (constructor) ด้วยความละเอียดจอจริงของเครื่องนั้นๆ
+// เพื่อให้เกมเต็มจอสนิทเสมอแบบ DCSS ไม่ scale ภาพ 800x600 เดิมให้ยืด/หด
+// ส่วน panel ต่างๆ (RIGHT_PANEL_W, LOG_PANEL_H) ยังคงขนาด pixel เท่าเดิมเสมอ
+void Game::refreshWindowMetrics(int w, int h)
+{
+    WINDOW_W       = w;
+    WINDOW_H       = h;
+    GAME_VIEW_W    = WINDOW_W - RIGHT_PANEL_W;
+    GAME_VIEW_H    = WINDOW_H - LOG_PANEL_H;
+    STATUS_PANEL_H = GAME_VIEW_H - INV_GRID_H;
+
+    m_gameView.setSize({(float)GAME_VIEW_W * 1.5f, (float)GAME_VIEW_H * 1.5f});
+    m_uiView.setSize({(float)WINDOW_W, (float)WINDOW_H});
+    m_uiView.setCenter({(float)WINDOW_W / 2.f, (float)WINDOW_H / 2.f});
+    applyLetterbox();
 }
 
 
@@ -1825,19 +1852,6 @@ void Game::processEvents()
         {
             if (key->code == sf::Keyboard::Key::Tab)
             m_partyUI.toggle();   // เปลี่ยนชื่อ instance ตามที่ประกาศไว้จริงใน Game.hpp
-            // F11 toggle fullscreen
-            if (key->code == sf::Keyboard::Key::F11)
-            {
-                m_travelPath.clear();
-                m_isFullscreen = !m_isFullscreen;
-                if (m_isFullscreen)
-                    m_window.create(sf::VideoMode::getDesktopMode(), "Dungeon and Stone", sf::Style::None);
-                else
-                    m_window.create(sf::VideoMode({WINDOW_W, WINDOW_H}), "Dungeon and Stone", sf::Style::Titlebar | sf::Style::Close);
-                m_window.setFramerateLimit(60);
-                applyLetterbox();
-                return;
-            }
             if (m_playerDead)
             {
                 if (key->code==sf::Keyboard::Key::R)
@@ -2403,8 +2417,8 @@ void Game::handlePlayerMove(int dc, int dr)
         {addLog("  "+it.name+" here. [G] pick up.",sf::Color(255,255,255));break;}
 
     TileType tile=m_tileMap.getTile(pc,pr);
-    if (tile==TileType::GateDown) addLog("  Gate ahead! [.] enter.",sf::Color(255,255,255));
-    if (tile==TileType::GateUp)   addLog("  Gate! [,] return.",  sf::Color(255,255,255));
+    if (tile==TileType::GateDown) addLog("  Gate Down",sf::Color(255,255,255));
+    if (tile==TileType::GateUp)   addLog("  Gate Up",  sf::Color(255,255,255));
 
     int hunger=m_player->getStats().hunger;
     if(hunger==50) addLog("  You feel hungry.",      sf::Color(255,255,255));
@@ -4006,10 +4020,10 @@ void Game::renderRaceSelect()
     m_window.draw(titleBox);
 
     sf::Text title(m_font, "SELECT YOUR CHARACTER", 14);
-    title.setFillColor(sf::Color(220, 220, 220));
+    title.setFillColor(sf::Color(50, 50, 50));
     auto tb = title.getLocalBounds();
-    //title.setPosition({(float)WINDOW_W/2.f - tb.size.x/2.f, 32.f});
-    title.setPosition({252.5f, 36.f});
+    title.setPosition({(float)WINDOW_W/2.f - tb.size.x/2.f, 36.f});
+    //title.setPosition({252.5f, 36.f});
     m_window.draw(title);
 
     // grid: 3 cols x 2 rows

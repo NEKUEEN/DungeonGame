@@ -170,7 +170,7 @@ void Player::onTurnPassed()
 
     // ── Hunger drain (ทุก 100 turns) ──
     m_stats.hungerTimer++;
-    if (m_stats.hungerTimer >= 100)
+    if (m_stats.hungerTimer >= 5)
     {
         m_stats.hungerTimer = 0;
         if (m_stats.hunger > 0) m_stats.hunger--;

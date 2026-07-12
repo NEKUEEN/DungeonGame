@@ -24,20 +24,26 @@
 #include "NPCDB.hpp"
 #include "PartyUI.hpp"
 
-constexpr int WINDOW_W        = 800;
-constexpr int WINDOW_H        = 600;
-constexpr int RIGHT_PANEL_W   = 250;
+constexpr int BASE_WINDOW_W   = 800;   // ค่าเริ่มต้นชั่วคราวก่อน constructor เรียก refreshWindowMetrics() ด้วยขนาดจอจริง
+constexpr int BASE_WINDOW_H   = 600;
+constexpr int RIGHT_PANEL_W   = 250;   // ขนาด panel เป็น pixel คงที่ ไม่ขึ้นกับความละเอียดจอ
 constexpr int LOG_PANEL_H     = 170;
-constexpr int GAME_VIEW_W     = WINDOW_W - RIGHT_PANEL_W;
-constexpr int GAME_VIEW_H     = WINDOW_H - LOG_PANEL_H;
 constexpr int INV_GRID_H      = 185;
+
+// ── ค่าที่ปรับเปลี่ยนได้ตอนรันไทม์ (เดิมเป็น constexpr คงที่ 800x600 เสมอ) ──
+// ตอนนี้เปลี่ยนได้ เพื่อให้เกม (ซึ่งเป็นฟูลสกรีนเสมอ) ใช้ "ความละเอียดจอจริง"
+// ของเครื่องนั้นๆ แทนการ scale ภาพ 800x600 เดิมให้ยืด/หด (ดู Game::refreshWindowMetrics)
+extern int WINDOW_W;
+extern int WINDOW_H;
+extern int GAME_VIEW_W;   // = WINDOW_W - RIGHT_PANEL_W
+extern int GAME_VIEW_H;   // = WINDOW_H - LOG_PANEL_H
+extern int STATUS_PANEL_H; // = GAME_VIEW_H - INV_GRID_H
 
 constexpr int STATUS_PANEL_TOP_PADDING = 20;
 constexpr float STATUS_HEADER_SIZE       = 11.8;
 constexpr float STATUS_LINE_SIZE         = 8.8;
 constexpr int STATUS_LINE_SPACING      = 10;
 constexpr int STATUS_HEADER_SPACING    = 16;
-constexpr int STATUS_PANEL_H           = GAME_VIEW_H - INV_GRID_H;
 
 constexpr int LOG_MAX_LINES   = 7;
 constexpr int TILE_SIZE       = 64;
@@ -220,6 +226,7 @@ private:
     void newDungeon(bool keepPlayer = false);
     void updateCamera();
     void applyLetterbox();
+    void refreshWindowMetrics(int w, int h);  // ← อัปเดต WINDOW_W/H, GAME_VIEW_W/H ฯลฯ ตามความละเอียดจอจริง (เรียกตอนเปิดเกม)
 
 
     // สมาชิก
@@ -254,7 +261,6 @@ private:
     int  m_mapRows       = MAP_ROWS;
     int  m_respawnTimer  = 0;
     bool m_playerDead    = false;
-    bool m_isFullscreen  = false;
 
     std::map<std::string, int>  m_familyKillCount;
     std::map<std::string, bool> m_bossActive;
