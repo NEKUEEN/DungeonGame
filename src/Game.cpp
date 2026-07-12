@@ -1160,7 +1160,7 @@ void Game::newDungeon(bool keepPlayer)
     // Game.cpp บรรทัด 1107-1115 แก้เป็น:
 
     {
-        std::string path = "assets/data/map_floor" + std::to_string(m_dungeonFloor) + ".tmj";
+        std::string path = "assets/data/1000map_floor" + std::to_string(m_dungeonFloor) + ".tmj";
         if (!m_tileMap.loadFromTiled(path))
             m_tileMap.generate();
     }
