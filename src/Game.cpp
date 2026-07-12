@@ -3135,13 +3135,35 @@ void Game::render()
 
     if (m_hoverCol >= 0 && m_hoverRow >= 0)
     {
-        sf::RectangleShape highlight({(float)TILE_SIZE, (float)TILE_SIZE});
-        highlight.setPosition({(float)(m_hoverCol * TILE_SIZE), 
-                                (float)(m_hoverRow * TILE_SIZE)});
-        highlight.setFillColor(sf::Color(255, 255, 255, 40));
-        highlight.setOutlineColor(sf::Color(255, 255, 255, 150));
-        highlight.setOutlineThickness(2.f);
-        m_window.draw(highlight);
+        // มุมสี่ด้าน (corner brackets) แทนกรอบสี่เหลี่ยมทึบ — ไม่มี fill
+        const float tx = (float)(m_hoverCol * TILE_SIZE);
+        const float ty = (float)(m_hoverRow * TILE_SIZE);
+        const float ts = (float)TILE_SIZE;
+        const float armLen = ts * 0.28f;   // ความยาวแขนมุม (ปรับได้)
+        const float thick  = 3.f;          // ความหนาเส้น
+        const sf::Color hoverColor(255, 255, 255, 200);
+
+        auto drawCornerArm = [&](sf::Vector2f corner, float hSign, float vSign)
+        {
+            // hSign/vSign: -1 = แขนยื่นไปทางลบ, +1 = แขนยื่นไปทางบวก
+            sf::RectangleShape h({armLen, thick});
+            h.setPosition({ hSign < 0 ? corner.x - armLen : corner.x,
+                             corner.y - thick / 2.f });
+            h.setFillColor(hoverColor);
+            m_window.draw(h);
+
+            sf::RectangleShape v({thick, armLen});
+            v.setPosition({ corner.x - thick / 2.f,
+                             vSign < 0 ? corner.y - armLen : corner.y });
+            v.setFillColor(hoverColor);
+            m_window.draw(v);
+        };
+
+        // มุมบนซ้าย, บนขวา, ล่างซ้าย, ล่างขวา
+        drawCornerArm({tx, ty},       +1.f, +1.f);
+        drawCornerArm({tx + ts, ty},  -1.f, +1.f);
+        drawCornerArm({tx, ty + ts},  +1.f, -1.f);
+        drawCornerArm({tx + ts, ty + ts}, -1.f, -1.f);
     }
 
     if (m_ui.targeting.active) renderTargeting();
