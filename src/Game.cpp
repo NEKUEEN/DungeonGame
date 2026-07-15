@@ -954,28 +954,7 @@ void Game::fireBow()
             hit = true;
 
             if (e->isDead())
-            {
-                onEnemyKilled(e);
-                auto dropped = DropTable::instance().roll(e->getId());
-                for (const auto& itemId : dropped)
-                {
-                    const ItemData* idata = DropTable::instance().getItem(itemId);
-                    if (!idata) continue;
-                    Item drop;
-                    drop.id    = idata->id;
-                    drop.name  = idata->name;
-                    drop.type  = idata->type == "Core" ? ItemType::Core :
-                                 idata->type == "Ammo" ? ItemType::Ammo :
-                                                         ItemType::Material;
-                    drop.desc  = idata->desc;
-                    drop.value = idata->value;
-                    drop.spriteName = idata->sprite;   // ← ขาดตรงนี้
-                    drop.col   = e->getCol();
-                    drop.row   = e->getRow();
-                    m_mapItems.push_back(drop);
-                    addLog("  " + drop.name + " dropped!", sf::Color(255,255,255));
-                }
-            }
+                handleEnemyDeath(e);
             break;
         }
     }
@@ -1065,75 +1044,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                     applyKnockback(e, pc, pr, sk->data.effect.knockbackTiles);
 
                 if (e->isDead())
-                {
-                    //addLog("  "+e->getName()+" dead! +"+std::to_string(e->getExp())+" EXP", sf::Color(255,255,255));
-                    
-                    auto dropped = DropTable::instance().roll(e->getId());
-                    for (const auto& itemId : dropped)
-                    {
-                        const ItemData* idata = DropTable::instance().getItem(itemId);
-                        if (!idata) continue;
-                        Item drop;
-                        drop.id = idata->id;
-                        drop.type = (idata->type=="Core") ? ItemType::Core :
-                                    idata->type == "Ammo" ? ItemType::Ammo :
-                                                            ItemType::Material;
-                        drop.name = idata->name;
-                        drop.desc = idata->desc;
-                        drop.value = idata->value;
-                        drop.hpBonus = idata->hpBonus;
-                        drop.atkBonus = idata->atkBonus;
-                        drop.defBonus = idata->defBonus;
-                        drop.dodgeBonus = idata->dodgeBonus;
-                        drop.manaBonus = idata->manaBonus;
-                        drop.magicDmgBonus = idata->magicDmgBonus;
-                        drop.magicResBonus = idata->magicResBonus;
-                        drop.spdBonus = idata->spdBonus;
-                        drop.bleedBonus  = idata->bleedBonus;
-                        drop.poisonBonus = idata->poisonBonus;
-                        drop.burnBonus   = idata->burnBonus;
-                        drop.resistBurn = idata->resistBurn;
-                        drop.resistBleed = idata->resistBleed;
-                        drop.resistPoison = idata->resistPoison;
-                        drop.resistSlow = idata->resistSlow;
-                        drop.resistStun = idata->resistStun;
-                        //ตรงนี้
-                        drop.bleedDmgReduce = idata->bleedDmgReduce;
-                        drop.bleedDurReduce = idata->bleedDurReduce;
-                        drop.poisonDmgReduce = idata->poisonDmgReduce;
-                        drop.poisonDurReduce = idata->poisonDurReduce;
-                        drop.burnDmgReduce = idata->burnDmgReduce;
-                        drop.burnDurReduce = idata->burnDurReduce;
-                        drop.stunDurReduce = idata->stunDurReduce;
-                        drop.slowDurReduce = idata->slowDurReduce;
-                        drop.onHitChance = idata->onHitChance;
-                        drop.onHitDuration = idata->onHitDuration;
-                        drop.onHitPower = idata->onHitPower;
-                        drop.onHitStatus = idata->onHitStatus;
-                        drop.spriteName = idata->sprite;
-                        drop.stackable = idata->stackable;
-                        drop.col = e->getCol();
-                        drop.row = e->getRow();
-                        m_mapItems.push_back(drop);
-                        addLog("  Dropped: "+idata->name, sf::Color(255,255,255));
-                    }
-
-                    const std::string& eid = e->getId();
-                        bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
-                        int expGain = isFirstKill ? e->getExp() : 0;
-
-                    if (isFirstKill) {
-                        m_firstKillDone.insert(eid);
-                        addLog("   " + e->getName() + " killed +" + std::to_string(expGain) + " EXP",
-                        sf::Color(255,255,255));
-                    } else {
-                        addLog("  " + e->getName() + " killed ",
-                        sf::Color(255,255,255));
-                    }
-
-                    grantPartyExp(expGain);
-                    onEnemyKilled(e);
-                }
+                    handleEnemyDeath(e);
                 hit = true;
                 break;
             }
@@ -1499,6 +1410,105 @@ void Game::onEnemyKilled(Enemy* enemy)
     {
         spawnBoss(fam);
     }
+}
+
+// ============================================================
+//  makeDropItem / handleEnemyDeath – รวมศูนย์ logic "มอนตายแล้วเกิดอะไรขึ้น"
+//  (drop item + แจก EXP + onEnemyKilled) ที่เคยก็อปแปะกระจาย 5 จุด
+//  (playerAttack, fireBow, fireRangedAt, companionAttack, processTurn DOT)
+//  โดยแต่ละจุดก็อปฟิลด์ของ Item ไม่ครบกันคนละแบบ ทำให้ของดรอปจากบาง
+//  เส้นทาง (fireBow / companion / DOT kill) ไม่มี stat bonus / resist /
+//  on-hit effect ใดๆ ทั้งที่ควรจะเหมือนกันหมด — แก้โดยรวมเป็นจุดเดียว
+// ============================================================
+Item Game::makeDropItem(const ItemData* idata, int col, int row) const
+{
+    Item drop;
+    drop.id            = idata->id;
+    drop.name          = idata->name;
+    drop.type          = idata->type == "Core" ? ItemType::Core :
+                          idata->type == "Ammo" ? ItemType::Ammo :
+                                                  ItemType::Material;
+    drop.desc          = idata->desc;
+    drop.value         = idata->value;
+    drop.hpBonus       = idata->hpBonus;
+    drop.atkBonus      = idata->atkBonus;
+    drop.defBonus      = idata->defBonus;
+    drop.dodgeBonus    = idata->dodgeBonus;
+    drop.manaBonus     = idata->manaBonus;
+    drop.magicDmgBonus = idata->magicDmgBonus;
+    drop.magicResBonus = idata->magicResBonus;
+    drop.spdBonus      = idata->spdBonus;
+    drop.bleedBonus    = idata->bleedBonus;
+    drop.poisonBonus   = idata->poisonBonus;
+    drop.burnBonus     = idata->burnBonus;
+    drop.resistBleed   = idata->resistBleed;
+    drop.resistBurn    = idata->resistBurn;
+    drop.resistPoison  = idata->resistPoison;
+    drop.resistSlow    = idata->resistSlow;
+    drop.resistStun    = idata->resistStun;
+    drop.bleedDmgReduce  = idata->bleedDmgReduce;
+    drop.bleedDurReduce  = idata->bleedDurReduce;
+    drop.poisonDmgReduce = idata->poisonDmgReduce;
+    drop.poisonDurReduce = idata->poisonDurReduce;
+    drop.burnDmgReduce   = idata->burnDmgReduce;
+    drop.burnDurReduce   = idata->burnDurReduce;
+    drop.stunDurReduce   = idata->stunDurReduce;
+    drop.slowDurReduce   = idata->slowDurReduce;
+    drop.onHitChance   = idata->onHitChance;
+    drop.onHitDuration = idata->onHitDuration;
+    drop.onHitPower    = idata->onHitPower;
+    drop.onHitStatus   = idata->onHitStatus;
+    drop.spriteName    = idata->sprite;
+    drop.stackable     = idata->stackable;
+    drop.col           = col;
+    drop.row           = row;
+    return drop;
+}
+
+//  handleEnemyDeath – ให้ loot + แจก EXP (ครั้งแรกที่ฆ่ามอน id นี้เท่านั้น)
+//  + เรียก onEnemyKilled ครบทุกเส้นทางที่ฆ่ามอนได้
+//  killerName ว่าง = ข้อความทั่วไป ("Goblin killed"), ไม่ว่าง = ใส่ชื่อผู้ฆ่า
+//  (ใช้กับ companion เช่น "Aria killed Goblin!")
+void Game::handleEnemyDeath(Enemy* enemy, const std::string& killerName)
+{
+    if (!enemy) return;
+
+    // ── Loot drop (ทาง single source of truth: makeDropItem) ──
+    auto dropped = DropTable::instance().roll(enemy->getId());
+    for (const auto& itemId : dropped)
+    {
+        const ItemData* idata = DropTable::instance().getItem(itemId);
+        if (!idata) continue;
+        Item drop = makeDropItem(idata, enemy->getCol(), enemy->getRow());
+        m_mapItems.push_back(drop);
+        addLog("  Dropped: " + drop.name, sf::Color(255,255,255));
+    }
+
+    // ── EXP: ให้เฉพาะครั้งแรกที่ฆ่ามอน id นี้ (ทุกเส้นทางเหมือนกันหมด) ──
+    const std::string& eid = enemy->getId();
+    bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
+    int expGain = isFirstKill ? enemy->getExp() : 0;
+
+    if (isFirstKill)
+    {
+        m_firstKillDone.insert(eid);
+        if (killerName.empty())
+            addLog("  " + enemy->getName() + " killed +" + std::to_string(expGain) + " EXP",
+                   sf::Color(255,255,255));
+        else
+            addLog("  " + killerName + " killed " + enemy->getName() + "! +" +
+                   std::to_string(expGain) + " EXP", sf::Color(255,255,255));
+    }
+    else
+    {
+        if (killerName.empty())
+            addLog("  " + enemy->getName() + " killed", sf::Color(255,255,255));
+        else
+            addLog("  " + killerName + " killed " + enemy->getName() + "!", sf::Color(255,255,255));
+    }
+
+    grantPartyExp(expGain);
+    onEnemyKilled(enemy);
 }
 
 void Game::tryRespawnEnemies()
@@ -2496,65 +2506,7 @@ if (mainHand && !mainHand->onHitStatus.empty() &&
 }
 
     if (enemy->isDead())
-    {
-        //addLog("  "+enemy->getName()+" dead! +"+std::to_string(enemy->getExp())+" EXP",sf::Color(255,255,255));
-        auto dropped=DropTable::instance().roll(enemy->getId());
-        for (const auto& itemId:dropped)
-        {
-            const ItemData* idata=DropTable::instance().getItem(itemId);
-            if (!idata) continue;
-            Item drop;
-            drop.id=(idata->id);
-            drop.type = idata->type == "Core" ? ItemType::Core :
-                        idata->type == "Ammo" ? ItemType::Ammo :
-                                                ItemType::Material;
-            drop.name=idata->name; drop.desc=idata->desc; drop.value=idata->value;
-            drop.hpBonus=idata->hpBonus; drop.atkBonus=idata->atkBonus;
-            drop.defBonus=idata->defBonus; drop.dodgeBonus=idata->dodgeBonus;
-            drop.manaBonus=idata->manaBonus; drop.magicDmgBonus=idata->magicDmgBonus;
-            drop.magicResBonus=idata->magicResBonus; drop.spdBonus=idata->spdBonus;
-            drop.bleedBonus  = idata->bleedBonus;
-            drop.poisonBonus = idata->poisonBonus;
-            drop.burnBonus   = idata->burnBonus;
-            drop.resistBleed = idata->resistBleed;
-            drop.resistBurn = idata->resistBurn;
-            drop.resistPoison = idata->resistPoison;
-            drop.resistSlow = idata->resistSlow;
-            drop.resistStun = idata->resistStun;
-            //ตรงนี้
-            drop.bleedDmgReduce = idata->bleedDmgReduce;
-            drop.bleedDurReduce = idata->bleedDurReduce;
-            drop.poisonDmgReduce = idata->poisonDmgReduce;
-            drop.poisonDurReduce = idata->poisonDurReduce;
-            drop.burnDmgReduce = idata->burnDmgReduce;
-            drop.burnDurReduce = idata->burnDurReduce;
-            drop.stunDurReduce = idata->stunDurReduce;
-            drop.slowDurReduce = idata->slowDurReduce;
-            drop.onHitChance = idata->onHitChance;
-            drop.onHitDuration = idata->onHitDuration;
-            drop.onHitPower = idata->onHitPower;
-            drop.onHitStatus = idata->onHitStatus;
-            drop.spriteName=idata->sprite; drop.stackable=idata->stackable;
-            drop.col=enemy->getCol(); drop.row=enemy->getRow();
-            m_mapItems.push_back(drop);
-            addLog("  Dropped: "+idata->name,sf::Color(255,255,255));
-        }
-        const std::string& eid = enemy->getId();
-            bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
-            int expGain = isFirstKill ? enemy->getExp() : 0;
-
-        if (isFirstKill) {
-            m_firstKillDone.insert(eid);
-        addLog("  " + enemy->getName() + " killed +" + std::to_string(expGain) + " EXP",
-           sf::Color(255,255,255));
-        } else {
-            addLog("  " + enemy->getName() + " killed",
-                   sf::Color(255, 255, 255));
-        }
-
-            grantPartyExp(expGain);
-        onEnemyKilled(enemy);
-    }
+        handleEnemyDeath(enemy);
 }
 
 void Game::enemyAttack(Enemy* enemy)
@@ -2708,42 +2660,8 @@ void Game::companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy)
 
     if (!enemy->isDead()) return;
 
-    // ── EXP แบ่งทั้งปาร์ตี้เท่ากัน (ข้อ 6: party-wide sharing) ──
-    const std::string& eid = enemy->getId();
-    bool isFirstKill = (m_firstKillDone.find(eid) == m_firstKillDone.end());
-    int expGain = isFirstKill ? enemy->getExp() : 0;
-
-    if (isFirstKill)
-    {
-        m_firstKillDone.insert(eid);
-        addLog("  " + npc->getName() + " killed " + enemy->getName() + "! +" +
-               std::to_string(expGain) + " EXP", sf::Color(255,255,255));
-    }
-
-    grantPartyExp(expGain);
-
-    // ── Loot drop (path เดียวกับ playerAttack/fireBow) ──
-    auto dropped = DropTable::instance().roll(enemy->getId());
-    for (const auto& itemId : dropped)
-    {
-        const ItemData* idata = DropTable::instance().getItem(itemId);
-        if (!idata) continue;
-        Item drop;
-        drop.id         = idata->id;
-        drop.name       = idata->name;
-        drop.type       = idata->type == "Core" ? ItemType::Core :
-                          idata->type == "Ammo" ? ItemType::Ammo :
-                                                  ItemType::Material;
-        drop.desc       = idata->desc;
-        drop.value      = idata->value;
-        drop.spriteName = idata->sprite;
-        drop.col        = enemy->getCol();
-        drop.row        = enemy->getRow();
-        m_mapItems.push_back(drop);
-        addLog("  " + drop.name + " dropped!", sf::Color(255,255,255));
-    }
-
-    onEnemyKilled(enemy);
+    // ── EXP + Loot + onEnemyKilled (path เดียวกับ playerAttack/fireBow ทุกจุด) ──
+    handleEnemyDeath(enemy, npc->getName());
 }
 // ============================================================
 //  tryMoveCompanion – เดินทีละก้าว (ข้อ 4: active AI ไล่มอน)
@@ -2822,164 +2740,167 @@ void Game::processTurn()
     for (auto* e : m_enemies)
     {
         if (e->isDead()) continue;
+        processEnemyTurn(e, playerTime, pc, pr, partyBlockedTiles);
+    }
 
-        // ── Tick status effects ──
+    processCompanionActions(playerTime);
+
+    m_enemies.erase(
+        std::remove_if(m_enemies.begin(), m_enemies.end(),
+            [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
+        m_enemies.end());
+
+    recalcAllStats();
+}
+
+// ============================================================
+//  processEnemyTurn – ตัดสินใจ+ลงมือของมอนตัวเดียวใน 1 เทิร์น
+//  (ย้ายออกมาจาก processTurn เดิมที่เป็น loop ยาวเดียว ~330 บรรทัด
+//  แยกให้ processTurn เหลือแค่ orchestration)
+// ============================================================
+void Game::processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
+                             const std::vector<std::pair<int,int>>& partyBlockedTiles)
+{
+    // ── Tick status effects ──
+    {
+        int hpDelta = 0;
+        std::string effectName;
+        e->tickStatusEffects(hpDelta, effectName);
+        if (hpDelta < 0)
+            addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
+                   " " + effectName + " dmg", sf::Color(255,255,255));
+    }
+
+    if (e->isDead())
+    {
+        // เดิมจุดนี้ไม่แจก EXP เลย (มอนตายเพราะ bleed/poison/burn ระหว่างเทิร์น
+        // ไม่เคยเรียก grantPartyExp) และของดรอปก็ไม่มี stat bonus ใดๆ —
+        // handleEnemyDeath() แก้ทั้งสองปัญหาให้ตรงกับทุกเส้นทางอื่น
+        handleEnemyDeath(e);
+        return;
+    }
+
+    // ── Stun → เสียเวลาแต่ไม่ขยับ ──
+    if (e->hasStatus(StatusType::Stun))
+    {
+        e->advanceActTime();
+        e->tickSkills();
+        return;
+    }
+
+    // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง advance ──
+    if (e->getNextActTime() > playerTime)
+        return;
+
+    // ── ไม่เห็นและไม่ alerted → advance แล้วข้าม ──
+    if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted())
+    {
+        e->advanceActTime();
+        return;
+    }
+
+    // ── หาว่ามี companion ยืนติดตัวมอนไหม ก่อนเช็คระยะ player ──
+    std::shared_ptr<NPC> adjacentCompanion = nullptr;
+    {
+        auto& party = Party::instance();
+        for (int pi = 0; pi < party.size(); pi++)
         {
-            int hpDelta = 0;
-            std::string effectName;
-            e->tickStatusEffects(hpDelta, effectName);
-            if (hpDelta < 0)
-                addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
-                       " " + effectName + " dmg", sf::Color(255,255,255));
+            auto member = party.getMember(pi);
+            if (!member || member->isDead()) continue;
+            int mdx = std::abs(e->getCol() - member->getCol());
+            int mdy = std::abs(e->getRow() - member->getRow());
+            if (mdx <= 1 && mdy <= 1) { adjacentCompanion = member; break; }
         }
+    }
 
-        if (e->isDead())
+    int dx = std::abs(e->getCol() - pc);
+    int dy = std::abs(e->getRow() - pr);
+
+    if (adjacentCompanion)
+    {
+        enemyAttackCompanion(e, adjacentCompanion);
+    }
+    else if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
+    {
+        enemyAttack(e);
+    }
+    else
+    {
+        e->updateAI(pc, pr, m_tileMap, m_enemies, partyBlockedTiles);
+
+        if (e->hasPendingSkill())
         {
-            onEnemyKilled(e);
-            auto dropped = DropTable::instance().roll(e->getId());
-            for (const auto& itemId : dropped)
+            auto ps = e->consumePendingSkill();
+            SkillInstance* sk = e->findSkill(ps.skillId);
+            if (!sk) { e->advanceActTime(); e->tickSkills(); return; }
+
+            if (sk->data.type == SkillType::ActiveRanged)
             {
-                const ItemData* idata = DropTable::instance().getItem(itemId);
-                if (!idata) continue;
-                Item drop;
-                drop.id         = idata->id;
-                drop.name       = idata->name;
-                drop.type       = idata->type == "Core" ? ItemType::Core :
-                                  idata->type == "Ammo" ? ItemType::Ammo :
-                                                          ItemType::Material;
-                drop.desc       = idata->desc;
-                drop.value      = idata->value;
-                drop.spriteName = idata->sprite;
-                drop.col        = e->getCol();
-                drop.row        = e->getRow();
-                m_mapItems.push_back(drop);
-                addLog("  " + drop.name + " dropped!", sf::Color(255,255,255));
-            }
-            continue;
-        }
-
-        // ── Stun → เสียเวลาแต่ไม่ขยับ ──
-        if (e->hasStatus(StatusType::Stun))
-        {
-            e->advanceActTime();
-            e->tickSkills();
-            continue;
-        }
-
-        // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง advance ──
-        if (e->getNextActTime() > playerTime)
-            continue;
-
-        // ── ไม่เห็นและไม่ alerted → advance แล้วข้าม ──
-        if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted())
-        {
-            e->advanceActTime();
-            continue;
-        }
-        // debug — เพิ่มชั่วคราว
-        //if (e->getName() == "Orc")
-        //addLog("  [DBG] orc nextAct=" + std::to_string(e->getNextActTime()) +
-           //" playerTime=" + std::to_string(playerTime), sf::Color(255,255,255));
-
-        // ── หาว่ามี companion ยืนติดตัวมอนไหม ก่อนเช็คระยะ player ──
-            std::shared_ptr<NPC> adjacentCompanion = nullptr;
-            {
-                auto& party = Party::instance();
-                for (int pi = 0; pi < party.size(); pi++)
+                int dmg = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
+                auto line = getLine(e->getCol(), e->getRow(), ps.targetCol, ps.targetRow);
+                bool blocked = false;
+                for (int i = 1; i < (int)line.size(); ++i)
                 {
-                    auto member = party.getMember(pi);
-                    if (!member || member->isDead()) continue;
-                    int mdx = std::abs(e->getCol() - member->getCol());
-                    int mdy = std::abs(e->getRow() - member->getRow());
-                    if (mdx <= 1 && mdy <= 1) { adjacentCompanion = member; break; }
-                }
-            }
-
-            int dx = std::abs(e->getCol() - pc);
-            int dy = std::abs(e->getRow() - pr);
-
-            if (adjacentCompanion)
-            {
-                enemyAttackCompanion(e, adjacentCompanion);
-            }
-            else if (dx <= 1 && dy <= 1 && (dx + dy) > 0)
-            {
-                enemyAttack(e);
-            }
-            else
-            {
-                e->updateAI(pc, pr, m_tileMap, m_enemies, partyBlockedTiles);
-
-            if (e->hasPendingSkill())
-            {
-                auto ps = e->consumePendingSkill();
-                SkillInstance* sk = e->findSkill(ps.skillId);
-                if (!sk) { e->advanceActTime(); e->tickSkills(); continue; }
-
-                if (sk->data.type == SkillType::ActiveRanged)
-                {
-                    int dmg = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
-                    auto line = getLine(e->getCol(), e->getRow(), ps.targetCol, ps.targetRow);
-                    bool blocked = false;
-                    for (int i = 1; i < (int)line.size(); ++i)
-                    {
-                        if (m_tileMap.getTile(line[i].x, line[i].y) == TileType::Wall)
-                        { blocked = true; break; }
-                        if (line[i].x == pc && line[i].y == pr)
-                        {
-                            Stats& s = m_player->getStats();
-                            int def = getBuffedDef();
-                            int actualDmg = std::max(1, dmg - def);
-                            s.hp -= actualDmg;
-                            addLog("  " + e->getName() + " uses " + sk->data.name +
-                                   " " + std::to_string(actualDmg) + " dmg",
-                                   sf::Color(255,255,255));
-                            if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
-                                addLog("  *** YOU DIED *** [R] restart", sf::Color(255,255,255)); }
-                            break;
-                        }
-                    }
-                    if (blocked)
-                        addLog("  " + e->getName() + "'s " + sk->data.name + " was blocked.",
-                               sf::Color(255,255,255));
-                }
-                else if (sk->data.type == SkillType::ActiveAoe)
-                {
-                    int radius = sk->data.effect.aoeRadius;
-                    int dmg    = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
-                    int dxP = pc - e->getCol(), dyP = pr - e->getRow();
-                    if (dxP*dxP + dyP*dyP <= radius*radius)
+                    if (m_tileMap.getTile(line[i].x, line[i].y) == TileType::Wall)
+                    { blocked = true; break; }
+                    if (line[i].x == pc && line[i].y == pr)
                     {
                         Stats& s = m_player->getStats();
                         int def = getBuffedDef();
                         int actualDmg = std::max(1, dmg - def);
                         s.hp -= actualDmg;
                         addLog("  " + e->getName() + " uses " + sk->data.name +
-                               " -> " + std::to_string(actualDmg) + " dmg!",
+                               " " + std::to_string(actualDmg) + " dmg",
                                sf::Color(255,255,255));
                         if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
                             addLog("  *** YOU DIED *** [R] restart", sf::Color(255,255,255)); }
+                        break;
                     }
+                }
+                if (blocked)
+                    addLog("  " + e->getName() + "'s " + sk->data.name + " was blocked.",
+                           sf::Color(255,255,255));
+            }
+            else if (sk->data.type == SkillType::ActiveAoe)
+            {
+                int radius = sk->data.effect.aoeRadius;
+                int dmg    = std::max(1, e->getAttack() * sk->data.effect.damagePct / 100);
+                int dxP = pc - e->getCol(), dyP = pr - e->getRow();
+                if (dxP*dxP + dyP*dyP <= radius*radius)
+                {
+                    Stats& s = m_player->getStats();
+                    int def = getBuffedDef();
+                    int actualDmg = std::max(1, dmg - def);
+                    s.hp -= actualDmg;
+                    addLog("  " + e->getName() + " uses " + sk->data.name +
+                           " -> " + std::to_string(actualDmg) + " dmg!",
+                           sf::Color(255,255,255));
+                    if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
+                        addLog("  *** YOU DIED *** [R] restart", sf::Color(255,255,255)); }
                 }
             }
         }
-        e->advanceActTime();
-        e->tickSkills();
     }
+    e->advanceActTime();
+    e->tickSkills();
+}
 
-    // ============================================================
-    //  Companion actions – ผูกเข้าระบบ Aut/turn ของตัวเอง (ข้อ 3)
-    //  + Active AI: เลือกเป้าหมายใกล้สุดที่เห็นได้แล้วเดินเข้าไปฟัน (ข้อ 4)
-    //  ── ทำ 2 pass ──
-    //  Pass 1: เช็คก่อนว่า companion ตัวไหน "engaged" กับมอนอยู่
-    //          (adjacent หรือเห็นมอนในระยะ) โดยใช้ตำแหน่งปัจจุบัน
-    //          (ก่อน follow snap ของเทิร์นนี้)
-    //  Follow: snap เข้า trail เฉพาะตัวที่ "ไม่" engaged เท่านั้น
-    //  Pass 2: ตัว engaged ลงมือตี/เดินไล่ ตาม nextActTime ของตัวเอง
-    //  แก้บั๊ก: เดิมเรียก follow ก่อนเสมอ ทำให้ตำแหน่งที่เพิ่งไล่มอน
-    //  ไปเมื่อเทิร์นก่อนถูก snap กลับ formation ทุกเทิร์น (yo-yo,
-    //  ตีบ้างไม่ตีบ้าง)
-    // ============================================================
+// ============================================================
+//  processCompanionActions – ผูกเข้าระบบ Aut/turn ของตัวเอง (ข้อ 3)
+//  + Active AI: เลือกเป้าหมายใกล้สุดที่เห็นได้แล้วเดินเข้าไปฟัน (ข้อ 4)
+//  ── ทำ 2 pass ──
+//  Pass 1: เช็คก่อนว่า companion ตัวไหน "engaged" กับมอนอยู่
+//          (adjacent หรือเห็นมอนในระยะ) โดยใช้ตำแหน่งปัจจุบัน
+//          (ก่อน follow snap ของเทิร์นนี้)
+//  Follow: snap เข้า trail เฉพาะตัวที่ "ไม่" engaged เท่านั้น
+//  Pass 2: ตัว engaged ลงมือตี/เดินไล่ ตาม nextActTime ของตัวเอง
+//  แก้บั๊ก: เดิมเรียก follow ก่อนเสมอ ทำให้ตำแหน่งที่เพิ่งไล่มอน
+//  ไปเมื่อเทิร์นก่อนถูก snap กลับ formation ทุกเทิร์น (yo-yo,
+//  ตีบ้างไม่ตีบ้าง)
+//  (ย้ายออกมาจาก processTurn เดิม เพื่อแยก orchestration ออกจาก detail)
+// ============================================================
+void Game::processCompanionActions(long long playerTime)
+{
     {
         auto& party = Party::instance();
         int n = party.size();
@@ -3116,13 +3037,6 @@ void Game::processTurn()
             // เดินไม่ได้เลย (ทางตัน) → ไม่ advance รอเทิร์นหน้าลองใหม่
         }
     }
-
-    m_enemies.erase(
-        std::remove_if(m_enemies.begin(), m_enemies.end(),
-            [](Enemy* e) { bool d = e->isDead(); if (d) delete e; return d; }),
-        m_enemies.end());
-
-    recalcAllStats();
 }
 
 // ============================================================

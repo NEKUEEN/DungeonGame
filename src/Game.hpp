@@ -56,6 +56,8 @@ constexpr int RESPAWN_TURNS   = 12;
 constexpr int BOSS_KILL_THRESHOLD = 50;
 constexpr int COMPANION_DETECT_RANGE = 6;  // ระยะที่ companion "เห็น" มอนแล้วแหกแถวไปไล่ (ข้อ 4)
 
+struct ItemData;  // fwd decl (นิยามเต็มอยู่ใน DropTable.hpp ซึ่ง Game.cpp include ไว้แล้ว)
+
 // สร้างโครงสร้าง FinalStats รวม stat ที่คำนวณแล้วทั้งหมด
 struct FinalStats {
     int maxHp = 0;
@@ -156,6 +158,10 @@ private:
     void fireBow();
 
     void processTurn();
+    // ── แตกออกจาก processTurn เดิม (เคยยาว ~330 บรรทัดในฟังก์ชันเดียว) ──
+    void processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
+                           const std::vector<std::pair<int,int>>& partyBlockedTiles);
+    void processCompanionActions(long long playerTime);
     void tryRespawnEnemies();
     void spawnEnemy(int floor);
     void spawnEnemies(int count);
@@ -187,6 +193,11 @@ private:
     void onEnemyKilled(Enemy* enemy);
     void grantPartyExp(int expGain);  // ข้อ 6: แจก EXP ให้ player + companion ทุกคนที่ยังไม่ตายเท่ากัน
     void spawnBoss(const std::string& family);
+
+    // ── Enemy death / loot: รวมศูนย์จาก 5 จุดที่เคยก็อปแปะ
+    //    (playerAttack, fireBow, fireRangedAt, companionAttack, processTurn DOT) ──
+    Item makeDropItem(const ItemData* idata, int col, int row) const;
+    void handleEnemyDeath(Enemy* enemy, const std::string& killerName = "");
     
     //tileMousse sel
     int m_hoverCol = -1;
