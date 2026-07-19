@@ -22,6 +22,42 @@ int GAME_VIEW_W = BASE_WINDOW_W - RIGHT_PANEL_W;
 int GAME_VIEW_H = BASE_WINDOW_H - LOG_PANEL_H;
 int STATUS_PANEL_H = (BASE_WINDOW_H - LOG_PANEL_H) - INV_GRID_H;
 
+// ── ใช้แปลง sf::Keyboard::Key (A..Z) → index 0-25 สำหรับหน้าจอเลือกสกิลแบบ DCSS ──
+// เขียนแบบ explicit switch (ไม่พึ่ง underlying enum value) กันปัญหาข้าม SFML version
+static int letterKeyIndex(sf::Keyboard::Key code)
+{
+    switch (code)
+    {
+        case sf::Keyboard::Key::A: return 0;
+        case sf::Keyboard::Key::B: return 1;
+        case sf::Keyboard::Key::C: return 2;
+        case sf::Keyboard::Key::D: return 3;
+        case sf::Keyboard::Key::E: return 4;
+        case sf::Keyboard::Key::F: return 5;
+        case sf::Keyboard::Key::G: return 6;
+        case sf::Keyboard::Key::H: return 7;
+        case sf::Keyboard::Key::I: return 8;
+        case sf::Keyboard::Key::J: return 9;
+        case sf::Keyboard::Key::K: return 10;
+        case sf::Keyboard::Key::L: return 11;
+        case sf::Keyboard::Key::M: return 12;
+        case sf::Keyboard::Key::N: return 13;
+        case sf::Keyboard::Key::O: return 14;
+        case sf::Keyboard::Key::P: return 15;
+        case sf::Keyboard::Key::Q: return 16;
+        case sf::Keyboard::Key::R: return 17;
+        case sf::Keyboard::Key::S: return 18;
+        case sf::Keyboard::Key::T: return 19;
+        case sf::Keyboard::Key::U: return 20;
+        case sf::Keyboard::Key::V: return 21;
+        case sf::Keyboard::Key::W: return 22;
+        case sf::Keyboard::Key::X: return 23;
+        case sf::Keyboard::Key::Y: return 24;
+        case sf::Keyboard::Key::Z: return 25;
+        default: return -1;
+    }
+}
+
 std::vector<std::pair<int,int>> Game::findPath(int sc, int sr, int ec, int er)
 {
     int COLS = m_tileMap.getCols();
@@ -284,6 +320,8 @@ void Game::recalcSpeed()
 
     // รวม moveSpd จาก equipment + passive/active buff skills
     int ms = m_finalStats.spd;
+    //if (m_player->hasStatus(StatusType::Slow))
+        //ms -= -2;
     int as = 0;
     for (const auto& sk : m_player->getSkills())
     {
@@ -398,25 +436,24 @@ void Game::useSkillBuff(const std::string& skillId)
     if (!sk->isReady())
     {
         addLog("  "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns",
-               sf::Color(255,255,255));
+               sf::Color(225,222,208));
         return;
     }
     sk->buffActive   = true;
     sk->durationLeft = sk->data.duration;
     sk->cooldownLeft = sk->data.cooldown;
     addLog("  "+sk->data.name+" activated! ATK +"+std::to_string(sk->data.effect.atkPct)+
-           "% for "+std::to_string(sk->data.duration)+" turns", sf::Color(255,255,255));
+           "% for "+std::to_string(sk->data.duration)+" turns", sf::Color(225,222,208));
     recalcSpeed();
 }
 
 // ============================================================
 //  executeSkill
 // ============================================================
-void Game::executeSkill(int hotbarIdx)
+void Game::executeSkillById(const std::string& id)
 {
     if (!m_player) return;
-    const std::string& id = m_player->getHotbar(hotbarIdx);
-    if (id.empty()) { addLog("  Slot "+std::to_string(hotbarIdx+1)+" empty."); return; }
+    if (id.empty()) { addLog("  No skill selected."); return; }
 
     SkillInstance* sk = m_player->findSkill(id);
     if (!sk) return;
@@ -425,20 +462,20 @@ void Game::executeSkill(int hotbarIdx)
 
     if (s.mana < sk->data.effect.manaCost)
     {
-        addLog("  Not enough mana! Need " + std::to_string(sk->data.effect.manaCost), sf::Color(255,255,255));
+        addLog("  Not enough mana! Need " + std::to_string(sk->data.effect.manaCost), sf::Color(225,222,208));
         return;
     }
 
     if (s.stamina < sk->data.effect.staminaCost)
     {
         addLog("  Not enough stamina! Need " + std::to_string(sk->data.effect.staminaCost) +
-               " (have " + std::to_string(s.stamina) + ")", sf::Color(255,255,255));
+               " (have " + std::to_string(s.stamina) + ")", sf::Color(225,222,208));
         return;
     }
 
     if (!sk->isReady())
     {
-        addLog("  "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns", sf::Color(255,255,255));
+        addLog("  "+sk->data.name+" cooldown: "+std::to_string(sk->cooldownLeft)+" turns", sf::Color(225,222,208));
         return;
     }
 
@@ -450,7 +487,7 @@ void Game::executeSkill(int hotbarIdx)
         sk->buffActive = true;
         sk->durationLeft = sk->data.duration;
         sk->cooldownLeft = sk->data.cooldown;
-        addLog("  "+sk->data.name+" activated!", sf::Color(255,255,255));
+        addLog("  "+sk->data.name+" activated!", sf::Color(225,222,208));
         recalcAllStats();
         recalcSpeed();
         break;
@@ -462,7 +499,7 @@ void Game::executeSkill(int hotbarIdx)
             int heal = sk->data.effect.healFlat + s.maxHp * sk->data.effect.healPct / 100;
             s.hp = std::min(s.maxHp, s.hp + heal);
             sk->cooldownLeft = sk->data.cooldown;
-            addLog("  "+sk->data.name+" +"+std::to_string(heal)+" HP", sf::Color(255,255,255));
+            addLog("  "+sk->data.name+" +"+std::to_string(heal)+" HP", sf::Color(225,222,208));
         }
         break;
 
@@ -507,9 +544,9 @@ void Game::executeSkill(int hotbarIdx)
         }
 
         if (sk->data.type == SkillType::ActiveRanged)
-            addLog(" [Targeting] " + sk->data.name, sf::Color(255,255,255));
+            addLog(" [Targeting] " + sk->data.name, sf::Color(225,222,208));
         else
-            addLog(" [Warp] " + sk->data.name, sf::Color(255,255,255));
+            addLog(" [Warp] " + sk->data.name, sf::Color(225,222,208));
         break;
 
             case SkillType::ActiveAoe:
@@ -522,7 +559,7 @@ void Game::executeSkill(int hotbarIdx)
             m_ui.targeting.locked     = false;
             m_ui.targeting.targetCol  = m_player->getCol();
             m_ui.targeting.targetRow  = m_player->getRow();
-            addLog(" [AOE Targeting] " + sk->data.name, sf::Color(255,255,255));
+            addLog(" [AOE Targeting] " + sk->data.name, sf::Color(225,222,208));
             break;
 
             case SkillType::ActiveAoeSelf:
@@ -535,7 +572,7 @@ void Game::executeSkill(int hotbarIdx)
             m_ui.targeting.locked     = true;     // ← ล็อกอยู่กับตัว ขยับไม่ได้
             m_ui.targeting.targetCol  = m_player->getCol();
             m_ui.targeting.targetRow  = m_player->getRow();
-            addLog(" [AOE] " + sk->data.name + " — press again to release", sf::Color(255,255,255));
+            addLog(" [AOE] " + sk->data.name + " — press again to release", sf::Color(225,222,208));
             break;
 
             case SkillType::ActiveAoeWarp:
@@ -548,12 +585,67 @@ void Game::executeSkill(int hotbarIdx)
             m_ui.targeting.locked     = false;   // เลือกตำแหน่งที่จะโดดไปได้
             m_ui.targeting.targetCol  = m_player->getCol();
             m_ui.targeting.targetRow  = m_player->getRow();
-            addLog(" [Leap] " + sk->data.name, sf::Color(255,255,255));
+            addLog(" [Leap] " + sk->data.name, sf::Color(225,222,208));
             break;
 
         case SkillType::Passive:
-            addLog("  "+sk->data.name+" is passive.", sf::Color(255,255,255));
+            addLog("  "+sk->data.name+" is passive.", sf::Color(225,222,208));
         break;
+    }
+}
+
+// ============================================================
+//  DCSS-style skill select / F-key system
+// ============================================================
+void Game::selectSkillByLetter(char letter)
+{
+    if (!m_player) return;
+    std::string id = m_player->getSkillIdByLetter(letter);
+    if (id.empty())
+    {
+        addLog(std::string("  Nothing on '") + letter + "'.", sf::Color(225,222,208));
+        return;
+    }
+
+    m_player->setSelectedSkillId(id);
+    m_ui.fMode = UIState::FMode::Skill;   // เลือกสกิลแล้ว = ตั้งใจจะใช้มัน → สลับ F เข้าโหมด Skill ให้อัตโนมัติ
+    m_ui.skillSelectOpen = false;   // พับหน้าต่างทันทีหลังเลือก
+
+    SkillInstance* sk = m_player->findSkill(id);
+    addLog("  Selected: " + (sk ? sk->data.name : id) + " ["+std::string(1,letter)+"] — press F to use",
+           sf::Color(225,222,208));
+}
+
+void Game::executeSelectedSkill()
+{
+    if (!m_player) return;
+    const std::string& id = m_player->getSelectedSkillId();
+    if (id.empty())
+    {
+        addLog("  No skill selected. Press Shift+Q to choose one.", sf::Color(225,222,208));
+        return;
+    }
+    executeSkillById(id);
+}
+
+void Game::toggleFMode()
+{
+    if (m_ui.fMode == UIState::FMode::Bow)
+    {
+        m_ui.fMode = UIState::FMode::Skill;
+        const std::string& id = m_player ? m_player->getSelectedSkillId() : std::string();
+        if (id.empty())
+            addLog("  [F] mode: Skill (none selected — press Shift+Q)", sf::Color(225,222,208));
+        else
+        {
+            SkillInstance* sk = m_player->findSkill(id);
+            addLog("  [F] mode: Skill (" + (sk ? sk->data.name : id) + ")", sf::Color(225,222,208));
+        }
+    }
+    else
+    {
+        m_ui.fMode = UIState::FMode::Bow;
+        addLog("  [F] mode: Bow", sf::Color(225,222,208));
     }
 }
 
@@ -585,7 +677,7 @@ void Game::applyStatusOnHit(SkillInstance* sk, Enemy* e)
     se.duration = sk->data.effect.statusDuration;
     se.sourceId = sk->data.id;
     e->applyStatus(se);
-    addLog("  " + e->getName() + " is " + st + "!", sf::Color(255,255,255));
+    addLog("  " + e->getName() + " is " + st + "!", sf::Color(225,222,208));
 }
 
 void Game::applyKnockback(Enemy* e, int sourceCol, int sourceRow, int tiles)
@@ -629,7 +721,7 @@ void Game::applyKnockback(Enemy* e, int sourceCol, int sourceRow, int tiles)
     if (pushed > 0)
     {
         e->setPos(curC, curR);
-        addLog("  " + e->getName() + " is knocked back!", sf::Color(255,255,255));
+        addLog("  " + e->getName() + " is knocked back!", sf::Color(225,222,208));
     }
 }
 
@@ -651,7 +743,7 @@ void Game::executeAoe(SkillInstance* sk)
         {
             e->takeDamage(dmg);
             addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
-                   sf::Color(255,255,255));
+                   sf::Color(225,222,208));
             applyStatusOnHit(sk, e);
             if (sk->data.effect.knockbackTiles > 0)
                 applyKnockback(e, pc, pr, sk->data.effect.knockbackTiles);
@@ -659,7 +751,7 @@ void Game::executeAoe(SkillInstance* sk)
         }
     }
     if (hits == 0)
-        addLog("  "+sk->data.name+"  no targets in range.", sf::Color(255,255,255));
+        addLog("  "+sk->data.name+"  no targets in range.", sf::Color(225,222,208));
 
     {
         Stats& ps = m_player->getStats();
@@ -688,7 +780,7 @@ void Game::executeAoeAt(SkillInstance* sk, int col, int row)
         {
             e->takeDamage(dmg);
             addLog("  "+sk->data.name+" hits "+e->getName()+" for "+std::to_string(dmg)+"!",
-                   sf::Color(255,255,255));
+                   sf::Color(225,222,208));
             applyStatusOnHit(sk, e);
             if (sk->data.effect.knockbackTiles > 0)
                 applyKnockback(e, col, row, sk->data.effect.knockbackTiles);
@@ -696,7 +788,7 @@ void Game::executeAoeAt(SkillInstance* sk, int col, int row)
         }
     }
     if (hits == 0)
-        addLog("  "+sk->data.name+"  no targets in range.", sf::Color(255,255,255));
+        addLog("  "+sk->data.name+"  no targets in range.", sf::Color(225,222,208));
 
     Stats& ps = m_player->getStats();
     
@@ -722,7 +814,7 @@ void Game::executeWarp(int col, int row)
         // หัก stamina ตอน confirm warp จริง
         m_player->getStats().stamina -= sk->data.effect.staminaCost;
     }
-    addLog("  Warped!", sf::Color(255,255,255));
+    addLog("  Warped!", sf::Color(225,222,208));
     recomputeFog(col, row);
     updateCamera();
 
@@ -743,12 +835,12 @@ void Game::executeAoeWarp(SkillInstance* sk, int col, int row)
 
     if (!m_tileMap.isWalkable(col, row))
     {
-        addLog("  Cannot leap there!", sf::Color(255,255,255));
+        addLog("  Cannot leap there!", sf::Color(225,222,208));
         return;
     }
 
     m_player->setPos(col, row);
-    addLog("  " + sk->data.name + " — leap!", sf::Color(255,255,255));
+    addLog("  " + sk->data.name + " — leap!", sf::Color(225,222,208));
     updateCamera();
 
     executeAoeAt(sk, col, row);   // ดาเมจ + status + knockback + processTurn + fog ครบในตัว
@@ -802,7 +894,7 @@ void Game::moveTargetCursor(int dc, int dr)
                                    (nr - m_player->getRow())*(nr - m_player->getRow())));
     if (dist > range)
     {
-        addLog("  Out of range (max " + std::to_string(range) + " tiles)", sf::Color(255,255,255));
+        addLog("  Out of range (max " + std::to_string(range) + " tiles)", sf::Color(225,222,208));
         return;
     }
 
@@ -849,7 +941,7 @@ void Game::confirmTarget()
 void Game::cancelTargeting()
 {
     m_ui.targeting.reset();
-    addLog("  Targeting cancelled.", sf::Color(255,255,255));
+    addLog("  Targeting cancelled.", sf::Color(225,222,208));
 }
 
 // ============================================================
@@ -862,7 +954,7 @@ void Game::enterBowTargeting()
     const Item* mainHand = m_equipment.getItem(EquipSlot::MainHand);
     if (!mainHand || mainHand->id.find("bow") == std::string::npos)
     {
-        addLog("  No bow equipped!", sf::Color(255,255,255));
+        addLog("  No bow equipped!", sf::Color(225,222,208));
         return;
     }
 
@@ -876,7 +968,7 @@ void Game::enterBowTargeting()
 
     if (!hasArrow)
     {
-        addLog("  No arrows in inventory!", sf::Color(255,255,255));
+        addLog("  No arrows in inventory!", sf::Color(225,222,208));
         return;
     }
 
@@ -886,7 +978,7 @@ void Game::enterBowTargeting()
     m_ui.targeting.targetRow = m_player->getRow();
 
     addLog("  [Bow] hjkl/yubn=move  Enter=fire  Esc/F=cancel",
-           sf::Color(255,255,255));
+           sf::Color(225,222,208));
 }
 
 void Game::fireBow()
@@ -907,7 +999,7 @@ void Game::fireBow()
 
     if (arrowSlot == -1)
     {
-        addLog("  No arrows in inventory!", sf::Color(255,255,255));
+        addLog("  No arrows in inventory!", sf::Color(225,222,208));
         return;
     }
 
@@ -921,7 +1013,7 @@ void Game::fireBow()
     if (dist > BOW_RANGE)
     {
         addLog("  Out of range! (max " + std::to_string(BOW_RANGE) + " tiles)",
-               sf::Color(255,255,255));
+               sf::Color(225,222,208));
         return;
     }
 
@@ -950,7 +1042,7 @@ void Game::fireBow()
 
             e->takeDamage(dmg);
             addLog("  Arrow hits " + e->getName() + " for " + std::to_string(dmg) + "!",
-                   sf::Color(255,255,255));
+                   sf::Color(225,222,208));
             hit = true;
 
             if (e->isDead())
@@ -960,7 +1052,7 @@ void Game::fireBow()
     }
 
     if (!hit)
-        addLog("  Arrow flies into the dark.", sf::Color(255,255,255));
+        addLog("  Arrow flies into the dark.", sf::Color(225,222,208));
 
     Stats& ps = m_player->getStats();
     
@@ -1035,10 +1127,10 @@ void Game::fireRangedAt(int targetCol, int targetRow)
                     se.duration = sk->data.effect.statusDuration;
                     se.sourceId = sk->data.id;
                     e->applyStatus(se);
-                        addLog("  " + e->getName() + " is " + st + "!", sf::Color(255,255,255));
+                        addLog("  " + e->getName() + " is " + st + "!", sf::Color(225,222,208));
                 }
             }
-                        addLog(hitLog, sf::Color(255,255,255));  // ← log เดียว
+                        addLog(hitLog, sf::Color(225,222,208));  // ← log เดียว
 
                 if (!e->isDead() && sk->data.effect.knockbackTiles > 0)
                     applyKnockback(e, pc, pr, sk->data.effect.knockbackTiles);
@@ -1053,7 +1145,7 @@ void Game::fireRangedAt(int targetCol, int targetRow)
     }
 
     if (!hit)
-        addLog("  " + sk->data.name + " hits nothing.", sf::Color(255,255,255));
+        addLog("  " + sk->data.name + " hits nothing.", sf::Color(225,222,208));
 
     // หัก spdCounter เหมือนขยับ
     {
@@ -1142,6 +1234,13 @@ void Game::newDungeon(bool keepPlayer)
         m_player->setSprite(race->sprite);
         }
 }
+        // ── Debug/testing: สกิลไหนใน skills.json ตั้ง "hotbar_slot" ไม่เป็น -1 → ยัดให้ตัวละครทันที ──
+        // (เทสไวๆ แบบเดิม: แค่แก้เลขในไฟล์ json ก็โผล่ที่ตัวละครเลย ไม่ต้องสร้างไอเทม core ผูกสกิล)
+        for (const auto& sd : SkillDB::instance().getAll())
+        {
+            if (sd.hotbarSlot != -1 && !m_player->findSkill(sd.id))
+                m_player->addCoreSkill(sd.id);
+        }
         // ใน newDungeon() หลัง new Player
         //StatusEffect test;
         //test.type     = StatusType::Bleed;
@@ -1205,9 +1304,9 @@ void Game::newDungeon(bool keepPlayer)
     m_ui.targeting.reset();
 
     if (keepPlayer)
-        addLog("  Floor "+std::to_string(m_dungeonFloor)+" - Deeper...", sf::Color(255,255,255));
+        addLog("  Floor "+std::to_string(m_dungeonFloor)+" - Deeper...", sf::Color(225,222,208));
     else
-        addLog("  Floor 1", sf::Color(255,255,255));
+        addLog("  Floor 1", sf::Color(225,222,208));
 }
 
 void Game::applyLetterbox()
@@ -1328,7 +1427,7 @@ void Game::spawnBoss(const std::string& family)
     }
     if (bossId.empty())
     {
-        addLog("  [" + family + "] Boss not defined in JSON!", sf::Color(255,255,255));
+        addLog("  [" + family + "] Boss not defined in JSON!", sf::Color(225,222,208));
         return;
     }
 
@@ -1348,8 +1447,8 @@ void Game::spawnBoss(const std::string& family)
         }
         m_enemies.push_back(new Enemy(bossId, col, row, TILE_SIZE, m_dungeonFloor));
         m_bossActive[family] = true;
-        addLog("  *** " + family + " BOSS APPEARS! ***", sf::Color(255,255,255));
-        addLog("  The slaughter has summoned a guardian!", sf::Color(255,255,255));
+        addLog("  *** " + family + " BOSS APPEARS! ***", sf::Color(225,222,208));
+        addLog("  The slaughter has summoned a guardian!", sf::Color(225,222,208));
         return;
     }
 }
@@ -1372,7 +1471,7 @@ void Game::grantPartyExp(int expGain)
         m_coreSlots.setSlotCount(lv);
         refreshStats();
         recalcSpeed();
-        addLog("  *** LEVEL UP! Level " + std::to_string(lv) + " ***", sf::Color(255,255,255));
+        addLog("  *** LEVEL UP! Level " + std::to_string(lv) + " ***", sf::Color(225,222,208));
     }
 
     for (auto& member : Party::instance().getMembers())
@@ -1382,7 +1481,7 @@ void Game::grantPartyExp(int expGain)
         member->addExp(expGain);
         if (member->getLevel() > lvBefore)
             addLog("  " + member->getName() + " leveled up to Lv." +
-                   std::to_string(member->getLevel()) + "!", sf::Color(255,255,255));
+                   std::to_string(member->getLevel()) + "!", sf::Color(225,222,208));
     }
 }
 
@@ -1393,7 +1492,7 @@ void Game::onEnemyKilled(Enemy* enemy)
     {
         m_bossActive[enemy->getFamily()] = false;
         addLog("  Boss defeated! The " + enemy->getFamily() +
-               " threat fades...", sf::Color(255,255,255));
+               " threat fades...", sf::Color(225,222,208));
         return;
     }
     const std::string& fam = enemy->getFamily();
@@ -1404,7 +1503,7 @@ void Game::onEnemyKilled(Enemy* enemy)
     {
         addLog("  " + fam + " kills: " + std::to_string(count) +
                "/" + std::to_string(BOSS_KILL_THRESHOLD),
-               sf::Color(255,255,255));
+               sf::Color(225,222,208));
     }
     if (count >= BOSS_KILL_THRESHOLD && !m_bossActive[fam])
     {
@@ -1481,7 +1580,7 @@ void Game::handleEnemyDeath(Enemy* enemy, const std::string& killerName)
         if (!idata) continue;
         Item drop = makeDropItem(idata, enemy->getCol(), enemy->getRow());
         m_mapItems.push_back(drop);
-        addLog("  Dropped: " + drop.name, sf::Color(255,255,255));
+        addLog("  Dropped: " + drop.name, sf::Color(225,222,208));
     }
 
     // ── EXP: ให้เฉพาะครั้งแรกที่ฆ่ามอน id นี้ (ทุกเส้นทางเหมือนกันหมด) ──
@@ -1494,17 +1593,17 @@ void Game::handleEnemyDeath(Enemy* enemy, const std::string& killerName)
         m_firstKillDone.insert(eid);
         if (killerName.empty())
             addLog("  " + enemy->getName() + " killed +" + std::to_string(expGain) + " EXP",
-                   sf::Color(255,255,255));
+                   sf::Color(225,222,208));
         else
             addLog("  " + killerName + " killed " + enemy->getName() + "! +" +
-                   std::to_string(expGain) + " EXP", sf::Color(255,255,255));
+                   std::to_string(expGain) + " EXP", sf::Color(225,222,208));
     }
     else
     {
         if (killerName.empty())
-            addLog("  " + enemy->getName() + " killed", sf::Color(255,255,255));
+            addLog("  " + enemy->getName() + " killed", sf::Color(225,222,208));
         else
-            addLog("  " + killerName + " killed " + enemy->getName() + "!", sf::Color(255,255,255));
+            addLog("  " + killerName + " killed " + enemy->getName() + "!", sf::Color(225,222,208));
     }
 
     grantPartyExp(expGain);
@@ -1938,6 +2037,25 @@ void Game::processEvents()
                 return;
             }
 
+            // ── DCSS-style skill select (Shift+Q): เปิดอยู่ → ดัก input ทั้งหมดไปเลือกสกิลด้วย a-z/A-Z ──
+            if (m_ui.skillSelectOpen)
+            {
+                if (key->code == sf::Keyboard::Key::Escape)
+                {
+                    m_ui.skillSelectOpen = false;
+                    return;
+                }
+                int idx = letterKeyIndex(key->code);
+                if (idx >= 0)
+                {
+                    bool shift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+                    char letter = char((shift ? 'A' : 'a') + idx);
+                    selectSkillByLetter(letter);
+                }
+                return;
+            }
+
             switch(key->code)
             {
                 case sf::Keyboard::Key::Escape: m_window.close();    break;
@@ -1956,15 +2074,6 @@ void Game::processEvents()
 
                 
 
-                case sf::Keyboard::Key::Num1: executeSkill(0); break;
-                case sf::Keyboard::Key::Num2: executeSkill(1); break;
-                case sf::Keyboard::Key::Num3: executeSkill(2); break;
-                case sf::Keyboard::Key::Num4: executeSkill(3); break;
-                case sf::Keyboard::Key::Num5: executeSkill(4); break;
-                case sf::Keyboard::Key::Num6: executeSkill(5); break;
-                case sf::Keyboard::Key::Num7: executeSkill(6); break;
-                case sf::Keyboard::Key::Num8: executeSkill(7); break;
-                case sf::Keyboard::Key::Num9: executeSkill(8); break;
 
                 case sf::Keyboard::Key::R:
                     m_inRaceSelect = true;
@@ -2015,7 +2124,25 @@ void Game::processEvents()
                 case sf::Keyboard::Key::Period: tryDescendStairs(); break;
                 case sf::Keyboard::Key::Comma:  tryAscendStairs();  break;
                 case sf::Keyboard::Key::Space:  tryInteractNPC();   break;  // Try to recruit NPC, otherwise wait
-                case sf::Keyboard::Key::F: enterBowTargeting(); break;
+                case sf::Keyboard::Key::F:
+                {
+                    bool shift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+                    if (shift)
+                        toggleFMode();                              // Shift+F: สลับโหมดยิงธนู/ใช้สกิล
+                    else if (m_ui.fMode == UIState::FMode::Bow)
+                        enterBowTargeting();                        // F: ยิงธนู (โหมด Bow)
+                    else
+                        executeSelectedSkill();                     // F: ใช้สกิลที่เลือกไว้ (โหมด Skill)
+                    break;
+                }
+                case sf::Keyboard::Key::Q:
+                {
+                    bool shift = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift) ||
+                                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift);
+                    if (shift) m_ui.skillSelectOpen = !m_ui.skillSelectOpen;  // Shift+Q: เปิด/ปิดหน้าเลือกสกิล
+                    break;
+                }
                 case sf::Keyboard::Key::X:
                     if (m_ui.isPanelOpen(UIState::Panel::Cores))
                         unequipCore();
@@ -2118,8 +2245,8 @@ void Game::tryDescendStairs()
     m_dungeonFloor++;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
-    auto savedHotbar = std::vector<std::string>();
-    for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
+    auto savedLetters = m_player->getSkillLetters();
+    auto savedSelected = m_player->getSelectedSkillId();
     newDungeon(true);
     if (m_player)
     {
@@ -2136,11 +2263,12 @@ void Game::tryDescendStairs()
         if (foundCol!=-1) m_player->setPos(foundCol,foundRow);
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
-        for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
+        m_player->setSkillLetters(savedLetters);
+        m_player->setSelectedSkillId(savedSelected);
         updateCamera();
         recomputeFog();
     }
-    addLog("  Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,255,255));
+    addLog("  Entered floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(225,222,208));
 }
 
 void Game::tryAscendStairs()
@@ -2156,8 +2284,8 @@ void Game::tryAscendStairs()
     m_dungeonFloor--;
     Stats saved=m_player->getStats();
     auto savedSkills=m_player->getSkills();
-    auto savedHotbar = std::vector<std::string>();
-    for (int i=0;i<9;++i) savedHotbar.push_back(m_player->getHotbar(i));
+    auto savedLetters = m_player->getSkillLetters();
+    auto savedSelected = m_player->getSelectedSkillId();
     newDungeon(true);
     if (m_player)
     {
@@ -2168,11 +2296,12 @@ void Game::tryAscendStairs()
         ascend_placed:
         m_player->getStats()=saved;
         m_player->getSkills()=savedSkills;
-        for (int i=0;i<9;++i) m_player->setHotbar(i,savedHotbar[i]);
+        m_player->setSkillLetters(savedLetters);
+        m_player->setSelectedSkillId(savedSelected);
         updateCamera();
         recomputeFog();
     }
-    addLog("  Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(255,255,255));
+    addLog("  Returned to floor "+std::to_string(m_dungeonFloor)+" through the gate!",sf::Color(225,222,208));
 }
 
 void Game::waitTurn()
@@ -2183,7 +2312,7 @@ void Game::waitTurn()
     {
         if (m_fog.isVisible(e->getCol(), e->getRow()))
         {
-            addLog("  Can't wait - enemy in sight!", sf::Color(255,255,255));
+            addLog("  Can't wait - enemy in sight!", sf::Color(225,222,208));
             return;
         }
     }
@@ -2196,7 +2325,7 @@ void Game::waitTurn()
     m_turnCount++; m_player->onTurnPassed();
     processTurn(); tryRespawnEnemies();
     recomputeFog();
-    addLog("  You wait.", sf::Color(255,255,255));
+    addLog("  You wait.", sf::Color(225,222,208));
 }
 
 // ============================================================
@@ -2212,7 +2341,7 @@ void Game::tryPickupItem()
             Item item=m_mapItems[i]; item.col=-1; item.row=-1;
 
             if (!m_inventory.addItem(item)) {
-                addLog("  Inventory full!",sf::Color(255,255,255));
+                addLog("  Inventory full!",sf::Color(225,222,208));
                 return;
             }
             m_mapItems.erase(m_mapItems.begin()+i);
@@ -2231,16 +2360,16 @@ void Game::useOrEquipSelected()
     {
         if(item->type==ItemType::Food)
         {s.hunger=std::min(100,s.hunger+item->value);
-         addLog("  Ate "+item->name+". Hunger +"+std::to_string(item->value),sf::Color(255,255,255));}
+         addLog("  Ate "+item->name+". Hunger +"+std::to_string(item->value),sf::Color(225,222,208));}
         else
         {s.hp=std::min(s.maxHp,s.hp+item->value);
-         addLog("  Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(255,255,255));}
+         addLog("  Used "+item->name+". HP +"+std::to_string(item->value),sf::Color(225,222,208));}
         m_inventory.removeItem(m_ui.selectedInvSlot);
     }
     else if (item->type == ItemType::Ammo)
-        addLog("  " + item->name + " is ammunition. Cannot equip.", sf::Color(255,255,255));
+        addLog("  " + item->name + " is ammunition. Cannot equip.", sf::Color(225,222,208));
     else if (item->isCore()) equipCore();
-    else if (item->isMaterial()) addLog("  "+item->name+" is a trade item.",sf::Color(255,255,255));
+    else if (item->isMaterial()) addLog("  "+item->name+" is a trade item.",sf::Color(225,222,208));
     else if (item->isEquipment())
     {
         EquipSlot slot=Equipment::itemToSlot(*item);
@@ -2248,13 +2377,13 @@ void Game::useOrEquipSelected()
         {
             Item old=m_equipment.unequip(slot);
             if (!m_inventory.isFull()) m_inventory.addItem(old);
-            else{addLog("  Inventory full!",sf::Color(255,255,255));return;}
+            else{addLog("  Inventory full!",sf::Color(225,222,208));return;}
         }
         Item toEquip=*item;
         m_inventory.removeItem(m_ui.selectedInvSlot);
         m_equipment.equip(toEquip,slot);
         addLog("  Equipped "+toEquip.name+" ["+Equipment::slotName(slot)+"] +"+
-               std::to_string(toEquip.value),sf::Color(255,255,255));
+               std::to_string(toEquip.value),sf::Color(225,222,208));
         
         refreshStats();
         recalcSpeed();
@@ -2275,7 +2404,7 @@ void Game::unequipSelected()
     if (m_inventory.isFull()) { addLog("  Inventory full!"); return; }
     Item item = m_equipment.unequip(slot);
     m_inventory.addItem(item);
-    addLog("  Unequipped "+item.name, sf::Color(255,255,255));
+    addLog("  Unequipped "+item.name, sf::Color(225,222,208));
     refreshStats();
     recalcSpeed();
 }
@@ -2287,20 +2416,20 @@ void Game::equipCore()
     int freeSlot=-1;
     for (int i=0;i<m_coreSlots.getSlotCount();++i)
         if (!m_coreSlots.hasCore(i)){freeSlot=i;break;}
-    if (freeSlot==-1){addLog("  All core slots full!",sf::Color(255,255,255));return;}
+    if (freeSlot==-1){addLog("  All core slots full!",sf::Color(225,222,208));return;}
     Item core=*item;
     m_inventory.removeItem(m_ui.selectedInvSlot);
     m_coreSlots.equip(freeSlot,core);
-    addLog("  Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),sf::Color(255,255,255));
+    addLog("  Equipped "+core.name+" in core slot "+std::to_string(freeSlot+1),sf::Color(225,222,208));
 
     const ItemData* idata = DropTable::instance().getItem(core.id);
     if (idata)
         for (const auto& skillId : idata->coreSkills)
         {
             if (m_player->addCoreSkill(skillId))
-                addLog("  Skill unlocked: "+skillId, sf::Color(255,255,255));
+                addLog("  Skill unlocked: "+skillId, sf::Color(225,222,208));
             else
-                addLog("  Hotbar full — "+skillId+" not assigned", sf::Color(255,255,255));
+                addLog("  Unknown skill id: "+skillId, sf::Color(225,222,208));
         }
     int abilityCount = 0;
     for (const auto& sk : m_player->getSkills())
@@ -2317,14 +2446,14 @@ void Game::unequipCore()
     if (m_inventory.isFull()){addLog("  Inventory full!");return;}
     Item core=m_coreSlots.unequip(m_ui.selectedCoreSlot);
     m_inventory.addItem(core);
-    addLog("  Removed "+core.name+" from core slot "+std::to_string(m_ui.selectedCoreSlot+1),sf::Color(255,255,255));
+    addLog("  Removed "+core.name+" from core slot "+std::to_string(m_ui.selectedCoreSlot+1),sf::Color(225,222,208));
 
     const ItemData* idata = DropTable::instance().getItem(core.id);
     if (idata)
         for (const auto& skillId : idata->coreSkills)
         {
             m_player->removeCoreSkill(skillId);
-            addLog("  Skill lost: "+skillId, sf::Color(255,255,255));
+            addLog("  Skill lost: "+skillId, sf::Color(225,222,208));
         }
     int abilityCount = 0;
     for (const auto& sk : m_player->getSkills())
@@ -2340,7 +2469,7 @@ void Game::dropSelectedItem()
     if (!item||!m_player) return;
     Item d=*item; d.col=m_player->getCol(); d.row=m_player->getRow();
     m_mapItems.push_back(d);
-    addLog("  Dropped: "+d.name,sf::Color(255,255,255));
+    addLog("  Dropped: "+d.name,sf::Color(225,222,208));
     m_inventory.removeItem(m_ui.selectedInvSlot);
 }
 
@@ -2401,7 +2530,7 @@ void Game::handlePlayerMove(int dc, int dr)
             recomputeFog();
             auto t2 = std::chrono::high_resolution_clock::now();
             auto ms2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
-            //addLog("fog: " + std::to_string(ms2) + "ms", sf::Color(255,255,255));
+            //addLog("fog: " + std::to_string(ms2) + "ms", sf::Color(225,222,208));
             updateCamera(); return;
             
         }
@@ -2424,16 +2553,16 @@ void Game::handlePlayerMove(int dc, int dr)
     int pc=m_player->getCol(),pr=m_player->getRow();
     for (auto& it:m_mapItems)
         if (it.col==pc&&it.row==pr)
-        {addLog("  "+it.name+" here. [G] pick up.",sf::Color(255,255,255));break;}
+        {addLog("  "+it.name+" here. [G] pick up.",sf::Color(225,222,208));break;}
 
     TileType tile=m_tileMap.getTile(pc,pr);
-    if (tile==TileType::GateDown) addLog("  Gate Down",sf::Color(255,255,255));
-    if (tile==TileType::GateUp)   addLog("  Gate Up",  sf::Color(255,255,255));
+    if (tile==TileType::GateDown) addLog("  Gate Down",sf::Color(225,222,208));
+    if (tile==TileType::GateUp)   addLog("  Gate Up",  sf::Color(225,222,208));
 
     int hunger=m_player->getStats().hunger;
-    if(hunger==50) addLog("  You feel hungry.",      sf::Color(255,255,255));
-    if(hunger==20) addLog("  Very hungry!",          sf::Color(255,255,255));
-    if(hunger== 0) addLog("  Starving! HP draining!",sf::Color(255,255,255));
+    if(hunger==50) addLog("  You feel hungry.",      sf::Color(225,222,208));
+    if(hunger==20) addLog("  Very hungry!",          sf::Color(225,222,208));
+    if(hunger== 0) addLog("  Starving! HP draining!",sf::Color(225,222,208));
 }
 
 void Game::playerAttack(Enemy* enemy)
@@ -2468,7 +2597,7 @@ void Game::playerAttack(Enemy* enemy)
 
     std::string msg="  You hit "+enemy->getName()+" for "+std::to_string(dmg)+"!";
     if (powered) msg+=" [POWERED]";
-    addLog(msg,sf::Color(255,255,255));
+    addLog(msg,sf::Color(225,222,208));
 
     // ── On-hit status effect จาก weapon ──
 if (mainHand && !mainHand->onHitStatus.empty() &&
@@ -2499,7 +2628,7 @@ if (mainHand && !mainHand->onHitStatus.empty() &&
             se.duration = mainHand->onHitDuration;
             se.sourceId = mainHand->id;
             enemy->applyStatus(se);
-            addLog("  " + enemy->getName() + " is " + st + "!", sf::Color(255,255,255));
+            addLog("  " + enemy->getName() + " is " + st + "!", sf::Color(225,222,208));
             
         }
     }
@@ -2517,7 +2646,7 @@ void Game::enemyAttack(Enemy* enemy)
     int dodge=s.maxDodge+m_equipment.getTotalDodgeBonus();
     float dodgeChance=std::min(0.45f,0.06f+dodge*0.05f);
     if (std::uniform_int_distribution<int>(0,99)(m_rng)<(int)(dodgeChance*100))
-    {addLog("  You dodged "+enemy->getName()+"!",sf::Color(255,255,255));return;}
+    {addLog("  You dodged "+enemy->getName()+"!",sf::Color(225,222,208));return;}
     int dmg=std::max(1,enemy->getAttack()-def);
     s.hp -= dmg;
 
@@ -2555,7 +2684,7 @@ if (mdata && !mdata->applyStatus.empty() && mdata->statusDuration > 0)
         int roll = rollDist(m_rng);
         if (roll < resist)
         {
-            addLog("  You resist " + st + "!", sf::Color(255,255,255));
+            addLog("  You resist " + st + "!", sf::Color(225,222,208));
         }
         else
         {
@@ -2601,18 +2730,18 @@ if (mdata && !mdata->applyStatus.empty() && mdata->statusDuration > 0)
                 se.duration = std::max(1, se.duration * (100 - durReduce) / 100);
 
                 s.statusEffects.push_back(se);
-                addLog("  You are " + st + "ed!", sf::Color(255,255,255));
+                addLog("  You are " + st + "ed!", sf::Color(225,222,208));
             }
         }
     }
     
 }
-addLog("  "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(255,255,255));
+addLog("  "+enemy->getName()+" hits you for "+std::to_string(dmg)+"!",sf::Color(225,222,208));
     if (s.hp<=0)
     {
         s.hp=0;
         m_playerDead=true;
-        addLog("  *** YOU DIED *** [R] restart",sf::Color(255,255,255));
+        addLog("  *** YOU DIED *** [R] restart",sf::Color(225,222,208));
     }
 }
 // ============================================================
@@ -2627,7 +2756,7 @@ void Game::enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc)
     npc->takeDamage(dmg);
 
     addLog("  " + enemy->getName() + " hits " + npc->getName() +
-           " for " + std::to_string(dmg) + "!", sf::Color(255,255,255));
+           " for " + std::to_string(dmg) + "!", sf::Color(225,222,208));
 
     if (npc->isDead())
     {
@@ -2637,7 +2766,7 @@ void Game::enemyAttackCompanion(Enemy* enemy, std::shared_ptr<NPC> npc)
         // ที่ทุกจุดมี guard "if (!npc || npc->isDead()) continue;")
         // ตำแหน่งยังโดนลาก follow trail ต่อไปเหมือนถูกหามเดิน
         // ปลุกคืนได้ด้วยการเดินไปยืนติดแล้วกด interact → tryInteractNPC()
-        addLog("  " + npc->getName() + " is downed!", sf::Color(255,255,255));
+        addLog("  " + npc->getName() + " is downed!", sf::Color(225,222,208));
     }
 }
 // ============================================================
@@ -2656,7 +2785,7 @@ void Game::companionAttack(std::shared_ptr<NPC> npc, Enemy* enemy)
     enemy->takeDamage(dmg);
 
     addLog("  " + npc->getName() + " hits " + enemy->getName() +
-           " for " + std::to_string(dmg) + "!", sf::Color(255,255,255));
+           " for " + std::to_string(dmg) + "!", sf::Color(225,222,208));
 
     if (!enemy->isDead()) return;
 
@@ -2711,13 +2840,13 @@ void Game::processTurn()
         if (hpDelta < 0)
         {
             addLog("  You take " + std::to_string(-hpDelta) +
-                   " " + effectName + " dmg!", sf::Color(255,255,255));
+                   " " + effectName + " dmg!", sf::Color(225,222,208));
             Stats& ps = m_player->getStats();
             if (ps.hp <= 0)
             {
                 ps.hp = 0;
                 m_playerDead = true;
-                addLog("  *** YOU DIED *** [R] restart", sf::Color(255,255,255));
+                addLog("  *** YOU DIED *** [R] restart", sf::Color(225,222,208));
             }
         }
     }
@@ -2768,7 +2897,7 @@ void Game::processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
         e->tickStatusEffects(hpDelta, effectName);
         if (hpDelta < 0)
             addLog("  " + e->getName() + " takes " + std::to_string(-hpDelta) +
-                   " " + effectName + " dmg", sf::Color(255,255,255));
+                   " " + effectName + " dmg", sf::Color(225,222,208));
     }
 
     if (e->isDead())
@@ -2851,15 +2980,15 @@ void Game::processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
                         s.hp -= actualDmg;
                         addLog("  " + e->getName() + " uses " + sk->data.name +
                                " " + std::to_string(actualDmg) + " dmg",
-                               sf::Color(255,255,255));
+                               sf::Color(225,222,208));
                         if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
-                            addLog("  *** YOU DIED *** [R] restart", sf::Color(255,255,255)); }
+                            addLog("  *** YOU DIED *** [R] restart", sf::Color(225,222,208)); }
                         break;
                     }
                 }
                 if (blocked)
                     addLog("  " + e->getName() + "'s " + sk->data.name + " was blocked.",
-                           sf::Color(255,255,255));
+                           sf::Color(225,222,208));
             }
             else if (sk->data.type == SkillType::ActiveAoe)
             {
@@ -2874,9 +3003,9 @@ void Game::processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
                     s.hp -= actualDmg;
                     addLog("  " + e->getName() + " uses " + sk->data.name +
                            " -> " + std::to_string(actualDmg) + " dmg!",
-                           sf::Color(255,255,255));
+                           sf::Color(225,222,208));
                     if (s.hp <= 0) { s.hp = 0; m_playerDead = true;
-                        addLog("  *** YOU DIED *** [R] restart", sf::Color(255,255,255)); }
+                        addLog("  *** YOU DIED *** [R] restart", sf::Color(225,222,208)); }
                 }
             }
         }
@@ -3101,10 +3230,11 @@ void Game::render()
     renderRightPanel();
     renderLogPanel();
     if (m_ui.activePanel == UIState::Panel::Stats) renderStatsOverlay();
-    renderHotbar();
+    renderFStatus();
     renderStatusEffects();  // ← เพิ่ม
     renderPartyUI();        // ← Party UI overlay
     if (m_ui.levelUpFlash) renderLevelUpEffect();
+    if (m_ui.skillSelectOpen) renderSkillSelect();   // ← หน้าจอเลือกสกิลแบบ DCSS (Shift+Q) วาดทับบนสุด
     if (m_playerDead) renderDeathScreen();
 
     // ใน render() ก่อน m_window.display()
@@ -3129,109 +3259,141 @@ void Game::render()
 }
 
 // ============================================================
-//  Hotbar Render
+//  F-status indicator (แทน Hotbar bar เดิม) — โชว์โหมด F ปัจจุบัน
+//  + สกิลที่เลือกไว้ (ถ้าอยู่โหมด Skill)
 // ============================================================
-void Game::renderHotbar()
+void Game::renderFStatus()
 {
     if (!m_player || !m_fontLoaded) return;
 
-    const float SZ  = 32.f;
-    const float GAP = 4.f;
-    const int   N   = 9;
-    float startX = 8.f;
-    float startY = 558.f;
+    float x = 8.f, y = 558.f;
 
-    if ((int)m_hotbarCache.size() != N)
-        m_hotbarCache.assign(N, HotbarSlotCache{});
+    bool isSkillMode = (m_ui.fMode == UIState::FMode::Skill);
+    std::string modeLabel = isSkillMode ? "Skill" : "Bow";
 
-    for (int i = 0; i < N; ++i)
+    //sf::Text modeTxt(m_font, "[F] " + modeLabel + "   (Shift+F: switch, Shift+Q: choose skill)", 9);
+    //modeTxt.setFillColor(sf::Color(160,160,160));
+    //modeTxt.setPosition({x, y});
+    //m_window.draw(modeTxt);
+
+    if (!isSkillMode) return;
+
+    const std::string& id = m_player->getSelectedSkillId();
+    if (id.empty())
     {
-        float sx = startX + i * (SZ + GAP);
-        const std::string& id = m_player->getHotbar(i);
-        const SkillInstance* sk = id.empty() ? nullptr : m_player->findSkill(id);
-        HotbarSlotCache& c = m_hotbarCache[i];
+        //sf::Text noneTxt(m_font, "  (no skill selected)", 9);
+        //noneTxt.setFillColor(sf::Color(150,90,90));
+        //noneTxt.setPosition({x, y + 12.f});
+        //m_window.draw(noneTxt);
+        return;
+    }
 
-        // ── slot bg (geometry เปลี่ยนน้อย, setPosition ทุกเฟรมพอ) ──
-        c.slotBg.setFillColor(sf::Color(8, 8, 8, 200));
-        c.slotBg.setOutlineColor(sf::Color(120, 120, 120));
-        c.slotBg.setOutlineThickness(1.f);
-        c.slotBg.setPosition({sx, startY});
-        m_window.draw(c.slotBg);
+    SkillInstance* sk = m_player->findSkill(id);
+    char letter = m_player->getSkillLetter(id);
+    std::string label = sk ? sk->data.name : id;
+    std::string line = "  " + std::string(1, letter ? letter : '?') + ") " + label;
+    sf::Color col = sf::Color(200,200,120);
 
-        // ── เลขช่อง 1-9: ไม่เปลี่ยนเลย สร้างครั้งเดียวพอ ──
-        if (!c.numTxt)
+    if (sk && !sk->isReady())
+    {
+        line += "  [cd:" + std::to_string(sk->cooldownLeft) + "]";
+        col = sf::Color(180,80,80);
+    }
+    else if (sk && sk->buffActive)
+    {
+        line += "  [" + std::to_string(sk->durationLeft) + "t]";
+        col = sf::Color(255,220,50);
+    }
+    else
+    {
+        line += "  ready";
+        col = sf::Color(100,220,100);
+    }
+
+    sf::Text skillTxt(m_font, line, 9);
+    skillTxt.setFillColor(col);
+    skillTxt.setPosition({x, y + 12.f});
+    m_window.draw(skillTxt);
+}
+
+// ============================================================
+//  DCSS-style Skill Select overlay (Shift+Q)
+//  แสดงสกิล active ทั้งหมดที่ผู้เล่นมี พร้อมตัวอักษร a-z/A-Z ประจำตัว
+//  กดตัวอักษร → เลือกเป็นสกิลปัจจุบัน แล้วหน้าต่างพับลงทันที (ดู Game::selectSkillByLetter)
+// ============================================================
+void Game::renderSkillSelect()
+{
+    if (!m_player || !m_fontLoaded) return;
+
+    sf::RectangleShape dim({(float)WINDOW_W, (float)WINDOW_H});
+    dim.setFillColor(sf::Color(0,0,0,180));
+    m_window.draw(dim);
+
+    // เก็บรายชื่อสกิลที่มีตัวอักษร (active เท่านั้น — passive ไม่ได้ assign ตัวอักษร) เรียงตามตัวอักษร
+    std::vector<std::pair<char,std::string>> entries;
+    for (const auto& kv : m_player->getSkillLetters())
+        entries.push_back({kv.second, kv.first});
+    std::sort(entries.begin(), entries.end(),
+        [](const auto& a, const auto& b){ return a.first < b.first; });
+
+    float pw = 340.f;
+    float ph = std::max(120.f, 60.f + entries.size() * 16.f + 20.f);
+    ph = std::min(ph, (float)WINDOW_H - 40.f);
+    float px = (WINDOW_W - pw) / 2.f;
+    float py = (WINDOW_H - ph) / 2.f;
+
+    sf::RectangleShape panel({pw, ph});
+    panel.setFillColor(sf::Color(12,12,18));
+    panel.setOutlineColor(sf::Color(120,120,120));
+    panel.setOutlineThickness(1.f);
+    panel.setPosition({px, py});
+    m_window.draw(panel);
+
+    sf::Text header(m_font, "Select a skill  (Esc: cancel)", 12);
+    header.setFillColor(sf::Color(220,220,220));
+    header.setPosition({px + 14.f, py + 12.f});
+    m_window.draw(header);
+
+    if (entries.empty())
+    {
+        sf::Text empty(m_font, "  (no active skills learned)", 10);
+        empty.setFillColor(sf::Color(140,140,140));
+        empty.setPosition({px + 14.f, py + 40.f});
+        m_window.draw(empty);
+        return;
+    }
+
+    float y = py + 40.f;
+    const std::string& curSelected = m_player->getSelectedSkillId();
+
+    for (const auto& [letter, id] : entries)
+    {
+        if (y + 14.f > py + ph - 10.f) break;  // เกินพื้นที่ panel — ตัดไว้ (มี scroll ได้ในอนาคตถ้าจำเป็น)
+
+        const SkillInstance* sk = m_player->findSkill(id);
+        std::string name = sk ? sk->data.name : id;
+
+        std::string status;
+        sf::Color col = sf::Color(200,200,200);
+        if (sk && !sk->isReady())
         {
-            c.numTxt.emplace(m_font, std::to_string(i + 1), 8);
-            c.numTxt->setFillColor(sf::Color(120, 120, 120));
+            status = "  [cd:" + std::to_string(sk->cooldownLeft) + "]";
+            col = sf::Color(170,90,90);
         }
-        c.numTxt->setPosition({sx + 2.f, startY + 1.f});
-        m_window.draw(*c.numTxt);
-
-        if (!sk)
+        else if (sk && sk->buffActive)
         {
-            c.lastSkillId.clear();
-            continue;
+            status = "  [" + std::to_string(sk->durationLeft) + "t]";
+            col = sf::Color(230,200,60);
         }
 
-        // ── Icon sprite: rebuild เฉพาะตอนสกิลใน slot นี้เปลี่ยน ──
-        if (id != c.lastSkillId)
-        {
-            c.lastSkillId = id;
-            c.icon.reset();
-            if (!sk->data.icon.empty())
-            {
-                const sf::Texture* tex = TextureManager::instance().get(sk->data.icon);
-                if (tex)
-                {
-                    c.icon.emplace(*tex);
-                    auto tsz = tex->getSize();
-                    float sc = SZ / std::max((float)tsz.x, (float)tsz.y);
-                    c.icon->setScale({sc, sc});
-                }
-            }
-            std::string label = sk->data.name.substr(0, 4);
-            c.nameTxt.emplace(m_font, label, 7);
-        }
-        if (c.icon)
-        {
-            c.icon->setPosition({sx, startY});
-            m_window.draw(*c.icon);
-        }
+        std::string line = std::string(1, letter) + ") " + name + status;
+        if (id == curSelected) line += "  <selected>";
 
-        if (!sk->isReady())  // ← บรรทัด 1846 เดิม
-        {
-            float ratio = sk->data.cooldown > 0
-                ? (float)sk->cooldownLeft / sk->data.cooldown : 1.f;
-            c.cooldownOverlay.setSize({SZ, SZ * ratio});
-            c.cooldownOverlay.setFillColor(sf::Color(0, 0, 0, 160));
-            c.cooldownOverlay.setPosition({sx, startY + SZ * (1.f - ratio)});
-            m_window.draw(c.cooldownOverlay);
-
-            // เลข cooldown เปลี่ยนทุกเทิร์น → setString แทนสร้างใหม่
-            if (!c.cooldownTxt)
-            {
-                c.cooldownTxt.emplace(m_font, std::to_string(sk->cooldownLeft), 9);
-                c.cooldownTxt->setFillColor(sf::Color(220, 100, 100));
-            }
-            else
-            {
-                c.cooldownTxt->setString(std::to_string(sk->cooldownLeft));
-            }
-            c.cooldownTxt->setPosition({sx + SZ/2.f - 5.f, startY + SZ/2.f - 6.f});
-            m_window.draw(*c.cooldownTxt);
-        }
-        else if (sk->buffActive)
-        {
-            c.activeGlow.setFillColor(sf::Color(255, 200, 50, 40));
-            c.activeGlow.setOutlineColor(sf::Color(255, 200, 50));
-            c.activeGlow.setOutlineThickness(2.f);
-            c.activeGlow.setPosition({sx, startY});
-            m_window.draw(c.activeGlow);
-        }
-
-        c.nameTxt->setFillColor(sk->isReady() ? sf::Color(200, 200, 200) : sf::Color(100, 100, 100));
-        c.nameTxt->setPosition({sx + 2.f, startY + SZ - 10.f});
-        m_window.draw(*c.nameTxt);
+        sf::Text t(m_font, line, 10);
+        t.setFillColor(id == curSelected ? sf::Color(120,220,255) : col);
+        t.setPosition({px + 14.f, y});
+        m_window.draw(t);
+        y += 16.f;
     }
 }
 
@@ -3552,15 +3714,25 @@ void Game::renderStatsOverlay()
     float x = px + 20.f;
 
     // วาด line เฉพาะที่อยู่ใน panel
+    // ── cache sf::Text ต่อบรรทัด: สร้างครั้งแรกครั้งเดียว เฟรมต่อไปแค่ setString/setPosition ──
+    // (เดิมสร้าง sf::Text ใหม่ ~30 ตัวทุกเฟรมตอนพาเนลเปิด → กิน FPS)
+    size_t lineIdx = 0;
     auto line = [&](const std::string& label, const std::string& val,
                     sf::Color col = sf::Color(200,200,200))
     {
+        size_t idx = lineIdx++;
         if (y >= contentTop && y + lineH <= contentBot)
         {
-            sf::Text t(m_font, label + val, sz);
-            t.setFillColor(col);
-            t.setPosition({x, y});
-            m_window.draw(t);
+            if (idx >= m_statsOverlayCache.size())
+                m_statsOverlayCache.emplace_back();
+            auto& opt = m_statsOverlayCache[idx];
+            if (!opt) opt.emplace(m_font, "", sz);
+
+            std::string str = label + val;
+            if (opt->getString() != str) opt->setString(str);
+            opt->setFillColor(col);
+            opt->setPosition({x, y});
+            m_window.draw(*opt);
         }
         y += lineH;
     };
@@ -3715,7 +3887,7 @@ void Game::renderRightPanel()
                 if (cnt > 1) info += " x" + std::to_string(cnt);
             }
             sf::Text infoTxt(m_font, info, 9);
-            infoTxt.setFillColor(sf::Color(180,160,100));
+            infoTxt.setFillColor(sf::Color::White);   // ← สีเดียวกับ Status Panel (renderStatusPanel)
             infoTxt.setPosition({panelX+8.f, panelY + 10.f + ROWS*(SZ+GAP) + 4.f});
             m_window.draw(infoTxt);
             break;
@@ -4259,7 +4431,7 @@ void Game::dismissSelectedCompanion()
     party.removeMember(npc->getId());   // เอาออกจากปาร์ตี้ก่อน (ล้าง trail-follow/combat state ของตัวนี้)
     m_npcManager.add(npc);              // แล้วโผล่กลับบนแมพ ให้คุยแล้ว recruitNPC() ซ้ำได้
 
-    addLog("  " + name + " leaves the party.", sf::Color(255,255,255));
+    addLog("  " + name + " leaves the party.", sf::Color(225,222,208));
     m_partyUI.resetSelection(party.size());
 }
 
@@ -4337,7 +4509,7 @@ void Game::tryInteractNPC()
         if (dc <= 1 && dr <= 1)
         {
             member->revive();
-            addLog("  " + member->getName() + " is back on their feet!", sf::Color(255,255,255));
+            addLog("  " + member->getName() + " is back on their feet!", sf::Color(225,222,208));
             processTurn();  // Count as action
             return;
         }
@@ -4367,7 +4539,7 @@ void Game::tryInteractNPC()
         }
     }
     // ก่อน waitTurn() ที่ท้ายฟังก์ชัน
-    //addLog("No adjacent NPC found", sf::Color(255,255,255));
+    //addLog("No adjacent NPC found", sf::Color(225,222,208));
     // No adjacent NPC found, just wait
     waitTurn();
 }

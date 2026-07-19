@@ -145,7 +145,7 @@
       "name": "Fire Marble",
       "desc": "Fire a fire like marble. Range 10, dmg MAG/2.",
       "type": "active_ranged",
-      "hotbar_slot": -1,
+      "hotbar_slot": 0,
       "cooldown": 1,
       "duration": 0,
       "effect": {

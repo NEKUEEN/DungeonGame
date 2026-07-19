@@ -2,6 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include <vector>
 #include <string>
+#include <map>
 #include "TileMap.hpp"
 #include "Skill.hpp"
 #include <algorithm>
@@ -130,63 +131,67 @@ public:
         return nullptr;
     }
 
-    // ── Hotbar ──
-    const std::string& getHotbar(int idx) const
+    // ── DCSS-style skill letters (a-z แล้วต่อด้วย A-Z) ──
+    // แทนที่ระบบ hotbar 9 ช่องเดิม: สกิล active ทุกตัวที่ผู้เล่นมีจะได้ตัวอักษรประจำตัว
+    // ตัวอักษรจะ "คงที่" ตราบใดที่ยังไม่ถอดสกิลนั้นออก (ไม่ขึ้นกับลำดับใน m_skills)
+    char getSkillLetter(const std::string& skillId) const
     {
-        static const std::string empty = "";
-        if (idx < 0 || idx >= 9) return empty;
-        return m_hotbar[idx];
+        auto it = m_skillLetters.find(skillId);
+        return it != m_skillLetters.end() ? it->second : '\0';
     }
 
-    void setHotbar(int idx, const std::string& skillId)
+    std::string getSkillIdByLetter(char letter) const
     {
-        if (idx >= 0 && idx < 9) m_hotbar[idx] = skillId;
+        for (const auto& kv : m_skillLetters)
+            if (kv.second == letter) return kv.first;
+        return "";
     }
 
-    // เพิ่ม skill จาก core → หา hotbar slot ว่างแรก
-    bool addCoreSkill(const std::string& skillId)
-    {   
+    const std::map<std::string, char>& getSkillLetters() const { return m_skillLetters; }
+    void setSkillLetters(const std::map<std::string, char>& letters) { m_skillLetters = letters; }
+
+    // จองตัวอักษรว่างตัวถัดไป (a..z, A..Z) ให้กับสกิล — เรียกตอนได้สกิล active ใหม่
+    void assignSkillLetter(const std::string& skillId)
+    {
+        if (skillId.empty() || m_skillLetters.count(skillId)) return;
+        static const std::string pool = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (char c : pool)
         {
-            // ไม่เช็ค existing แล้ว — สร้าง instance ใหม่เสมอ
+            bool used = false;
+            for (const auto& kv : m_skillLetters)
+                if (kv.second == c) { used = true; break; }
+            if (!used) { m_skillLetters[skillId] = c; return; }
+        }
+        // ตัวอักษรหมด (มีสกิล active มากกว่า 52 ตัว) — ไม่ได้ assign ตัวอักษรให้
+    }
+
+    // ── สกิลที่เลือกไว้ปัจจุบัน (เลือกจากหน้า Shift+Q แล้วใช้ผ่านปุ่ม F) ──
+    const std::string& getSelectedSkillId() const { return m_selectedSkillId; }
+    void setSelectedSkillId(const std::string& skillId) { m_selectedSkillId = skillId; }
+
+    // เพิ่ม skill จาก core
+    bool addCoreSkill(const std::string& skillId)
+    {
         const SkillData* sd = SkillDB::instance().get(skillId);
         if (!sd) return false;
 
         SkillInstance inst;
         inst.data     = *sd;
-        inst.fromCore = true;  // ← set ตรงนี้
+        inst.fromCore = true;
         m_skills.push_back(inst);
 
-        // passive ไม่ใส่ hotbar
-        if (sd->type == SkillType::Passive)
-            return true;
+        // passive ไม่ต้องมีตัวอักษร (ไม่ได้เรียกใช้แบบ active ผ่าน F)
+        if (sd->type != SkillType::Passive)
+            assignSkillLetter(skillId);
 
-
-        for (int i = 0; i < 9; ++i)
-            if (m_hotbar[i].empty())
-            { m_hotbar[i] = skillId; return true; }
-
-            return false;
-        }
-       //if (!findSkill(skillId))
-        {
-            const SkillData* sd = SkillDB::instance().get(skillId);
-            if (!sd) return false;
-            SkillInstance inst;
-            inst.data = *sd;
-            m_skills.push_back(inst);
-        }
-        for (int i = 0; i < 9; ++i)
-            if (m_hotbar[i].empty())
-            { m_hotbar[i] = skillId; return true; }
-        return false;  // hotbar เต็ม
+        return true;
     }
 
-    // ลบ skill ออกจาก hotbar + m_skills (ตอนถอดคอร์)
+    // ลบ skill ออกจาก m_skills + คืนตัวอักษร (ตอนถอดคอร์)
     void removeCoreSkill(const std::string& skillId)
     {
-        for (int i = 0; i < 9; ++i)
-            if (m_hotbar[i] == skillId)
-                m_hotbar[i] = "";
+        m_skillLetters.erase(skillId);
+        if (m_selectedSkillId == skillId) m_selectedSkillId.clear();
 
         m_skills.erase(
             std::remove_if(m_skills.begin(), m_skills.end(),
@@ -209,7 +214,8 @@ private:
     
     std::vector<SkillInstance> m_skills;
 
-    // Hotbar — เก็บ skill id ที่ assign ไว้ใน slot 0-8
-    // "" = ว่าง
-    std::string m_hotbar[9];
+    // ── DCSS-style skill letters: skillId → a-z/A-Z (แทน hotbar 9 ช่องเดิม) ──
+    std::map<std::string, char> m_skillLetters;
+    // สกิลที่เลือกไว้ปัจจุบัน (เลือกจาก Shift+Q, ใช้ด้วย F)
+    std::string m_selectedSkillId;
 };

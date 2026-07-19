@@ -140,12 +140,12 @@ void CoreSlots::render(sf::RenderWindow& window, const sf::Font& font,
         if (cs.cleaveDmgBonus) info += " CLE+"+std::to_string(cs.cleaveDmgBonus);
 
         sf::Text infoTxt(font, info, 8);
-        infoTxt.setFillColor(sf::Color(100,200,255));
+        infoTxt.setFillColor(sf::Color::White);
         infoTxt.setPosition({startX, sy + SZ + 4.f});
         window.draw(infoTxt);
     } else {
         sf::Text empty(font, "Slot "+std::to_string(selectedSlot+1)+": empty", 8);
-        empty.setFillColor(sf::Color(60,80,100));
+        empty.setFillColor(sf::Color::White);
         empty.setPosition({startX, sy + SZ + 4.f});
         window.draw(empty);
     }

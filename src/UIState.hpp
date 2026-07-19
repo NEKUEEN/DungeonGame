@@ -13,6 +13,13 @@ struct UIState {
     bool levelUpFlash = false;
     int levelUpTimer = 0;
 
+    // ── DCSS-style skill select (Shift+Q) ──
+    bool skillSelectOpen = false;
+
+    // ── F-key mode: ยิงธนู หรือ ใช้สกิลที่เลือกไว้ (สลับด้วย Shift+F) ──
+    enum class FMode { Bow, Skill };
+    FMode fMode = FMode::Bow;
+
     struct Targeting {
         bool active = false;
         int targetCol = 0, targetRow = 0;

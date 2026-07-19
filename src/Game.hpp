@@ -45,15 +45,15 @@ constexpr float STATUS_LINE_SIZE         = 8.8;
 constexpr int STATUS_LINE_SPACING      = 10;
 constexpr int STATUS_HEADER_SPACING    = 16;
 
-constexpr int LOG_MAX_LINES   = 7;
+constexpr int LOG_MAX_LINES   = 9;
 constexpr int TILE_SIZE       = 64;
 constexpr int MAP_COLS        = 50;
 constexpr int MAP_ROWS        = 50;
 constexpr int VIEW_RADIUS     = 10;
 constexpr int DARK_ZONE_VIEW_RADIUS = 1;  // ระยะมองเห็นในโซนมืด (เช่น Darkness) — ไม่มีไฟ
-constexpr int MAX_ENEMIES     = 1;
-constexpr int RESPAWN_TURNS   = 12;
-constexpr int BOSS_KILL_THRESHOLD = 50;
+constexpr int MAX_ENEMIES     = 100;
+constexpr int RESPAWN_TURNS   = 50;
+constexpr int BOSS_KILL_THRESHOLD = 5;
 constexpr int COMPANION_DETECT_RANGE = 6;  // ระยะที่ companion "เห็น" มอนแล้วแหกแถวไปไล่ (ข้อ 4)
 
 struct ItemData;  // fwd decl (นิยามเต็มอยู่ใน DropTable.hpp ซึ่ง Game.cpp include ไว้แล้ว)
@@ -114,10 +114,12 @@ private:
     void renderItems();
     void renderLevelUpEffect();
     void renderSkillPanel();
-    void renderHotbar();
+    void renderSkillSelect();   // ← หน้าจอเลือกสกิลแบบ DCSS (เปิดด้วย Shift+Q)
+    void renderFStatus();       // ← แถบสถานะเล็กๆ แทน hotbar เดิม (โชว์โหมด F + สกิลที่เลือก)
     void renderStatusEffects();
     void renderTargeting();
     void renderStatsOverlay();
+    std::vector<std::optional<sf::Text>> m_statsOverlayCache;  // ← cache กัน realloc sf::Text ทุกเฟรม (แก้ FPS drop)
     void renderDeathScreen();
     void renderPartyUI();
 
@@ -142,7 +144,10 @@ private:
     void unequipSelected();
     void renderRaceSelect();
 
-    void executeSkill(int hotbarIdx);
+    void executeSkillById(const std::string& skillId);   // ใช้สกิลตาม id ตรงๆ (แทน executeSkill(hotbarIdx) เดิม)
+    void executeSelectedSkill();                          // เรียกตอนกด F ในโหมด Skill — ใช้สกิลที่เลือกไว้จาก Shift+Q
+    void selectSkillByLetter(char letter);                 // เลือกสกิลในหน้า Shift+Q ด้วยตัวอักษร a-z/A-Z
+    void toggleFMode();                                    // Shift+F — สลับ F ระหว่างยิงธนู กับใช้สกิลที่เลือกไว้
     void executeAoe(SkillInstance* sk);                 // ใช้กับตำแหน่งผู้เล่น (ของเดิม ไว้เผื่อ legacy call)
     void executeAoeAt(SkillInstance* sk, int col, int row);  // ← เพิ่ม: ปล่อย AOE ที่ตำแหน่ง targeting
 
@@ -292,20 +297,7 @@ private:
     std::vector<LogEntry> m_log;
     int m_turnCount = 0;
 
-    // ── Hotbar render cache (ลด sf::Text/RectangleShape allocation ทุกเฟรม) ──
-    // หนึ่ง slot คงที่ 9 ช่อง สร้าง sf::Text/Sprite ครั้งเดียวตอนเปิดเกม (lazy, ใน renderHotbar)
-    // แล้ว frame ต่อไปแค่ setString/setFillColor/setPosition แทนสร้างใหม่
-    struct HotbarSlotCache {
-        sf::RectangleShape slotBg{ {32.f, 32.f} };
-        std::optional<sf::Text> numTxt;       // เลขช่อง 1-9 (ไม่เปลี่ยน เซ็ตครั้งแรกพอ)
-        std::optional<sf::Sprite> icon;       // ไอคอนสกิล
-        sf::RectangleShape cooldownOverlay{ {32.f, 32.f} };
-        std::optional<sf::Text> cooldownTxt;  // เลข cooldown เหลือ (เปลี่ยนบ่อย → setString)
-        sf::RectangleShape activeGlow{ {32.f, 32.f} };
-        std::optional<sf::Text> nameTxt;      // ชื่อสกิลย่อ (เปลี่ยนเมื่อสลับสกิลใน hotbar)
-        std::string lastSkillId;              // ใช้เช็คว่าต้อง rebuild icon/nameTxt ไหม
-    };
-    std::vector<HotbarSlotCache> m_hotbarCache;  // size = 9, lazy-built ใน renderHotbar()
+    // ── Hotbar bar เดิมถูกถอดออกแล้ว (เปลี่ยนเป็นระบบเลือกสกิลแบบ DCSS: Shift+Q + F) ──
 
     // ── Status effect icon cache (passive / buff / debuff แถบล่างขวา) ──
     struct StatusIconCache {

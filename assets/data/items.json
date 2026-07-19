@@ -433,7 +433,7 @@
         "def": 0,
         "dodge": 2
       },
-      "skills": ["stone_throw", "iron_skin"]
+      "skills": ["stone_throw", "iron_skin", "jump"]
     }
   ]
 }

@@ -26,7 +26,7 @@ Player::Player(int startCol, int startRow, int tileSize)
             inst.data     = sd;
             inst.fromCore = false;
             m_skills.push_back(inst);
-            m_hotbar[sd.hotbarSlot] = sd.id;
+            //m_hotbar[sd.hotbarSlot] = sd.id;
         }
     }
 }
