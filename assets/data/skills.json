@@ -49,8 +49,8 @@
       "aoe_radius": 2,
       "damage_pct": 140,
       "knockback_tiles": 2,
-      "mana_cost": 15,
-      "stamina_cost": 10,
+      "mana_cost": 1,
+      "stamina_cost": 1,
       "apply_status": "stun",
       "status_power": 0,
       "status_duration": 3
@@ -222,7 +222,7 @@
         "scaling_stat": "matk",
         "apply_status": "slow",
         "status_power": 3,
-        "status_duration": 4
+        "status_duration": 100
       }
     },
    {

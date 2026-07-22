@@ -2890,6 +2890,13 @@ void Game::processTurn()
 void Game::processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
                              const std::vector<std::pair<int,int>>& partyBlockedTiles)
 {
+    // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง tick/advance ──
+    // (ย้ายมาเช็คก่อน tickStatusEffects เพื่อให้ duration ของ status
+    //  (Slow/Bleed/Poison ฯลฯ) นับตาม "เทิร์นของมอนเอง" ไม่ใช่นับทุกเทิร์นผู้เล่น
+    //  เดิม tick ทุกเทิร์นผู้เล่นทำให้ status หมดอายุก่อนมอนจะได้ขยับจริงๆ)
+    if (e->getNextActTime() > playerTime)
+        return;
+
     // ── Tick status effects ──
     {
         int hpDelta = 0;
@@ -2916,10 +2923,6 @@ void Game::processEnemyTurn(Enemy* e, long long playerTime, int pc, int pr,
         e->tickSkills();
         return;
     }
-
-    // ── ยังไม่ถึงเวลา → รอ ไม่ต้อง advance ──
-    if (e->getNextActTime() > playerTime)
-        return;
 
     // ── ไม่เห็นและไม่ alerted → advance แล้วข้าม ──
     if (!m_fog.isVisible(e->getCol(), e->getRow()) && !e->isAlerted())

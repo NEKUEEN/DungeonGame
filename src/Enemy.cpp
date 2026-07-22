@@ -215,10 +215,6 @@ bool Enemy::updateAI(int pc, int pr,
     // Stun → skip turn
     if (hasStatus(StatusType::Stun)) return false;
 
-    // Slow → เพิ่ม nextActTime (ช้าลง 1.5x)
-    if (hasStatus(StatusType::Slow))
-        m_nextActTime += m_moveAut / 2;
-
     float dist = std::hypot((float)(pc - m_col), (float)(pr - m_row));
 
     // ── 1. Alert check: ต้องเห็นกันก่อน ──

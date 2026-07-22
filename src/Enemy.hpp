@@ -58,7 +58,12 @@ public:
 
     // ── Aut-based speed ──
     long long getNextActTime() const { return m_nextActTime; }
-    void advanceActTime()            { m_nextActTime += m_moveAut; }
+    void advanceActTime()
+    {
+        long long aut = m_moveAut;
+        if (hasStatus(StatusType::Slow)) aut += m_moveAut / 2;  // ช้าลง 1.5x ไม่ว่าจะตีหรือเดินไล่
+        m_nextActTime += aut;
+    }
     int  getMoveAut()          const { return m_moveAut; }
 
     void applyStatus(const StatusEffect& se);
